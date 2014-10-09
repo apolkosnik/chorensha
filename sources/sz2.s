@@ -14504,7 +14504,7 @@ L_00027918:
 
 L_00027964:
 	pea     $FF.w                                   ; $00027964 4878 00FF                ; 
-	jsr     L_0005B168                              ; $00027968 4EB9 0005 B168           ; 
+	jsr     INPOUT                              ; $00027968 4EB9 0005 B168           ; 
 
 	addq.w  #$4,A7                                  ; $0002796E 584F                     ; 
 
@@ -14585,7 +14585,7 @@ L_000279A4:
 
 L_000279F2:
 	pea     $FF.w                                   ; $000279F2 4878 00FF                ; 
-	jsr     L_0005B168                              ; $000279F6 4EB9 0005 B168           ; 
+	jsr     INPOUT                              ; $000279F6 4EB9 0005 B168           ; 
 
 	addq.w  #$4,A7                                  ; $000279FC 584F                     ; 
 
@@ -14701,7 +14701,7 @@ L_00027A74:
 
 L_00027AEC:
 	pea     $FF.w                                   ; $00027AEC 4878 00FF                ; 
-	jsr     L_0005B168                              ; $00027AF0 4EB9 0005 B168           ; 
+	jsr     INPOUT                              ; $00027AF0 4EB9 0005 B168           ; 
 
 	addq.w  #$4,A7                                  ; $00027AF6 584F                     ; 
 
@@ -90752,12 +90752,12 @@ L_0005AA24:
 	addq.l  #$4,A7                                  ; $0005AA5C 588F                     ; 
 
 	pea     L_0005AAA6                              ; $0005AA5E 4879 0005 AAA6           ; 
-	move.w  #$FFF1,-(A7)                            ; $0005AA64 3F3C FFF1                ; 
+	move.w  #$FFF1,-(A7)                            ; $0005AA64 3F3C FFF1                ; _CTRLVC
 	dc.w    $FF25                                   ; $0005AA68 FF25                     ; _INTVCS 
 	addq.l  #$6,A7                                  ; $0005AA6A 5C8F                     ; 
 
 	pea     L_0005AA9E                              ; $0005AA6C 4879 0005 AA9E           ; 
-	move.w  #$FFF2,-(A7)                            ; $0005AA72 3F3C FFF2                ; 
+	move.w  #$FFF2,-(A7)                            ; $0005AA72 3F3C FFF2                ; _ERRJVC
 	dc.w    $FF25                                   ; $0005AA76 FF25                     ; _INTVCS 
 	addq.l  #$6,A7                                  ; $0005AA78 5C8F                     ; 
 
@@ -91778,7 +91778,7 @@ L_0005B162:
 
 	rts                                             ; $0005B166 4E75                     ; 
 
-L_0005B168:
+INPOUT:
 	move.w  6(A7),-(A7)                             ; $0005B168 3F2F 0006                ; S($00027968) 
 	dc.w    $FF06                                   ; $0005B16C FF06                     ; _INPOUT 
 	addq.l  #$2,A7                                  ; $0005B16E 548F                     ; 

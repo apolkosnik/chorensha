@@ -111,6 +111,14 @@ line_f:
 	move	(a0),d0
 	addq.l	#2,22(sp)
 
+	cmp		#$ff36,d0 ; _DSKFRE
+	jne		.not_dskfre
+
+	move.l	#10000000,d0
+
+	jra		.exit
+
+.not_dskfre:
 	cmp		#$ff3d,d0 ; _OPEN
 	jne		.not_open
 
@@ -157,6 +165,29 @@ line_f:
 	bra		.exit
 
 .not_close:
+	cmp		#$ff40,d0 ; _WRITE
+	bne		.not_write
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move.l	26+LINE_F_OFFSET+2(sp),a0
+	move.l	26+LINE_F_OFFSET+6(sp),d1
+
+	cmp		#1,d0
+	bne		.exit
+
+	clr		d0
+	move.b	(a0),d0
+
+	move	d0,-(sp)
+	move	#2,-(sp)
+	trap	#1
+	addq	#4,sp
+
+	clr.l	d0
+
+	bra		.exit	
+
+.not_write:
 	cmp		#$ff4a,d0 ; _SETBLOCK
 	bne		.not_setblock
 
@@ -185,6 +216,56 @@ line_f:
 ; ------------------------------------------------------------------------------
 
 trap_f:
+	cmp		#$60,d0 ; _ADPCMOUT
+	jne		.no_adpcmout
+
+	movem.l	d0-d2/a0-a2,-(sp)
+
+;	WavePlay #0,#12571,(a1),d2
+;	movem.l	(sp)+,d0-d2/a0-a2
+;	rte
+
+;	move	#$200b,$ffff8932.w
+;	clr.b	$ffff8936.w
+
+	clr		$ffff8900.w
+
+	move.b	#$81,$ffff8921.w ; Mono & 12571 Hz.
+
+	move.l	a1,d0
+	move.b	d0,$ffff8907.w
+	lsr		#8,d0
+	move.b	d0,$ffff8905.w
+	swap	d0
+	move.b	d0,$ffff8903.w
+
+	move.l	a1,d0
+	add.l	d2,d0
+	move.b	d0,$ffff8913.w
+	lsr		#8,d0
+	move.b	d0,$ffff8911.w
+	swap	d0
+	move.b	d0,$ffff890f.w
+
+	move	#1,$ffff8900.w
+
+	movem.l	(sp)+,d0-d2/a0-a2
+
+	clr.l	d0
+
+	rte
+
+.no_adpcmout:
+	cmp		#$60,d0 ; _ONTIME
+	jne		.no_ontime
+
+	move.l	#100*100,d0
+	clr.l	d1
+
+	rte
+
+.no_ontime:
+
 	rte
 
 ; ------------------------------------------------------------------------------
