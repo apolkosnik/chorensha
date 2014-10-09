@@ -5,7 +5,7 @@ PutStr = -$3b4
 
 	text
 
-__start:
+start:
 	move.l	$4.w,a6
 	lea		dos_lib_name,a1
 	jsr		OldOpenLibrary(a6)

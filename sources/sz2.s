@@ -1,8 +1,6 @@
 
 	xdef _start
 
-	include defines.s
-
 	ifd __ATARI__
 
 	include sources/atari.s
@@ -14,6 +12,8 @@
 	include sources/amiga.s
 
 	endif
+
+	include defines.s
 
 	text
 
@@ -90533,23 +90533,11 @@ L_0005A7DA:
 ; ssp	システムのスタック "Stack of the system"
 
 _start:
-	ifd __ATARI__
-
-	jsr     __start
-
-	endif
-
-	ifd __AMIGA__
-
-	jsr     __start
-
-	endif
-
 	lea     NEW_STACK,A7                           ; $0005A82A 4FF9 000A B95A           ; 
 
 	move.l  A2,COMMANDLINE_ADDRESS                        ; $0005A830 23CA 000A B372           ; 
 	move.l  A3,ENVIRONMENT_ADDRESS                        ; $0005A836 23CB 000A B366           ; 
-	bsr.w   L_0005AAE6                              ; $0005A83C 6100 02A8                ; 
+	bsr.w   BUILD_PROGRAM_ARGUMENTS                              ; $0005A83C 6100 02A8                ; 
 
 	lea     256(A0),A5                              ; $0005A840 4BE8 0100                ; 
 	move.l  A5,LONG_000AB336                        ; $0005A844 23CD 000A B336           ; 
@@ -90774,8 +90762,8 @@ L_0005AA24:
 	addq.l  #$6,A7                                  ; $0005AA78 5C8F                     ; 
 
 	move.l  LONG_000AB36E,-(A7)                     ; $0005AA7A 2F39 000A B36E           ; 
-	move.l  LONG_000AB37A,-(A7)                     ; $0005AA80 2F39 000A B37A           ; 
-	move.l  LONG_000AB376,-(A7)                     ; $0005AA86 2F39 000A B376           ; 
+	move.l  ARGV,-(A7)                     ; $0005AA80 2F39 000A B37A           ; 
+	move.l  ARGC,-(A7)                     ; $0005AA86 2F39 000A B376           ; 
 	jsr     START_GAME                              ; $0005AA8C 4EB9 0002 69B4           ; 
 
 	lea     12(A7),A7                               ; $0005AA92 4FEF 000C                ; 
@@ -90820,11 +90808,11 @@ L_0005AAD6:
 	move.l  #$7F,-(A7)                              ; $0005AADA 2F3C 0000 007F           ; 
 	jsr     L_0005C6C2                              ; $0005AAE0 4EB9 0005 C6C2           ; 
 
-L_0005AAE6:
+BUILD_PROGRAM_ARGUMENTS:
 	movem.l A0-A2,-(A7)                             ; $0005AAE6 48E7 00E0                ; S($0005A83C) 
 
-	lea     BYTE_000AB502,A2                        ; $0005AAEA 45F9 000A B502           ; 
-	lea     LONG_000AB702,A1                        ; $0005AAF0 43F9 000A B702           ; 
+	lea     PROGRAM_ARGUMENTS_DATA,A2                        ; $0005AAEA 45F9 000A B502           ; 
+	lea     PROGRAM_ARGUMENTS_POINTER_TABLE,A1                        ; $0005AAF0 43F9 000A B702           ; 
 	move.l  A2,(A1)+                                ; $0005AAF6 22CA                     ; 
 
 	movem.l A0,-(A7)                                ; $0005AAF8 48E7 0080                ; 
@@ -90838,7 +90826,7 @@ L_0005AB00:
 	movea.l (A7)+,A0                                ; $0005AB04 205F                     ; 
 
 	tst.b   -(A2)                                   ; $0005AB06 4A22                     ; 
-	lea     196(A0),A0                              ; $0005AB08 41E8 00C4                ; 
+	lea     196(A0),A0                              ; $0005AB08 41E8 00C4                ; Program file name.
 
 L_0005AB0C:
 	move.b  (A0)+,(A2)+                             ; $0005AB0C 14D8                     ; 
@@ -90861,6 +90849,7 @@ L_0005AB1E:
 
 	addq.l  #$1,D0                                  ; $0005AB2E 5280                     ; 
 	move.l  A2,(A1)+                                ; $0005AB30 22CA                     ; 
+
 	cmp.b   #$27,D1                                 ; $0005AB32 B23C 0027                ; 
 	beq.s   L_0005AB4C                              ; $0005AB36 6714                     ; 
 
@@ -90959,10 +90948,11 @@ L_0005ABC6:
 
 L_0005ABCC:
 	move.b  D1,(A2)+                                ; $0005ABCC 14C1                     ; 
-	lea     LONG_000AB702,A0                        ; $0005ABCE 41F9 000A B702           ; 
+
+	lea     PROGRAM_ARGUMENTS_POINTER_TABLE,A0                        ; $0005ABCE 41F9 000A B702           ; 
 	addq.l  #$1,D0                                  ; $0005ABD4 5280                     ; 
-	move.l  D0,LONG_000AB376                        ; $0005ABD6 23C0 000A B376           ; 
-	move.l  A0,LONG_000AB37A                        ; $0005ABDC 23C8 000A B37A           ; 
+	move.l  D0,ARGC                        ; $0005ABD6 23C0 000A B376           ; 
+	move.l  A0,ARGV                        ; $0005ABDC 23C8 000A B37A           ; 
 
 	movem.l (A7)+,A0-A2                             ; $0005ABE2 4CDF 0700                ; 
 
@@ -93781,7 +93771,7 @@ L_0005BE82:
 	bmi.w   L_0005BF2A                              ; $0005BE86 6B00 00A2                ; 
 
 	move.l  D0,-(A7)                                ; $0005BE8A 2F00                     ; 
-	bsr.w   L_0005BF5E                              ; $0005BE8C 6100 00D0                ; 
+	bsr.w   FIOCTRL                              ; $0005BE8C 6100 00D0                ; 
 
 	bra.s   L_0005BEF6                              ; $0005BE90 6064                     ; 
 
@@ -93793,7 +93783,7 @@ L_0005BE96:
 
 L_0005BE98:
 	move.l  D0,-(A7)                                ; $0005BE98 2F00                     ; J($0005BE6E) 
-	bsr.w   L_0005BF5E                              ; $0005BE9A 6100 00C2                ; 
+	bsr.w   FIOCTRL                              ; $0005BE9A 6100 00C2                ; 
 
 	btst    #$7,D1                                  ; $0005BE9E 0801 0007                ; 
 	bne.s   L_0005BEF6                              ; $0005BEA2 6652                     ; 
@@ -93817,7 +93807,7 @@ L_0005BEB8:
 	bmi.s   L_0005BE4C                              ; $0005BEBA 6B90                     ; 
 
 	move.l  D0,-(A7)                                ; $0005BEBC 2F00                     ; 
-	bsr.w   L_0005BF5E                              ; $0005BEBE 6100 009E                ; 
+	bsr.w   FIOCTRL                              ; $0005BEBE 6100 009E                ; 
 
 	bra.s   L_0005BEF6                              ; $0005BEC2 6032                     ; 
 
@@ -93827,7 +93817,7 @@ L_0005BEC4:
 	bmi.s   L_0005BE4C                              ; $0005BEC6 6B84                     ; 
 
 	move.l  D0,-(A7)                                ; $0005BEC8 2F00                     ; 
-	bsr.w   L_0005BF5E                              ; $0005BECA 6100 0092                ; 
+	bsr.w   FIOCTRL                              ; $0005BECA 6100 0092                ; 
 
 	btst    #$7,D1                                  ; $0005BECE 0801 0007                ; 
 	bne.s   L_0005BEF6                              ; $0005BED2 6622                     ; 
@@ -93934,7 +93924,7 @@ FCLOSE:
 
 	rts                                             ; $0005BF5C 4E75                     ; 
 
-L_0005BF5E:
+FIOCTRL:
 	move.w  D0,-(A7)                                ; $0005BF5E 3F00                     ; S($0005BE9A) 
 	clr.w   -(A7)                                   ; $0005BF60 4267                     ; 
 	dc.w    $FF44                                   ; $0005BF62 FF44                     ; _IOCTRL 
@@ -101543,10 +101533,10 @@ LONG_000AB36E:
 COMMANDLINE_ADDRESS:
 	ds.b    $4
 
-LONG_000AB376:
+ARGC:
 	ds.b    $4
 
-LONG_000AB37A:
+ARGV:
 	ds.b    $4
 
 BYTE_000AB37E:
@@ -101555,10 +101545,10 @@ BYTE_000AB37E:
 LONG_000AB4FE:
 	ds.b    $4
 
-BYTE_000AB502:
+PROGRAM_ARGUMENTS_DATA:
 	ds.b    $200
 
-LONG_000AB702:
+PROGRAM_ARGUMENTS_POINTER_TABLE:
 	ds.b    $258
 NEW_STACK:
 
