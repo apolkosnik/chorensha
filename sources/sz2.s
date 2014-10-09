@@ -1,8 +1,19 @@
-; ./vasmm68k_mot sz2_vasm.s -Felf -nosym -no-opt -m68000 -rangewarnings -o sz2_vasm.elf && human68k-gcc -nostartfiles sz2_vasm.elf -o sz2_vasm.o && human68k-objcopy -O xfile sz2_vasm.o sz2_vasm.X && cp sz2_vasm.X CH68_101_B/SZ2.X && xxd sz2_vasm.X > sz2_vasm.hex
 
 	xdef _start
 
 	include defines.s
+
+	ifd __ATARI__
+
+	include sources/atari.s
+
+	endif
+
+	ifd __AMIGA__
+
+	include sources/amiga.s
+
+	endif
 
 	text
 
@@ -90522,6 +90533,18 @@ L_0005A7DA:
 ; ssp	システムのスタック "Stack of the system"
 
 _start:
+	ifd __ATARI__
+
+	jsr     __start
+
+	endif
+
+	ifd __AMIGA__
+
+	jsr     __start
+
+	endif
+
 	lea     NEW_STACK,A7                           ; $0005A82A 4FF9 000A B95A           ; 
 
 	move.l  A2,COMMANDLINE_ADDRESS                        ; $0005A830 23CA 000A B372           ; 
