@@ -7241,7 +7241,7 @@ L_000236CA:
 
 	pea     $3E8.w                                  ; $000236E0 4878 03E8                ; 
 	move.l  D0,-(A7)                                ; $000236E4 2F00                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $000236E6 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $000236E6 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $000236EC 504F                     ; 
 
@@ -11566,7 +11566,7 @@ L_00025F40:
 	and.w   #%0000000000111111,D7                   ; $00025F4A CE7C 003F                ; 
 
 	lea     WORD_00087C5A,A3                        ; $00025F4E 47F9 0008 7C5A           ; 
-	lea     CONVERT_PARAMETER_TO_TEXT,A4                           ; $00025F54 49F9 0005 9D20           ; 
+	lea     DIVIDE_INTEGER_VALUE,A4                           ; $00025F54 49F9 0005 9D20           ; 
 	movea.w (A3),A1                                 ; $00025F5A 3253                     ; 
 	move.l  A1,-(A7)                                ; $00025F5C 2F09                     ; 
 	movea.w D4,A1                                   ; $00025F5E 3244                     ; 
@@ -12853,7 +12853,7 @@ GAME_MAIN:
 
 	pea     $A.w                                    ; $00026A60 4878 000A                ; 
 	move.l  D0,-(A7)                                ; $00026A64 2F00                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $00026A66 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $00026A66 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00026A6C 504F                     ; 
 
@@ -12889,6 +12889,7 @@ L_00026A98:
 	jsr     PRINTF                              ; $00026AAE 4EB9 0005 9F16           ; 
 
 	move.w  #$1,DEBUG_MODE                       ; $00026AB4 33FC 0001 0008 DAFE      ; 
+
 	addq.w  #$4,A7                                  ; $00026ABC 584F                     ; 
 
 	bra.s   L_00026AC6                              ; $00026ABE 6006                     ; 
@@ -14296,6 +14297,22 @@ L_000277D4:
 	rts                                             ; $000277DA 4E75                     ; 
 
 CALCULATE_CPU_POWER:
+	ifd __ATARI__
+
+	move.l	#1000,d0
+
+	rts
+
+	endif
+
+	ifd __AMIGA__
+
+	move.l	#1000,d0
+
+	rts
+
+	endif
+
 	jsr     CPU_INTEGER_BENCHMARK                              ; $000277DC 4EB9 0002 2CC0           ; S($00026A5A) 
 
 	move.l  D0,-(A7)                                ; $000277E2 2F00                     ; 
@@ -16925,6 +16942,25 @@ INITIALIZE_GAME:
 
 	addq.w  #$4,A7                                  ; $00029220 584F                     ; 
 
+	ifd __ATARI__
+
+	movem.l	a0-a2,-(sp)
+
+	lea		sincos_tables_start,a0
+	lea		SIN_COS_TABLES_START,a1
+	lea		sincos_tables_end,a2
+
+.copy:
+	move.l	(a0)+,(a1)+
+	cmp.l	a2,a0
+	blt		.copy
+
+	movem.l	(sp)+,a0-a2
+
+	jra		skip_sincos
+
+	endif
+
 L_00029222:
 	move.l  A5,-(A7)                                ; $00029222 2F0D                     ; 
 	jsr     L_0005AD48                              ; $00029224 4EB9 0005 AD48           ; 
@@ -17113,6 +17149,7 @@ L_00029392:
 	cmpa.l  #$FF,A5                                 ; $000293FE BBFC 0000 00FF           ; 
 	ble.w   L_00029222                              ; $00029404 6F00 FE1C                ; 
 
+skip_sincos:
 	pea     $10.w                                   ; $00029408 4878 0010                ; 
 	bsr.w   L_000294A6                              ; $0002940C 6100 0098                ; 
 
@@ -18137,16 +18174,15 @@ L_00029CEC:
 	rts                                             ; $00029CF4 4E75                     ; 
 
 L_00029CF6:
-	dc.b    $72                                    ; r ; 0x00029CF6
-	dc.b    $74                                    ; t ; 0x00029CF7
-	dc.b    $00                                    ;  ; 0x00029CF8
+	dc.b    'rt',0
 
 L_00029CF9:
 	dc.b    'ETC_DAT\STATUS.CNF',0
 
 L_00029D0C:
 	dc.b    ' OBJ %4 = %4 %4 %.',0
-	dc.b    $00                                    ;  ; 0x00029D1F
+
+	even
 
 L_00029D20:
 	link    A6,#-268                                ; $00029D20 4E56 FEF4                ; S($00028FFE) 
@@ -30783,7 +30819,7 @@ L_00032FF6:
 	movea.w 100(A5),A1                              ; $00033010 326D 0064                ; 
 	move.l  A1,-(A7)                                ; $00033014 2F09                     ; 
 	pea     $100.w                                  ; $00033016 4878 0100                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0003301A 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0003301A 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00033020 504F                     ; 
 	move.w  D0,D5                                   ; $00033022 3A00                     ; 
@@ -30970,7 +31006,7 @@ L_000331C4:
 	move.l  A1,-(A7)                                ; $0003320C 2F09                     ; 
 	asl.l   #$8,D0                                  ; $0003320E E180                     ; 
 	move.l  D0,-(A7)                                ; $00033210 2F00                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $00033212 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $00033212 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00033218 504F                     ; 
 	addq.w  #$2,D0                                  ; $0003321A 5440                     ; 
@@ -31923,7 +31959,7 @@ L_00033B5A:
 	movea.w (A5),A2                                 ; $00033BB0 3455                     ; 
 	move.l  A2,-(A7)                                ; $00033BB2 2F0A                     ; 
 	move.l  D0,-(A7)                                ; $00033BB4 2F00                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $00033BB6 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $00033BB6 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00033BBC 504F                     ; 
 	move.w  D0,(A4)                                 ; $00033BBE 3880                     ; 
@@ -38939,7 +38975,7 @@ L_000384B6:
 	movea.w D0,A0                                   ; $00038588 3040                     ; 
 	pea     1(A0)                                   ; $0003858A 4868 0001                ; 
 	pea     $30.w                                   ; $0003858E 4878 0030                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $00038592 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $00038592 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00038598 504F                     ; 
 	add.w   #$60,D0                                 ; $0003859A D07C 0060                ; 
@@ -43087,7 +43123,7 @@ L_0003B1A6:
 	movea.w D0,A0                                   ; $0003B22E 3040                     ; 
 	pea     1(A0)                                   ; $0003B230 4868 0001                ; 
 	pea     $C.w                                    ; $0003B234 4878 000C                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0003B238 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0003B238 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0003B23E 504F                     ; 
 	add.w   #$1C,D0                                 ; $0003B240 D07C 001C                ; 
@@ -45360,7 +45396,7 @@ L_0003C8C2:
 	movea.w D0,A0                                   ; $0003C948 3040                     ; 
 	pea     1(A0)                                   ; $0003C94A 4868 0001                ; 
 	pea     $60.w                                   ; $0003C94E 4878 0060                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0003C952 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0003C952 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0003C958 504F                     ; 
 	add.w   #$20,D0                                 ; $0003C95A D07C 0020                ; 
@@ -45726,7 +45762,7 @@ L_0003CCAC:
 	movea.w D0,A0                                   ; $0003CD32 3040                     ; 
 	pea     1(A0)                                   ; $0003CD34 4868 0001                ; 
 	pea     $60.w                                   ; $0003CD38 4878 0060                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0003CD3C 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0003CD3C 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0003CD42 504F                     ; 
 	add.w   #$20,D0                                 ; $0003CD44 D07C 0020                ; 
@@ -52545,7 +52581,7 @@ L_00041748:
 	pea     $3.w                                    ; $00041770 4878 0003                ; 
 	add.l   D0,D0                                   ; $00041774 D080                     ; 
 	move.l  D0,-(A7)                                ; $00041776 2F00                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $00041778 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $00041778 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004177E 504F                     ; 
 	move.w  D0,(A3)                                 ; $00041780 3680                     ; 
@@ -57736,7 +57772,7 @@ L_00044E1C:
 	movea.w D0,A0                                   ; $00044EC6 3040                     ; 
 	pea     1(A0)                                   ; $00044EC8 4868 0001                ; 
 	pea     $60.w                                   ; $00044ECC 4878 0060                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $00044ED0 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $00044ED0 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00044ED6 504F                     ; 
 	add.w   #$30,D0                                 ; $00044ED8 D07C 0030                ; 
@@ -58514,7 +58550,7 @@ L_0004564A:
 	movea.w D0,A0                                   ; $000456F4 3040                     ; 
 	pea     1(A0)                                   ; $000456F6 4868 0001                ; 
 	pea     $60.w                                   ; $000456FA 4878 0060                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $000456FE 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $000456FE 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $00045704 504F                     ; 
 	add.w   #$30,D0                                 ; $00045706 D07C 0030                ; 
@@ -61408,7 +61444,7 @@ L_0004752E:
 	movea.w (A1),A0                                 ; $000475BA 3051                     ; 
 	pea     $3.w                                    ; $000475BC 4878 0003                ; 
 	move.l  A0,-(A7)                                ; $000475C0 2F08                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $000475C2 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $000475C2 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $000475C8 504F                     ; 
 	move.w  D0,(A3)                                 ; $000475CA 3680                     ; 
@@ -67228,7 +67264,7 @@ L_0004B41E:
 	movea.w D0,A0                                   ; $0004B4A0 3040                     ; 
 	pea     1(A0)                                   ; $0004B4A2 4868 0001                ; 
 	pea     $10.w                                   ; $0004B4A6 4878 0010                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004B4AA 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004B4AA 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004B4B0 504F                     ; 
 	add.w   #$20,D0                                 ; $0004B4B2 D07C 0020                ; 
@@ -67540,7 +67576,7 @@ L_0004B774:
 	movea.w (A1),A0                                 ; $0004B7F6 3051                     ; 
 	pea     $3.w                                    ; $0004B7F8 4878 0003                ; 
 	move.l  A0,-(A7)                                ; $0004B7FC 2F08                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004B7FE 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004B7FE 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004B804 504F                     ; 
 	move.w  D0,(A3)                                 ; $0004B806 3680                     ; 
@@ -71499,7 +71535,7 @@ L_0004E1E6:
 	movea.w D0,A0                                   ; $0004E290 3040                     ; 
 	pea     1(A0)                                   ; $0004E292 4868 0001                ; 
 	pea     $20.w                                   ; $0004E296 4878 0020                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004E29A 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004E29A 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004E2A0 504F                     ; 
 	add.w   #$50,D0                                 ; $0004E2A2 D07C 0050                ; 
@@ -72057,7 +72093,7 @@ L_0004E828:
 	movea.w D0,A0                                   ; $0004E8AE 3040                     ; 
 	pea     1(A0)                                   ; $0004E8B0 4868 0001                ; 
 	pea     $8.w                                    ; $0004E8B4 4878 0008                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004E8B8 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004E8B8 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004E8BE 504F                     ; 
 	add.w   #$12,D0                                 ; $0004E8C0 D07C 0012                ; 
@@ -72959,7 +72995,7 @@ L_0004F23C:
 	movea.w D0,A0                                   ; $0004F25C 3040                     ; 
 	pea     1(A0)                                   ; $0004F25E 4868 0001                ; 
 	pea     $40.w                                   ; $0004F262 4878 0040                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004F266 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004F266 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004F26C 504F                     ; 
 	add.w   #$40,D0                                 ; $0004F26E D07C 0040                ; 
@@ -73585,7 +73621,7 @@ L_0004F8D2:
 	movea.w 94(A4),A0                               ; $0004F8EA 306C 005E                ; 
 	pea     $3.w                                    ; $0004F8EE 4878 0003                ; 
 	move.l  A0,-(A7)                                ; $0004F8F2 2F08                     ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004F8F4 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004F8F4 4EB9 0005 9D20           ; 
 
 	move.w  D0,(A3)                                 ; $0004F8FA 3680                     ; 
 
@@ -73666,7 +73702,7 @@ L_0004F932:
 	movea.w D0,A0                                   ; $0004F9EC 3040                     ; 
 	pea     1(A0)                                   ; $0004F9EE 4868 0001                ; 
 	pea     $20.w                                   ; $0004F9F2 4878 0020                ; 
-	jsr     CONVERT_PARAMETER_TO_TEXT                              ; $0004F9F6 4EB9 0005 9D20           ; 
+	jsr     DIVIDE_INTEGER_VALUE                              ; $0004F9F6 4EB9 0005 9D20           ; 
 
 	addq.w  #$8,A7                                  ; $0004F9FC 504F                     ; 
 	add.w   #$120,D0                                ; $0004F9FE D07C 0120                ; 
@@ -73968,7 +74004,7 @@ L_0004FC9C:
 
 	movea.w #$E000,A0                               ; $0004FCBC 307C E000                ; 
 	suba.w  (A2),A0                                 ; $0004FCC0 90D2                     ; 
-	lea     CONVERT_PARAMETER_TO_TEXT,A3                           ; $0004FCC2 47F9 0005 9D20           ; 
+	lea     DIVIDE_INTEGER_VALUE,A3                           ; $0004FCC2 47F9 0005 9D20           ; 
 	pea     $C0.w                                   ; $0004FCC8 4878 00C0                ; 
 	move.l  A0,-(A7)                                ; $0004FCCC 2F08                     ; 
 	jsr     (A3)                                    ; $0004FCCE 4E93                     ; 
@@ -74004,7 +74040,7 @@ L_0004FCFE:
 
 	movea.w #$800,A0                                ; $0004FD10 307C 0800                ; 
 	suba.w  (A2),A0                                 ; $0004FD14 90D2                     ; 
-	lea     CONVERT_PARAMETER_TO_TEXT,A3                           ; $0004FD16 47F9 0005 9D20           ; 
+	lea     DIVIDE_INTEGER_VALUE,A3                           ; $0004FD16 47F9 0005 9D20           ; 
 	pea     $C0.w                                   ; $0004FD1C 4878 00C0                ; 
 	move.l  A0,-(A7)                                ; $0004FD20 2F08                     ; 
 	jsr     (A3)                                    ; $0004FD22 4E93                     ; 
@@ -74066,7 +74102,7 @@ L_0004FD92:
 
 	movea.w #$1000,A0                               ; $0004FDA4 307C 1000                ; 
 	suba.w  (A2),A0                                 ; $0004FDA8 90D2                     ; 
-	lea     CONVERT_PARAMETER_TO_TEXT,A3                           ; $0004FDAA 47F9 0005 9D20           ; 
+	lea     DIVIDE_INTEGER_VALUE,A3                           ; $0004FDAA 47F9 0005 9D20           ; 
 	pea     $C0.w                                   ; $0004FDB0 4878 00C0                ; 
 	move.l  A0,-(A7)                                ; $0004FDB4 2F08                     ; 
 	jsr     (A3)                                    ; $0004FDB6 4E93                     ; 
@@ -74102,7 +74138,7 @@ L_0004FDE6:
 
 	movea.w #$1C00,A0                               ; $0004FDF8 307C 1C00                ; 
 	suba.w  (A2),A0                                 ; $0004FDFC 90D2                     ; 
-	lea     CONVERT_PARAMETER_TO_TEXT,A3                           ; $0004FDFE 47F9 0005 9D20           ; 
+	lea     DIVIDE_INTEGER_VALUE,A3                           ; $0004FDFE 47F9 0005 9D20           ; 
 	pea     $C0.w                                   ; $0004FE04 4878 00C0                ; 
 	move.l  A0,-(A7)                                ; $0004FE08 2F08                     ; 
 	jsr     (A3)                                    ; $0004FE0A 4E93                     ; 
@@ -74136,7 +74172,7 @@ L_0004FE3A:
 	movea.l D2,A4                                   ; $0004FE4A 2842                     ; 
 	movea.w #$3000,A0                               ; $0004FE4C 307C 3000                ; 
 	suba.w  (A2),A0                                 ; $0004FE50 90D2                     ; 
-	lea     CONVERT_PARAMETER_TO_TEXT,A3                           ; $0004FE52 47F9 0005 9D20           ; 
+	lea     DIVIDE_INTEGER_VALUE,A3                           ; $0004FE52 47F9 0005 9D20           ; 
 	pea     $C0.w                                   ; $0004FE58 4878 00C0                ; 
 	move.l  A0,-(A7)                                ; $0004FE5C 2F08                     ; 
 	jsr     (A3)                                    ; $0004FE5E 4E93                     ; 
@@ -88815,7 +88851,7 @@ L_00059D12:
 
 	rts                                             ; $00059D1E 4E75                     ; 
 
-CONVERT_PARAMETER_TO_TEXT:
+DIVIDE_INTEGER_VALUE:
 	move.l  4(A7),D1                                ; $00059D20 222F 0004                ; S($000236E6) 
 	move.l  D1,D0                                   ; $00059D24 2001                     ; 
 	swap    D0                                      ; $00059D26 4840                     ; 
@@ -89236,6 +89272,18 @@ BYTE_00059E10:
 	dc.b    $04                                    ;  ; 0x00059F15
 
 PRINTF:
+	ifd __ATARI__
+
+	rts
+
+	endif
+
+	ifd __AMIGA__
+
+	rts
+
+	endif
+
 	pea     8(A7)                                   ; $00059F16 486F 0008                ; S($00023722) 
 	move.l  8(A7),-(A7)                             ; $00059F1A 2F2F 0008                ; 
 	pea     BYTE_000AAF3A                           ; $00059F1E 4879 000A AF3A           ; 
@@ -94948,13 +94996,12 @@ L_0005C682:
 	rts                                             ; $0005C684 4E75                     ; 
 
 L_0005C686:
-	dc.b    $54                                    ; T ; 0x0005C686
-	dc.b    $5A                                    ; Z ; 0x0005C687
-	dc.b    $00                                    ;  ; 0x0005C688
+	dc.b	'TZ',0
 
 L_0005C689:
-	dc.b    'JST-9',0;	dc.b    $4A,$53,$54,$2D,$39,$00 ; 0x0005C689
-	dc.b    $00                                    ;  ; 0x0005C68F
+	dc.b    'JST-9',0
+
+	even
 
 L_0005C690:
 	movem.l D1,-(A7)                                ; $0005C690 48E7 4000                ; S($0005AA44) 

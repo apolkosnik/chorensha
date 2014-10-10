@@ -2,6 +2,8 @@ LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
 
 	text
 
+; ------------------------------------------------------------------------------
+
 start:
 	jsr		init
 
@@ -111,6 +113,51 @@ line_f:
 	move	(a0),d0
 	addq.l	#2,22(sp)
 
+	cmp		#$fe0d,d0 ; __SRAND
+	jne		.not__srand
+
+	clr.l	d0
+
+	jra		.exit
+
+.not__srand:
+	cmp		#$ff06,d0 ; _INPOUT
+	jne		.not_inpout
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_inpout:
+	cmp		#$ff20,d0 ; _SUPER
+	jne		.not_super
+
+	move.l	26+LINE_F_OFFSET+0(sp),a0
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_super:
+	cmp		#$ff23,d0 ; _CONCTRL
+	jne		.not_conctrl
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_conctrl:
+	cmp		#$ff25,d0 ; _INTVCS
+	jne		.not_intvcs
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move	26+LINE_F_OFFSET+4(sp),a0
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_intvcs:
 	cmp		#$ff36,d0 ; _DSKFRE
 	jne		.not_dskfre
 
@@ -153,7 +200,7 @@ line_f:
 
 .not_read:
 	cmp		#$ff3e,d0 ; _CLOSE
-	bne		.not_close
+	jne		.not_close
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 
@@ -162,18 +209,18 @@ line_f:
 	trap	#1
 	addq	#4,sp
 
-	bra		.exit
+	jra		.exit
 
 .not_close:
 	cmp		#$ff40,d0 ; _WRITE
-	bne		.not_write
+	jne		.not_write
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move.l	26+LINE_F_OFFSET+2(sp),a0
 	move.l	26+LINE_F_OFFSET+6(sp),d1
 
 	cmp		#1,d0
-	bne		.exit
+	jne		.exit
 
 	clr		d0
 	move.b	(a0),d0
@@ -185,27 +232,37 @@ line_f:
 
 	clr.l	d0
 
-	bra		.exit	
+	jra		.exit	
 
 .not_write:
+	cmp		#$ff44,d0 ; _IOCTRL
+	jne		.not_ioctrl
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_ioctrl:
 	cmp		#$ff4a,d0 ; _SETBLOCK
-	bne		.not_setblock
+	jne		.not_setblock
 
 	move.l	26+LINE_F_OFFSET+4(sp),d0
 
 	cmp.l	#$ffffff,d0
-	beq		.1
+	jeq		.1
 
 	clr.l	d0
 
-	bra		.exit
+	jra		.exit
 
 .1:
 	move.l	#$81200000,d0
 
-	bra		.exit
+	jra		.exit
 
 .not_setblock:
+	illegal
+
 	clr.l	d0
 
 .exit:
@@ -216,7 +273,39 @@ line_f:
 ; ------------------------------------------------------------------------------
 
 trap_f:
-	cmp		#$60,d0 ; _ADPCMOUT
+	cmp.b	#$20,d0 ; _B_PUTC
+	jne		.no_b_putc
+
+	clr.l	d0
+
+	rte
+
+.no_b_putc:
+	cmp.b	#$22,d0 ; _B_COLOR
+	jne		.no_b_color
+
+	clr.l	d0
+
+	rte
+
+.no_b_color:
+	cmp.b	#$23,d0 ; _B_LOCATE
+	jne		.no_b_locate
+
+	clr.l	d0
+
+	rte
+
+.no_b_locate:
+	cmp.b	#$3b,d0 ; _JOYGET
+	jne		.no_joyget
+
+	move	#-1,d0
+
+	rte
+
+.no_joyget:
+	cmp.b	#$60,d0 ; _ADPCMOUT
 	jne		.no_adpcmout
 
 	movem.l	d0-d2/a0-a2,-(sp)
@@ -256,7 +345,13 @@ trap_f:
 	rte
 
 .no_adpcmout:
-	cmp		#$60,d0 ; _ONTIME
+	cmp.b	#$7d,d0 ; _SKEY_MOD
+	jne		.no_skey_mod
+
+	rte
+
+.no_skey_mod:
+	cmp.b	#$7f,d0 ; _ONTIME
 	jne		.no_ontime
 
 	move.l	#100*100,d0
@@ -265,8 +360,27 @@ trap_f:
 	rte
 
 .no_ontime:
+	cmp.b	#$81,d0 ; _B_SUPER
+	jne		.no_b_super
+
+	move.l	#-1,d0
 
 	rte
+
+.no_b_super:
+	cmp.b	#$ae,d0 ; _OS_CURON
+	jne		.no_os_curon
+
+	rte
+
+.no_os_curon:
+	cmp.b	#$af,d0 ; _OS_CUROFF
+	jne		.no_os_curoff
+
+	rte
+
+.no_os_curoff:
+	illegal
 
 ; ------------------------------------------------------------------------------
 
@@ -286,6 +400,10 @@ string:
 	dc.b	'hallo!',10,13,0
 
 	even
+
+sincos_tables_start:
+	incbin	"sincos.dat"
+sincos_tables_end:
 
 	bss
 
