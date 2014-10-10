@@ -7,6 +7,9 @@ LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
 start:
 	jsr		init
 
+	move.l	#dummy_interrupt_handler,L_00000118
+	move.l	#dummy_interrupt_handler,L_00000138
+
 ; a0	メモリ管理ポインタのアドレス "Address of a pointer to memory management"
 ; a1	プログラムの終わり+1 のアドレス "+1 Address of the end of the program"
 ; a2	コマンドラインのアドレス "Address of the command line"
@@ -36,6 +39,11 @@ start:
 
 	clr		-(sp)
 	trap	#1
+
+; ------------------------------------------------------------------------------
+
+dummy_interrupt_handler:
+	rte
 
 ; ------------------------------------------------------------------------------
 
@@ -71,6 +79,8 @@ init:
 	move.b	$fffffa15.w,old_fa15
 
 	move.l	$2c.w,old_line_f
+	move.l	$88.w,old_trap_2
+	move.l	$90.w,old_trap_4
 	move.l	$bc.w,old_trap_f
 	move.l	$70.w,old_vbl
 	move.l	$118.w,old_keyboard
@@ -93,6 +103,8 @@ init:
 	clr.b	$fffffa15.w
 
 	move.l	#line_f,$2c.w
+	move.l	#trap_2,$88.w
+	move.l	#trap_4,$90.w
 	move.l	#trap_f,$bc.w
 	move.l	#vbl,$70.w
 	move.l	#keyboard,$118.w
@@ -113,6 +125,22 @@ line_f:
 	move	(a0),d0
 	addq.l	#2,22(sp)
 
+	cmp		#$fe00,d0 ; __LMUL
+	jne		.not__lmul
+
+	muls.l	d1,d0
+
+	jra		.exit
+
+.not__lmul:
+	cmp		#$fe01,d0 ; __LDIV
+	jne		.not__ldiv
+
+	divs.l	d1,d0
+
+	jra		.exit
+
+.not__ldiv:
 	cmp		#$fe0d,d0 ; __SRAND
 	jne		.not__srand
 
@@ -180,6 +208,20 @@ line_f:
 	move.l	26+LINE_F_OFFSET+0(sp),a0
 	move	26+LINE_F_OFFSET+4(sp),d0
 
+	movem.l	d0/a0,-(sp)
+
+	pea		(a0)
+	move	#9,-(sp)
+	trap	#1
+	addq	#6,sp
+
+	pea		.new_line
+	move	#9,-(sp)
+	trap	#1
+	addq	#6,sp
+
+	movem.l	(sp)+,d0/a0
+
 	move	d0,-(sp)
 	pea		(a0)
 	move	#61,-(sp)
@@ -187,6 +229,9 @@ line_f:
 	addq	#8,sp
 
 	jra		.exit
+
+.new_line:
+	dc.b	10,13,0,0
 
 .not_open:
 	cmp		#$ff3f,d0 ; _READ
@@ -299,7 +344,45 @@ line_f:
 
 ; ------------------------------------------------------------------------------
 
+trap_2:
+	add		#$0f0,$ffff8240.w
+
+	rte
+
+; ------------------------------------------------------------------------------
+
+trap_4:
+	add		#$00f,$ffff8240.w
+
+	rte
+
+; ------------------------------------------------------------------------------
+
 trap_f:
+	cmp.b	#$4,d0 ; _BITSNS
+	jne		.no_bitsns
+
+	clr.l	d0
+
+	rte
+
+.no_bitsns:
+	cmp.b	#$10,d0 ; _CRTMOD
+	jne		.no_crtmod
+
+	clr.l	d0
+
+	rte
+
+.no_crtmod:
+	cmp.b	#$14,d0 ; _TPALET2
+	jne		.no_tpalet2
+
+	clr.l	d0
+
+	rte
+
+.no_tpalet2:
 	cmp.b	#$20,d0 ; _B_PUTC
 	jne		.no_b_putc
 
@@ -372,6 +455,22 @@ trap_f:
 	rte
 
 .no_adpcmout:
+	cmp.b	#$66,d0 ; _ADPCMSNS
+	jne		.no_adpcmsns
+
+	clr.l	d0
+
+	rte
+
+.no_adpcmsns:
+	cmp.b	#$67,d0 ; _ADPCMMOD
+	jne		.no_adpcmmod
+
+	clr.l	d0
+
+	rte
+
+.no_adpcmmod:
 	cmp.b	#$7d,d0 ; _SKEY_MOD
 	jne		.no_skey_mod
 
@@ -395,6 +494,24 @@ trap_f:
 	rte
 
 .no_b_super:
+	cmp.b	#$87,d0 ; _B_WPOKE
+	jne		.no_b_wpoke
+
+	rte
+
+.no_b_wpoke:
+	cmp.b	#$90,d0 ; _G_CLR_ON
+	jne		.no_g_clr_on
+
+	rte
+
+.no_g_clr_on:
+	cmp.b	#$92,d0 ; (未公開)	プライオリティ設定
+	jne		.no_prio_set
+
+	rte
+
+.no_prio_set:
 	cmp.b	#$ae,d0 ; _OS_CURON
 	jne		.no_os_curon
 
@@ -407,12 +524,64 @@ trap_f:
 	rte
 
 .no_os_curoff:
+	cmp.b	#$b2,d0 ; _VPAGE
+	jne		.no_vpage
+
+	clr.l	d0
+
+	rte
+
+.no_vpage:
+	cmp.b	#$b3,d0 ; _HOME
+	jne		.no_home
+
+	clr.l	d0
+
+	rte
+
+.no_home:
+	cmp.b	#$c1,d0 ; _SP_ON
+	jne		.no_sp_on
+
+	rte
+
+.no_sp_on:
+	cmp.b	#$c2,d0 ; _SP_OFF
+	jne		.no_sp_off
+
+	rte
+
+.no_sp_off:
+	cmp.b	#$ca,d0 ; _BGCTRLST
+	jne		.no_bgctrlst
+
+	rte
+
+.no_bgctrlst:
+	cmp.b	#$ce,d0 ; _BGTEXTGT
+	jne		.no_bgtextgt
+
+	clr.l	d0
+
+	rte
+
+.no_bgtextgt:
+	cmp.b	#$cf,d0 ; _SPALET
+	jne		.no_spalet
+
+	clr.l	d0
+
+	rte
+
+.no_spalet:
 	illegal
 
 ; ------------------------------------------------------------------------------
 
 vbl:
-	rte
+	move.l	L_00000118,-(sp)
+
+	rts
 
 ; ------------------------------------------------------------------------------
 
@@ -442,6 +611,10 @@ old_videl:
 	ds.l	11
 
 old_line_f:
+	ds.l	1
+old_trap_2:
+	ds.l	1
+old_trap_4:
 	ds.l	1
 old_trap_f:
 	ds.l	1

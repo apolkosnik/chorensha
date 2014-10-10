@@ -4718,6 +4718,18 @@ L_000226F0:
 
 	ori     #%0000011100000000,sr                   ; $000226FA 007C 0700                ; 
 
+	ifd __ATARI__
+
+	jra		skip_raster_sync1
+
+	endif
+
+	ifd __AMIGA__
+
+	jra		skip_raster_sync1
+
+	endif
+
 	moveq   #6,D0                                   ; $000226FE 7006                     ; 
 
 L_00022700:
@@ -4730,6 +4742,7 @@ L_0002270A:
 
 	dbf     D0,L_00022700                           ; $00022714 51C8 FFEA                ; 
 
+skip_raster_sync1:
 	move    (A7)+,sr                                ; $00022718 46DF                     ; 
 
 	move.w  (A0),L_00EB0000+$80A                    ; $0002271A 33D0 00EB 080A           ; [SPRITE REGISTERS + $80A]  
@@ -5648,6 +5661,18 @@ L_00022C92:
 	moveq   #-127,D0                                ; $00022C94 7081                     ; 
 	trap    #$F                                     ; $00022C96 4E4F                     ; _B_SUPER 
 
+	ifd __ATARI__
+
+	jra		skip_raster_sync2
+
+	endif
+
+	ifd __AMIGA__
+
+	jra		skip_raster_sync2
+
+	endif
+
 	move.w  6(A7),D1                                ; $00022C98 322F 0006                ; 
 
 L_00022C9C:
@@ -5660,6 +5685,7 @@ L_00022CA6:
 
 	dbf     D1,L_00022C9C                           ; $00022CB0 51C9 FFEA                ; 
 
+skip_raster_sync2:
 	tst.l   D0                                      ; $00022CB4 4A80                     ; 
 	bmi.s   L_00022CBE                              ; $00022CB6 6B06                     ; 
 
@@ -13441,7 +13467,7 @@ L_0002704A:
 
 	pea     $0.w                                    ; $00027064 4878 0000                ; 
 	move.l  #L_00E82000+$200,-(A7)                  ; $00027068 2F3C 00E8 2200           ; [VIDEO CONTROLLER + $200]  
-	jsr     L_0005AD3A                              ; $0002706E 4EB9 0005 AD3A           ; 
+	jsr     B_WPOKE                              ; $0002706E 4EB9 0005 AD3A           ; 
 
 	lea     PLAYER_SCORE,A0                        ; $00027074 41F9 0008 DB52           ; 
 	lea     LONG_0008DB18,A1                        ; $0002707A 43F9 0008 DB18           ; 
@@ -13465,6 +13491,7 @@ L_0002704A:
 	move.w  D0,D6                                   ; $000270AA 3C00                     ; 
 	move.w  D4,D3                                   ; $000270AC 3604                     ; 
 	move.w  D3,D5                                   ; $000270AE 3A03                     ; 
+
 	addq.w  #$4,A7                                  ; $000270B0 584F                     ; 
 
 L_000270B2:
@@ -14394,6 +14421,8 @@ L_00027890:
 
 L_00027893:
 	dc.b    'ETC_DAT\RANDOM.TBL',0
+
+	even
 
 L_000278A6:
 	pea     L_00027890(pc)                          ; $000278A6 487A FFE8                ; S($00029422) 
@@ -91251,7 +91280,7 @@ L_0005AD20:
 
 	rts                                             ; $0005AD38 4E75                     ; 
 
-L_0005AD3A:
+B_WPOKE:
 	movea.l 4(A7),A1                                ; $0005AD3A 226F 0004                ; S($0002706E) 
 	move.l  8(A7),D1                                ; $0005AD3E 222F 0008                ; 
 	moveq   #-121,D0                                ; $0005AD42 7087                     ; 
