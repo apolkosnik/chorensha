@@ -1,3 +1,5 @@
+; iconv -c -f SHIFT-JIS -t UTF-8 programmers.man > programmers.man.txt
+
 LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
 
 	text
@@ -208,6 +210,8 @@ line_f:
 	move.l	26+LINE_F_OFFSET+0(sp),a0
 	move	26+LINE_F_OFFSET+4(sp),d0
 
+	rem
+
 	movem.l	d0/a0,-(sp)
 
 	pea		(a0)
@@ -221,6 +225,8 @@ line_f:
 	addq	#6,sp
 
 	movem.l	(sp)+,d0/a0
+
+	erem
 
 	move	d0,-(sp)
 	pea		(a0)
@@ -579,9 +585,84 @@ trap_f:
 ; ------------------------------------------------------------------------------
 
 vbl:
+	movem.l	d0-a6,-(sp)
+
+	lea		screen_address,a0
+	clr.b	(a0)
+	move.b	$ffff8201.w,1(a0)
+	move.b	$ffff8203.w,2(a0)
+	move.b	$ffff820d.w,3(a0)
+
+	move.l	(a0),a0
+
+	lea		L_00EB0000,a1
+
+	move	#128-1,d7
+
+.sprite_loop:
+	move	(a1)+,d0
+	move	(a1)+,d1
+	move	(a1)+,d2
+	move	(a1)+,d3
+
+	jeq		.skip_sprite
+
+	cmp		#320-16,d0
+	jge		.skip_sprite
+
+	cmp		#200-16,d1
+	jge		.skip_sprite
+
+	move	d0,d2
+	and		#$f,d2
+	move.l	#%00000011110000000000000000000000,d3
+	move.l	#%00111111111111000000000000000000,d4
+	lsr.l	d2,d3
+	lsr.l	d2,d4
+
+	and		#$fff0,d0
+	lsr		#1,d0
+	lea		(a0,d0.w),a2
+	mulu	#160,d1
+	add.l	d1,a2
+
+	clr		160*0(a2)
+	clr		160*0+8(a2)
+
+	clr		160*7(a2)
+	clr		160*7+8(a2)
+
+	move	d3,160*1+8(a2)
+	move	d3,160*2+8(a2)
+	move	d3,160*5+8(a2)
+	move	d3,160*6+8(a2)
+
+	swap	d3
+
+	move	d3,160*1(a2)
+	move	d3,160*2(a2)
+	move	d3,160*5(a2)
+	move	d3,160*6(a2)
+
+	move	d4,160*3+8(a2)
+	move	d4,160*4+8(a2)
+
+	swap	d4
+
+	move	d4,160*3(a2)
+	move	d4,160*4(a2)
+
+.skip_sprite:
+	dbf		d7,.sprite_loop
+
+	movem.l	(sp)+,d0-a6
+
 	move.l	L_00000118,-(sp)
 
 	rts
+
+screen_address:
+	dc.l	0
 
 ; ------------------------------------------------------------------------------
 
