@@ -166,6 +166,14 @@ line_f:
 	jra		.exit
 
 .not_dskfre:
+	cmp		#$ff37,d0 ; _NAMECK
+	jne		.not_nameck
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_nameck:
 	cmp		#$ff3d,d0 ; _OPEN
 	jne		.not_open
 
@@ -215,6 +223,8 @@ line_f:
 	cmp		#$ff40,d0 ; _WRITE
 	jne		.not_write
 
+	illegal
+
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move.l	26+LINE_F_OFFSET+2(sp),a0
 	move.l	26+LINE_F_OFFSET+6(sp),d1
@@ -235,6 +245,23 @@ line_f:
 	jra		.exit	
 
 .not_write:
+	cmp		#$ff42,d0 ; _SEEK
+	jne		.not_seek
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move.l	26+LINE_F_OFFSET+2(sp),a0
+	move	26+LINE_F_OFFSET+6(sp),d1
+
+	move	d1,-(sp)
+	move	d0,-(sp)
+	move.l	a0,-(sp)
+	move	#66,-(sp)
+	trap	#1
+	lea		10(sp),sp
+
+	jra		.exit	
+
+.not_seek:
 	cmp		#$ff44,d0 ; _IOCTRL
 	jne		.not_ioctrl
 
