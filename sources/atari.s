@@ -1,4 +1,5 @@
 ; iconv -c -f SHIFT-JIS -t UTF-8 programmers.man > programmers.man.txt
+; sox -t vox -r 15600 out.pcm -t wav -c 2 -r 25033 out2.wav
 
 LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
 
@@ -657,6 +658,8 @@ vbl:
 
 	movem.l	(sp)+,d0-a6
 
+	addq	#1,vbl_wait_counter
+
 	move.l	L_00000118,-(sp)
 
 	rts
@@ -677,6 +680,9 @@ string:
 	dc.b	'hallo!',10,13,0
 
 	even
+
+vbl_wait_counter:
+	dc		0
 
 sincos_tables_start:
 	incbin	"sincos.dat"

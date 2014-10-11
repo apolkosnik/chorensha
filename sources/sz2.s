@@ -5656,18 +5656,28 @@ L_00022C84:
 LONG_00022C8E:
 	dc.l    $00000000                              ; ; 0x00022C8E
 
-L_00022C92:
+WAIT_VBL:
 	suba.l  A1,A1                                   ; $00022C92 93C9                     ; S($00024E7C) 
 	moveq   #-127,D0                                ; $00022C94 7081                     ; 
 	trap    #$F                                     ; $00022C96 4E4F                     ; _B_SUPER 
 
 	ifd __ATARI__
 
+	clr		vbl_wait_counter
+	move.w  6(sp),d1
+
+.vbl_wait_loop:
+	cmp		vbl_wait_counter,d1
+	
+	jge		.vbl_wait_loop
+
 	jra		skip_raster_sync2
 
 	endif
 
 	ifd __AMIGA__
+
+	illegal
 
 	jra		skip_raster_sync2
 
@@ -7819,7 +7829,7 @@ L_00023C24:
 	bne.s   L_00023C24                              ; $00023C32 66F0                     ; 
 
 	pea     $1.w                                    ; $00023C34 4878 0001                ; 
-	jsr     L_00022C92                              ; $00023C38 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00023C38 4EB9 0002 2C92           ; 
 
 	jsr     L_000225E2                              ; $00023C3E 4EB9 0002 25E2           ; 
 
@@ -8982,7 +8992,7 @@ L_000247DA:
 
 L_000247E2:
 	pea     $0.w                                    ; $000247E2 4878 0000                ; 
-	jsr     L_00022C92                              ; $000247E6 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $000247E6 4EB9 0002 2C92           ; 
 
 	move.w  D5,D3                                   ; $000247EC 3605                     ; 
 	pea     $1.w                                    ; $000247EE 4878 0001                ; 
@@ -9773,7 +9783,7 @@ L_00024DDC:
 
 L_00024E78:
 	pea     $0.w                                    ; $00024E78 4878 0000                ; 
-	jsr     L_00022C92                              ; $00024E7C 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00024E7C 4EB9 0002 2C92           ; 
 
 	move.w  D7,D6                                   ; $00024E82 3C07                     ; 
 
@@ -9907,7 +9917,7 @@ L_00024F62:
 
 L_00024F88:
 	pea     $0.w                                    ; $00024F88 4878 0000                ; 
-	jsr     L_00022C92                              ; $00024F8C 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00024F8C 4EB9 0002 2C92           ; 
 
 	pea     $1.w                                    ; $00024F92 4878 0001                ; 
 	jsr     READ_JOYSTICK_BUTTONS                              ; $00024F96 4EB9 0005 A5D4           ; 
@@ -9927,7 +9937,7 @@ L_00024F88:
 L_00024FB2:
 	moveq   #-1,D5                                  ; $00024FB2 7AFF                     ; 
 	pea     $0.w                                    ; $00024FB4 4878 0000                ; 
-	jsr     L_00022C92                              ; $00024FB8 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00024FB8 4EB9 0002 2C92           ; 
 
 	addq.w  #$4,A7                                  ; $00024FBE 584F                     ; 
 
@@ -10280,7 +10290,7 @@ L_0002534A:
 	jsr     (A3)                                    ; $0002537C 4E93                     ; 
 
 	pea     $0.w                                    ; $0002537E 4878 0000                ; 
-	jsr     L_00022C92                              ; $00025382 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00025382 4EB9 0002 2C92           ; 
 
 	move.w  D6,D4                                   ; $00025388 3806                     ; 
 
@@ -10950,7 +10960,7 @@ KAKUSI_MODE_LOOP:
 	jsr     (A3)                                    ; $000259EE 4E93                     ; 
 
 	pea     $0.w                                    ; $000259F0 4878 0000                ; 
-	jsr     L_00022C92                              ; $000259F4 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $000259F4 4EB9 0002 2C92           ; 
 
 	move.w  D6,D4                                   ; $000259FA 3806                     ; 
 
@@ -11942,7 +11952,7 @@ L_000262AE:
 	movem.l D3-D7,-(A7)                             ; $000262B2 48E7 1F00                ; 
 
 	clr.w   D1                                      ; $000262B6 4241                     ; 
-	lea     WORD_00087C6C,A0                        ; $000262B8 41F9 0008 7C6C           ; 
+	lea     PCM_SAMPLE_INFO_TABLE,A0                        ; $000262B8 41F9 0008 7C6C           ; 
 
 L_000262BE:
 	move.w  D1,D0                                   ; $000262BE 3001                     ; 
@@ -11963,7 +11973,7 @@ L_000262BE:
 	addq.w  #$8,A7                                  ; $000262E6 504F                     ; 
 	move.l  A6,D5                                   ; $000262E8 2A0E                     ; 
 	add.l   #$FFFFFF00,D5                           ; $000262EA DABC FFFF FF00           ; 
-	move.l  #WORD_00087C6C,D6                       ; $000262F0 2C3C 0008 7C6C           ; 
+	move.l  #PCM_SAMPLE_INFO_TABLE,D6                       ; $000262F0 2C3C 0008 7C6C           ; 
 
 	bra.w   L_000263F6                              ; $000262F6 6000 00FE                ; 
 
@@ -12142,7 +12152,7 @@ L_00026490:
 	lea     WORD_0005D9AC,A1                        ; $00026490 43F9 0005 D9AC           ; 
 	move.w  (A1),D0                                 ; $00026496 3011                     ; 
 	ext.l   D0                                      ; $00026498 48C0                     ; 
-	lea     WORD_00087C6C,A0                        ; $0002649A 41F9 0008 7C6C           ; 
+	lea     PCM_SAMPLE_INFO_TABLE,A0                        ; $0002649A 41F9 0008 7C6C           ; 
 	asl.l   #$4,D0                                  ; $000264A0 E980                     ; 
 	move.w  D2,D1                                   ; $000264A2 3202                     ; 
 	ext.l   D1                                      ; $000264A4 48C1                     ; 
@@ -12220,7 +12230,7 @@ L_0002653E:
 	move.w  D3,D0                                   ; $00026546 3003                     ; 
 	ext.l   D0                                      ; $00026548 48C0                     ; 
 	asl.l   #$4,D0                                  ; $0002654A E980                     ; 
-	lea     WORD_00087C6C,A3                        ; $0002654C 47F9 0008 7C6C           ; 
+	lea     PCM_SAMPLE_INFO_TABLE,A3                        ; $0002654C 47F9 0008 7C6C           ; 
 	adda.l  D0,A3                                   ; $00026552 D7C0                     ; 
 	move.w  10(A3),WORD_0005D9AE                    ; $00026554 33EB 000A 0005 D9AE      ; 
 
@@ -13151,7 +13161,7 @@ L_00026D08:
 	lea     32(A7),A7                               ; $00026D50 4FEF 0020                ; 
 
 	pea     $2.w                                    ; $00026D54 4878 0002                ; 
-	jsr     L_00022C92                              ; $00026D58 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00026D58 4EB9 0002 2C92           ; 
 
 	pea     $3.w                                    ; $00026D5E 4878 0003                ; 
 	jsr     (A3)                                    ; $00026D62 4E93                     ; 
@@ -13233,7 +13243,7 @@ L_00026E1A:
 	bne.s   L_00026EA8                              ; $00026E2A 667C                     ; 
 
 	pea     $1.w                                    ; $00026E2C 4878 0001                ; 
-	jsr     L_00022C92                              ; $00026E30 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00026E30 4EB9 0002 2C92           ; 
 
 	pea     PAUSE_TEXT(pc)                          ; $00026E36 487A FDE8                ; 
 	pea     $10.w                                   ; $00026E3A 4878 0010                ; 
@@ -13249,7 +13259,7 @@ L_00026E4C:
 	bne.s   L_00026E4C                              ; $00026E56 66F4                     ; 
 
 	pea     $1.w                                    ; $00026E58 4878 0001                ; 
-	jsr     L_00022C92                              ; $00026E5C 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00026E5C 4EB9 0002 2C92           ; 
 
 	addq.w  #$4,A7                                  ; $00026E62 584F                     ; 
 
@@ -13260,7 +13270,7 @@ L_00026E64:
 	beq.s   L_00026E64                              ; $00026E6E 67F4                     ; 
 
 	pea     $1.w                                    ; $00026E70 4878 0001                ; 
-	jsr     L_00022C92                              ; $00026E74 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00026E74 4EB9 0002 2C92           ; 
 
 	addq.w  #$4,A7                                  ; $00026E7A 584F                     ; 
 
@@ -13271,7 +13281,7 @@ L_00026E7C:
 	bne.s   L_00026E7C                              ; $00026E86 66F4                     ; 
 
 	pea     $1.w                                    ; $00026E88 4878 0001                ; 
-	jsr     L_00022C92                              ; $00026E8C 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $00026E8C 4EB9 0002 2C92           ; 
 
 	pea     PAUSE_ERASE_TEXT(pc)                          ; $00026E92 487A FD92                ; 
 	pea     $10.w                                   ; $00026E96 4878 0010                ; 
@@ -13496,7 +13506,7 @@ L_0002704A:
 
 L_000270B2:
 	pea     $0.w                                    ; $000270B2 4878 0000                ; 
-	jsr     L_00022C92                              ; $000270B6 4EB9 0002 2C92           ; 
+	jsr     WAIT_VBL                              ; $000270B6 4EB9 0002 2C92           ; 
 
 	addq.w  #$4,A7                                  ; $000270BC 584F                     ; 
 
@@ -100952,7 +100962,7 @@ LONG_00087C64:
 LONG_00087C68:
 	ds.b    $4
 
-WORD_00087C6C:
+PCM_SAMPLE_INFO_TABLE:
 	ds.b    $A
 
 WORD_00087C76:
