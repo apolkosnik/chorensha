@@ -8,6 +8,15 @@ LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
 ; ------------------------------------------------------------------------------
 
 start:
+	pea		welcome_text
+	move	#9,-(sp)
+	trap	#1
+	addq	#6,sp
+
+	move	#1,-(sp)
+	trap	#1
+	addq	#2,sp
+
 	jsr		init
 
 	move.l	#dummy_interrupt_handler,L_00000118
@@ -29,16 +38,6 @@ start:
 	lea		_start,a4
 
 	jmp		_start
-
-
-	pea		string
-	move	#9,-(sp)
-	trap	#1
-	addq	#6,sp
-
-	move	#1,-(sp)
-	trap	#1
-	addq	#2,sp
 
 	clr		-(sp)
 	trap	#1
@@ -125,26 +124,30 @@ line_f:
 	movem.l	d1-d2/a0-a2,-(sp)
 
 	move.l	22(sp),a0
-	move	(a0),d0
+	move	(a0),d1
 	addq.l	#2,22(sp)
 
-	cmp		#$fe00,d0 ; __LMUL
+	cmp		#$fe00,d1 ; __LMUL
 	jne		.not__lmul
+
+	move.l	(sp),d1
 
 	muls.l	d1,d0
 
 	jra		.exit
 
 .not__lmul:
-	cmp		#$fe01,d0 ; __LDIV
+	cmp		#$fe01,d1 ; __LDIV
 	jne		.not__ldiv
+
+	move.l	(sp),d1
 
 	divs.l	d1,d0
 
 	jra		.exit
 
 .not__ldiv:
-	cmp		#$fe0d,d0 ; __SRAND
+	cmp		#$fe0d,d1 ; __SRAND
 	jne		.not__srand
 
 	clr.l	d0
@@ -152,7 +155,7 @@ line_f:
 	jra		.exit
 
 .not__srand:
-	cmp		#$ff06,d0 ; _INPOUT
+	cmp		#$ff06,d1 ; _INPOUT
 	jne		.not_inpout
 
 	clr.l	d0
@@ -160,7 +163,7 @@ line_f:
 	jra		.exit
 
 .not_inpout:
-	cmp		#$ff20,d0 ; _SUPER
+	cmp		#$ff20,d1 ; _SUPER
 	jne		.not_super
 
 	move.l	26+LINE_F_OFFSET+0(sp),a0
@@ -170,7 +173,7 @@ line_f:
 	jra		.exit
 
 .not_super:
-	cmp		#$ff23,d0 ; _CONCTRL
+	cmp		#$ff23,d1 ; _CONCTRL
 	jne		.not_conctrl
 
 	clr.l	d0
@@ -178,7 +181,7 @@ line_f:
 	jra		.exit
 
 .not_conctrl:
-	cmp		#$ff25,d0 ; _INTVCS
+	cmp		#$ff25,d1 ; _INTVCS
 	jne		.not_intvcs
 
 	move	26+LINE_F_OFFSET+0(sp),d0
@@ -189,7 +192,7 @@ line_f:
 	jra		.exit
 
 .not_intvcs:
-	cmp		#$ff36,d0 ; _DSKFRE
+	cmp		#$ff36,d1 ; _DSKFRE
 	jne		.not_dskfre
 
 	move.l	#10000000,d0
@@ -197,7 +200,7 @@ line_f:
 	jra		.exit
 
 .not_dskfre:
-	cmp		#$ff37,d0 ; _NAMECK
+	cmp		#$ff37,d1 ; _NAMECK
 	jne		.not_nameck
 
 	clr.l	d0
@@ -205,7 +208,7 @@ line_f:
 	jra		.exit
 
 .not_nameck:
-	cmp		#$ff3d,d0 ; _OPEN
+	cmp		#$ff3d,d1 ; _OPEN
 	jne		.not_open
 
 	move.l	26+LINE_F_OFFSET+0(sp),a0
@@ -241,7 +244,7 @@ line_f:
 	dc.b	10,13,0,0
 
 .not_open:
-	cmp		#$ff3f,d0 ; _READ
+	cmp		#$ff3f,d1 ; _READ
 	jne		.not_read
 
 	move	26+LINE_F_OFFSET+0(sp),d0
@@ -259,7 +262,7 @@ line_f:
 	jra		.exit
 
 .not_read:
-	cmp		#$ff3e,d0 ; _CLOSE
+	cmp		#$ff3e,d1 ; _CLOSE
 	jne		.not_close
 
 	move	26+LINE_F_OFFSET+0(sp),d0
@@ -272,7 +275,7 @@ line_f:
 	jra		.exit
 
 .not_close:
-	cmp		#$ff40,d0 ; _WRITE
+	cmp		#$ff40,d1 ; _WRITE
 	jne		.not_write
 
 	illegal
@@ -297,7 +300,7 @@ line_f:
 	jra		.exit	
 
 .not_write:
-	cmp		#$ff42,d0 ; _SEEK
+	cmp		#$ff42,d1 ; _SEEK
 	jne		.not_seek
 
 	move	26+LINE_F_OFFSET+0(sp),d0
@@ -314,7 +317,7 @@ line_f:
 	jra		.exit	
 
 .not_seek:
-	cmp		#$ff44,d0 ; _IOCTRL
+	cmp		#$ff44,d1 ; _IOCTRL
 	jne		.not_ioctrl
 
 	clr.l	d0
@@ -322,7 +325,7 @@ line_f:
 	jra		.exit
 
 .not_ioctrl:
-	cmp		#$ff4a,d0 ; _SETBLOCK
+	cmp		#$ff4a,d1 ; _SETBLOCK
 	jne		.not_setblock
 
 	move.l	26+LINE_F_OFFSET+4(sp),d0
@@ -676,17 +679,18 @@ keyboard:
 
 	data
 
-string:
-	dc.b	'hallo!',10,13,0
+welcome_text:
+	dc.b	'ChoRenSha 68k',10,13
+	dc.b	'-------------',10,13
+	dc.b	10,13
+	dc.b	'Atari Falcon 030 port by Sascha Springer',10,13
+	dc.b	10,13
+	dc.b	'Press a key to start...',10,13,0
 
 	even
 
 vbl_wait_counter:
 	dc		0
-
-sincos_tables_start:
-	incbin	"sincos.dat"
-sincos_tables_end:
 
 	bss
 

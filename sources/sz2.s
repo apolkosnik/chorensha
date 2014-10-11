@@ -16983,6 +16983,14 @@ INITIALIZE_GAME:
 
 	ifd __ATARI__
 
+	data
+
+sincos_tables_start:
+	incbin	"sincos.dat"
+sincos_tables_end:
+
+	text
+
 	movem.l	a0-a2,-(sp)
 
 	lea		sincos_tables_start,a0
@@ -16997,6 +17005,12 @@ INITIALIZE_GAME:
 	movem.l	(sp)+,a0-a2
 
 	jra		skip_sincos
+
+	endif
+
+	ifd __AMIGA__
+
+	illegal
 
 	endif
 
