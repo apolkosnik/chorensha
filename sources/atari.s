@@ -1,3 +1,5 @@
+; sudo chmod a+rw /dev/ttyUSB0
+; ~/Work/MonoSerialDisk/MonoSerialDisk/bin/Release/MonoSerialDisk.exe --port=/dev/ttyUSB0 --disk-size=128 --verbosity=2 ~/Work/ChoRenSha/binaries/atari/
 ; iconv -c -f SHIFT-JIS -t UTF-8 programmers.man > programmers.man.txt
 ; sox -t vox -r 15600 out.pcm -t wav -c 2 -r 25033 out2.wav
 
@@ -599,6 +601,35 @@ vbl:
 
 	move.l	(a0),a0
 
+	moveq	#0,d0
+	move	#240-1,d7
+
+.clear_screen_loop:
+	move	d0,8*00(a0)
+	move	d0,8*01(a0)
+	move	d0,8*02(a0)
+	move	d0,8*03(a0)
+	move	d0,8*04(a0)
+	move	d0,8*05(a0)
+	move	d0,8*06(a0)
+	move	d0,8*07(a0)
+	move	d0,8*08(a0)
+	move	d0,8*09(a0)
+	move	d0,8*10(a0)
+	move	d0,8*11(a0)
+	move	d0,8*12(a0)
+	move	d0,8*13(a0)
+	move	d0,8*14(a0)
+	move	d0,8*15(a0)
+	move	d0,8*16(a0)
+	move	d0,8*17(a0)
+	move	d0,8*18(a0)
+	move	d0,8*19(a0)
+
+	add.l	#160,a0
+	dbf		d7,.clear_screen_loop
+
+	move.l	screen_address,a0
 	lea		L_00EB0000,a1
 
 	move	#128-1,d7
@@ -614,13 +645,13 @@ vbl:
 	cmp		#320-16,d0
 	jge		.skip_sprite
 
-	cmp		#200-16,d1
+	cmp		#240-16,d1
 	jge		.skip_sprite
 
 	move	d0,d2
 	and		#$f,d2
-	move.l	#%00000011110000000000000000000000,d3
-	move.l	#%00111111111111000000000000000000,d4
+	move.l	#%01111111111111100000000000000000,d3
+	move.l	#%01000000000000100000000000000000,d4
 	lsr.l	d2,d3
 	lsr.l	d2,d4
 
@@ -630,31 +661,47 @@ vbl:
 	mulu	#160,d1
 	add.l	d1,a2
 
-	clr		160*0(a2)
-	clr		160*0+8(a2)
+;	clr		160*0(a2)
+;	clr		160*0+8(a2)
 
-	clr		160*7(a2)
-	clr		160*7+8(a2)
+;	clr		160*15(a2)
+;	clr		160*15+8(a2)
 
-	move	d3,160*1+8(a2)
-	move	d3,160*2+8(a2)
-	move	d3,160*5+8(a2)
-	move	d3,160*6+8(a2)
+	or		d3,160*1+8(a2)
+	or		d3,160*14+8(a2)
 
 	swap	d3
 
-	move	d3,160*1(a2)
-	move	d3,160*2(a2)
-	move	d3,160*5(a2)
-	move	d3,160*6(a2)
+	or		d3,160*1(a2)
+	or		d3,160*14(a2)
 
-	move	d4,160*3+8(a2)
-	move	d4,160*4+8(a2)
+	or		d4,160*2+8(a2)
+	or		d4,160*3+8(a2)
+	or		d4,160*4+8(a2)
+	or		d4,160*5+8(a2)
+	or		d4,160*6+8(a2)
+	or		d4,160*7+8(a2)
+	or		d4,160*8+8(a2)
+	or		d4,160*9+8(a2)
+	or		d4,160*10+8(a2)
+	or		d4,160*11+8(a2)
+	or		d4,160*12+8(a2)
+	or		d4,160*13+8(a2)
 
 	swap	d4
 
-	move	d4,160*3(a2)
-	move	d4,160*4(a2)
+	or		d4,160*2(a2)
+	or		d4,160*3(a2)
+	or		d4,160*4(a2)
+	or		d4,160*5(a2)
+	or		d4,160*6(a2)
+	or		d4,160*7(a2)
+	or		d4,160*8(a2)
+	or		d4,160*9(a2)
+	or		d4,160*10(a2)
+	or		d4,160*11(a2)
+	or		d4,160*12(a2)
+	or		d4,160*13(a2)
 
 .skip_sprite:
 	dbf		d7,.sprite_loop

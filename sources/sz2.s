@@ -12911,6 +12911,18 @@ GAME_MAIN:
 L_00026A90:
 	move.w  #$2,CURRENT_XSP_MODE                       ; $00026A90 33FC 0002 0008 DB10      ; 
 
+	ifd __ATARI__
+
+	move	#1,CURRENT_XSP_MODE
+
+	endif
+
+	ifd __AMIGA__
+
+	move	#1,CURRENT_XSP_MODE
+
+	endif
+
 L_00026A98:
 	pea     $1.w                                    ; $00026A98 4878 0001                ; J($00026A8E) 
 	jsr     READ_JOYSTICK_BUTTONS                              ; $00026A9C 4EB9 0005 A5D4           ; 
