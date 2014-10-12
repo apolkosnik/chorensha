@@ -7590,19 +7590,19 @@ L_000239BC:
 	rts                                             ; $000239C4 4E75                     ; 
 
 RESET_DEMO_REPLAY:
-	clr.w   WORD_00066C3E                           ; $000239C6 4279 0006 6C3E           ; S($00026CC2) 
-	clr.w   WORD_00066C3C                           ; $000239CC 4279 0006 6C3C           ; 
+	clr.w   DEMO_REPLAY_JOYSTICK_DIRECTION                           ; $000239C6 4279 0006 6C3E           ; S($00026CC2) 
+	clr.w   DEMO_REPLAY_DIRECTION_REPEAT_COUNTER                           ; $000239CC 4279 0006 6C3C           ; 
 	move.l  #DEMO_REPLAY_DATA,CURRENT_DEMO_REPLAY_POINTER               ; $000239D2 23FC 0006 6C42 0005 D36E ; 
 	move.w  #$FFFF,WORD_00066C40                    ; $000239DC 33FC FFFF 0006 6C40      ; 
 
 	rts                                             ; $000239E4 4E75                     ; 
 
-L_000239E6:
+DEMO_REPLAY_OR_RECORD:
 	tst.w   6(A7)                                   ; $000239E6 4A6F 0006                ; S($0002A942) 
 	bne.w   L_00023AA0                              ; $000239EA 6600 00B4                ; 
 
 	pea     $1.w                                    ; $000239EE 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $000239F2 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $000239F2 4EB9 0005 A592           ; 
 
 	move.w  D0,D1                                   ; $000239F8 3200                     ; 
 
@@ -7613,7 +7613,7 @@ L_000239E6:
 
 	move.w  D1,D0                                   ; $00023A04 3001                     ; 
 	ext.l   D0                                      ; $00023A06 48C0                     ; 
-	lea     WORD_0005D37E,A0                        ; $00023A08 41F9 0005 D37E           ; 
+	lea     JOYSTICK_TO_REPLAY_DATA_TABLE,A0                        ; $00023A08 41F9 0005 D37E           ; 
 	add.l   D0,D0                                   ; $00023A0E D080                     ; 
 	move.w  0(A0,D0.l),D1                           ; $00023A10 3230 0800                ; 
 
@@ -7622,59 +7622,59 @@ L_00023A14:
 	tst.w   (A0)                                    ; $00023A1A 4A50                     ; 
 	beq.s   L_00023A2E                              ; $00023A1C 6710                     ; 
 
-	move.w  D1,WORD_00066C3E                        ; $00023A1E 33C1 0006 6C3E           ; 
+	move.w  D1,DEMO_REPLAY_JOYSTICK_DIRECTION                        ; $00023A1E 33C1 0006 6C3E           ; 
 	clr.w   (A0)                                    ; $00023A24 4250                     ; 
-	move.w  #$FFFF,WORD_00066C3C                    ; $00023A26 33FC FFFF 0006 6C3C      ; 
+	move.w  #$FFFF,DEMO_REPLAY_DIRECTION_REPEAT_COUNTER                    ; $00023A26 33FC FFFF 0006 6C3C      ; 
 
 L_00023A2E:
-	cmp.w   WORD_00066C3E,D1                        ; $00023A2E B279 0006 6C3E           ; 
+	cmp.w   DEMO_REPLAY_JOYSTICK_DIRECTION,D1                        ; $00023A2E B279 0006 6C3E           ; 
 	bne.s   L_00023A62                              ; $00023A34 662C                     ; 
 
-	cmpi.w  #$F,WORD_00066C3C                       ; $00023A36 0C79 000F 0006 6C3C      ; 
+	cmpi.w  #$F,DEMO_REPLAY_DIRECTION_REPEAT_COUNTER                       ; $00023A36 0C79 000F 0006 6C3C      ; 
 	bne.s   L_00023A5A                              ; $00023A3E 661A                     ; 
 
 	lea     CURRENT_DEMO_REPLAY_POINTER,A0                        ; $00023A40 41F9 0005 D36E           ; 
 	move.l  (A0),D2                                 ; $00023A46 2410                     ; 
-	cmp.l   LONG_0005D376,D2                        ; $00023A48 B4B9 0005 D376           ; 
+	cmp.l   CURRENT_DEMO_REPLAY_END_POINTER,D2                        ; $00023A48 B4B9 0005 D376           ; 
 	bcc.s   L_00023A52                              ; $00023A4E 6402                     ; 
 
 	addq.l  #$1,(A0)                                ; $00023A50 5290                     ; 
 
 L_00023A52:
-	clr.w   WORD_00066C3C                           ; $00023A52 4279 0006 6C3C           ; 
+	clr.w   DEMO_REPLAY_DIRECTION_REPEAT_COUNTER                           ; $00023A52 4279 0006 6C3C           ; 
 
 	bra.s   L_00023A80                              ; $00023A58 6026                     ; 
 
 L_00023A5A:
-	addq.w  #$1,WORD_00066C3C                       ; $00023A5A 5279 0006 6C3C           ; 
+	addq.w  #$1,DEMO_REPLAY_DIRECTION_REPEAT_COUNTER                       ; $00023A5A 5279 0006 6C3C           ; 
 
 	bra.s   L_00023A80                              ; $00023A60 601E                     ; 
 
 L_00023A62:
 	lea     CURRENT_DEMO_REPLAY_POINTER,A0                        ; $00023A62 41F9 0005 D36E           ; 
 	move.l  (A0),D2                                 ; $00023A68 2410                     ; 
-	cmp.l   LONG_0005D376,D2                        ; $00023A6A B4B9 0005 D376           ; 
+	cmp.l   CURRENT_DEMO_REPLAY_END_POINTER,D2                        ; $00023A6A B4B9 0005 D376           ; 
 	bcc.s   L_00023A74                              ; $00023A70 6402                     ; 
 
 	addq.l  #$1,(A0)                                ; $00023A72 5290                     ; 
 
 L_00023A74:
-	clr.w   WORD_00066C3C                           ; $00023A74 4279 0006 6C3C           ; 
-	move.w  D1,WORD_00066C3E                        ; $00023A7A 33C1 0006 6C3E           ; 
+	clr.w   DEMO_REPLAY_DIRECTION_REPEAT_COUNTER                           ; $00023A74 4279 0006 6C3C           ; 
+	move.w  D1,DEMO_REPLAY_JOYSTICK_DIRECTION                        ; $00023A7A 33C1 0006 6C3E           ; 
 
 L_00023A80:
 	lea     CURRENT_DEMO_REPLAY_POINTER,A0                        ; $00023A80 41F9 0005 D36E           ; J($00023A58) J($00023A60) 
 	movea.l (A0),A1                                 ; $00023A86 2250                     ; 
-	move.b  BYTE_00066C3F,D0                        ; $00023A88 1039 0006 6C3F           ; 
+	move.b  DEMO_REPLAY_JOYSTICK_DIRECTION+1,D0                        ; $00023A88 1039 0006 6C3F           ; 
 	asl.b   #$4,D0                                  ; $00023A8E E900                     ; 
-	add.b   BYTE_00066C3D,D0                        ; $00023A90 D039 0006 6C3D           ; 
+	add.b   DEMO_REPLAY_DIRECTION_REPEAT_COUNTER+1,D0                        ; $00023A90 D039 0006 6C3D           ; 
 	move.b  D0,(A1)                                 ; $00023A96 1280                     ; 
 	move.l  (A0),LONG_0005D372                      ; $00023A98 23D0 0005 D372           ; 
 
 	bra.s   L_00023AD8                              ; $00023A9E 6038                     ; 
 
 L_00023AA0:
-	lea     WORD_00066C3C,A1                        ; $00023AA0 43F9 0006 6C3C           ; 
+	lea     DEMO_REPLAY_DIRECTION_REPEAT_COUNTER,A1                        ; $00023AA0 43F9 0006 6C3C           ; 
 	subq.w  #$1,(A1)                                ; $00023AA6 5351                     ; 
 	bpl.s   L_00023AD2                              ; $00023AA8 6A28                     ; 
 
@@ -7683,19 +7683,19 @@ L_00023AA0:
 	move.b  (A0),D0                                 ; $00023AB2 1010                     ; 
 	asr.b   #$4,D0                                  ; $00023AB4 E800                     ; 
 	and.w   #%0000000000001111,D0                   ; $00023AB6 C07C 000F                ; 
-	move.w  D0,WORD_00066C3E                        ; $00023ABA 33C0 0006 6C3E           ; 
+	move.w  D0,DEMO_REPLAY_JOYSTICK_DIRECTION                        ; $00023ABA 33C0 0006 6C3E           ; 
 
 	move.b  (A0),D2                                 ; $00023AC0 1410                     ; 
 	and.w   #%0000000000001111,D2                   ; $00023AC2 C47C 000F                ; 
 	move.w  D2,(A1)                                 ; $00023AC6 3282                     ; 
 
-	cmpa.l  LONG_0005D376,A0                        ; $00023AC8 B1F9 0005 D376           ; 
+	cmpa.l  CURRENT_DEMO_REPLAY_END_POINTER,A0                        ; $00023AC8 B1F9 0005 D376           ; 
 	bcc.s   L_00023AD2                              ; $00023ACE 6402                     ; 
 
 	addq.l  #$1,(A2)                                ; $00023AD0 5292                     ; 
 
 L_00023AD2:
-	move.w  WORD_00066C3E,D1                        ; $00023AD2 3239 0006 6C3E           ; 
+	move.w  DEMO_REPLAY_JOYSTICK_DIRECTION,D1                        ; $00023AD2 3239 0006 6C3E           ; 
 
 L_00023AD8:
 	move.w  D1,D0                                   ; $00023AD8 3001                     ; J($00023A9E) 
@@ -7706,7 +7706,7 @@ L_00023AD8:
 L_00023ADE:
 	clr.w   WORD_00066C3A                           ; $00023ADE 4279 0006 6C3A           ; S($00026CC8) 
 	clr.w   WORD_00066C38                           ; $00023AE4 4279 0006 6C38           ; 
-	move.l  #BYTE_00086C41,LONG_0005D376            ; $00023AEA 23FC 0008 6C41 0005 D376 ; 
+	move.l  #DEMO_REPLAY_DATA_END,CURRENT_DEMO_REPLAY_END_POINTER            ; $00023AEA 23FC 0008 6C41 0005 D376 ; 
 
 	rts                                             ; $00023AF4 4E75                     ; 
 
@@ -7733,7 +7733,7 @@ L_00023AF6:
 	or.w    D1,D2                                   ; $00023B26 8441                     ; 
 
 L_00023B28:
-	lea     LONG_0005D376,A1                        ; $00023B28 43F9 0005 D376           ; 
+	lea     CURRENT_DEMO_REPLAY_END_POINTER,A1                        ; $00023B28 43F9 0005 D376           ; 
 	movea.l (A1),A0                                 ; $00023B2E 2051                     ; 
 	move.b  (A0),D3                                 ; $00023B30 1610                     ; 
 	asl.b   #$2,D3                                  ; $00023B32 E503                     ; 
@@ -7755,14 +7755,14 @@ L_00023B28:
 	subq.l  #$1,(A1)                                ; $00023B5A 5391                     ; 
 
 L_00023B5C:
-	move.l  LONG_0005D376,LONG_0005D37A             ; $00023B5C 23F9 0005 D376 0005 D37A ; 
+	move.l  CURRENT_DEMO_REPLAY_END_POINTER,LONG_0005D37A             ; $00023B5C 23F9 0005 D376 0005 D37A ; 
 
 	bra.s   L_00023BA0                              ; $00023B66 6038                     ; 
 
 L_00023B68:
 	lea     WORD_00066C38,A0                        ; $00023B68 41F9 0006 6C38           ; 
 	subq.w  #$1,(A0)                                ; $00023B6E 5350                     ; 
-	lea     LONG_0005D376,A1                        ; $00023B70 43F9 0005 D376           ; 
+	lea     CURRENT_DEMO_REPLAY_END_POINTER,A1                        ; $00023B70 43F9 0005 D376           ; 
 	movea.l (A1),A2                                 ; $00023B76 2451                     ; 
 	move.b  (A2),D0                                 ; $00023B78 1012                     ; 
 	ext.w   D0                                      ; $00023B7A 4880                     ; 
@@ -8134,7 +8134,7 @@ L_00023F24:
 	move.w  -204(A6),D3                             ; $00023F42 362E FF34                ; 
 
 	pea     $1.w                                    ; $00023F46 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $00023F4A 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $00023F4A 4EB9 0005 A592           ; 
 
 	move.w  D0,-204(A6)                             ; $00023F50 3D40 FF34                ; 
 	lea     12(A7),A7                               ; $00023F54 4FEF 000C                ; 
@@ -8255,7 +8255,7 @@ L_00024014:
 	lea     28(A7),A7                               ; $00024052 4FEF 001C                ; 
 
 L_00024056:
-	move.w  WORD_0008DB34,D0                        ; $00024056 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $00024056 3039 0008 DB34           ; 
 	and.w   #%0000000000010000,D0                   ; $0002405C C07C 0010                ; 
 	lsr.w   #$1,D0                                  ; $00024060 E248                     ; 
 	moveq   #0,D1                                   ; $00024062 7200                     ; 
@@ -8350,7 +8350,7 @@ L_00024142:
 	pea     $14.w                                   ; $00024158 4878 0014                ; 
 	jsr     DRAW_TEXT                              ; $0002415C 4EB9 0002 5D1A           ; 
 
-	move.w  WORD_0008DB34,D0                        ; $00024162 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $00024162 3039 0008 DB34           ; 
 	and.w   #%0000000000010000,D0                   ; $00024168 C07C 0010                ; 
 	lsr.w   #$1,D0                                  ; $0002416C E248                     ; 
 	moveq   #0,D1                                   ; $0002416E 7200                     ; 
@@ -8425,7 +8425,7 @@ L_000241F4:
 
 	jsr     XSP_OUT                              ; $00024200 4EB9 0002 04C2           ; 
 
-	addq.w  #$1,WORD_0008DB34                       ; $00024206 5279 0008 DB34           ; 
+	addq.w  #$1,BACKGROUND_SCROLL_COUNTER                       ; $00024206 5279 0008 DB34           ; 
 	cmp.w   #$30,D5                                 ; $0002420C BA7C 0030                ; 
 	beq.w   L_000244F2                              ; $00024210 6700 02E0                ; 
 
@@ -9738,7 +9738,7 @@ L_00024DDC:
 
 	jsr     L_000225E2                              ; $00024DE2 4EB9 0002 25E2           ; 
 
-	move.l  LONG_0008DB44,PLAYER_SCORE             ; $00024DE8 23F9 0008 DB44 0008 DB52 ; 
+	move.l  PLAYER_INFO_STRUCT,PLAYER_SCORE             ; $00024DE8 23F9 0008 DB44 0008 DB52 ; 
 	jsr     DRAW_GAME_SCORE                              ; $00024DF2 4EB9 0002 4C2A           ; 
 
 	pea     MENU_START_TEXT(pc)                          ; $00024DF8 487A FF1E                ; 
@@ -9793,7 +9793,7 @@ L_00024E78:
 	move.w  D7,D6                                   ; $00024E82 3C07                     ; 
 
 	pea     $1.w                                    ; $00024E84 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $00024E88 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $00024E88 4EB9 0005 A592           ; 
 
 	move.w  D0,D7                                   ; $00024E8E 3E00                     ; 
 
@@ -9932,7 +9932,7 @@ L_00024F88:
 	bne.s   L_00024FB2                              ; $00024FA0 6610                     ; 
 
 	pea     $1.w                                    ; $00024FA2 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $00024FA6 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $00024FA6 4EB9 0005 A592           ; 
 
 	addq.w  #$4,A7                                  ; $00024FAC 584F                     ; 
 
@@ -9956,7 +9956,7 @@ L_00024FC0:
 	bne.s   L_00024FC0                              ; $00024FCE 66F0                     ; 
 
 	pea     $1.w                                    ; $00024FD0 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $00024FD4 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $00024FD4 4EB9 0005 A592           ; 
 
 	addq.w  #$4,A7                                  ; $00024FDA 584F                     ; 
 
@@ -10031,7 +10031,7 @@ L_0002504C:
 
 L_00025066:
 	pea     $0.w                                    ; $00025066 4878 0000                ; 
-	jsr     GET_JOYSTICK_RAW                              ; $0002506A 4EB9 0005 A720           ; 
+	jsr     READ_JOYSTICK_RAW                              ; $0002506A 4EB9 0005 A720           ; 
 
 	moveq   #15,D1                                  ; $00025070 720F                     ; 
 	and.l   D1,D0                                   ; $00025072 C081                     ; 
@@ -10300,7 +10300,7 @@ L_0002534A:
 	move.w  D6,D4                                   ; $00025388 3806                     ; 
 
 	pea     $1.w                                    ; $0002538A 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $0002538E 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $0002538E 4EB9 0005 A592           ; 
 
 	move.w  D0,D6                                   ; $00025394 3C00                     ; 
 
@@ -10661,7 +10661,7 @@ L_0002569E:
 	jsr     PLAY_PCM_SAMPLE                              ; $000256AA 4EB9 0002 64F4           ; 
 
 	moveq   #0,D1                                   ; $000256B0 7200                     ; 
-	move.l  D1,LONG_0008DB44                        ; $000256B2 23C1 0008 DB44           ; 
+	move.l  D1,PLAYER_INFO_STRUCT                        ; $000256B2 23C1 0008 DB44           ; 
 	jsr     INITIALIZE_HIGHSCORE_TABLE                              ; $000256B8 4EB9 0002 4A10           ; 
 
 	pea     L_000251A4(pc)                          ; $000256BE 487A FAE4                ; 
@@ -10820,7 +10820,7 @@ KAKUSI_MODE_MENU:
 
 	lea     12(A7),A7                               ; $0002586A 4FEF 000C                ; 
 
-	move.l  #LONG_0008DB44,D0                       ; $0002586E 203C 0008 DB44           ; 
+	move.l  #PLAYER_INFO_STRUCT,D0                       ; $0002586E 203C 0008 DB44           ; 
 	movea.l D0,A4                                   ; $00025874 2840                     ; 
 	addq.w  #$4,A4                                  ; $00025876 584C                     ; 
 	moveq   #10,D1                                  ; $00025878 720A                     ; 
@@ -10970,7 +10970,7 @@ KAKUSI_MODE_LOOP:
 	move.w  D6,D4                                   ; $000259FA 3806                     ; 
 
 	pea     $1.w                                    ; $000259FC 4878 0001                ; 
-	jsr     READ_JOYSTICK                              ; $00025A00 4EB9 0005 A592           ; 
+	jsr     READ_JOYSTICK_ENCODED                              ; $00025A00 4EB9 0005 A592           ; 
 
 	move.w  D0,D6                                   ; $00025A06 3C00                     ; 
 	jsr     READ_JOYSTICK_FOR_MENU                              ; $00025A08 4EB9 0002 778A           ; 
@@ -12963,7 +12963,7 @@ L_00026ADE:
 	move.w  #$1,WORD_0008DB00                       ; $00026B20 33FC 0001 0008 DB00      ; 
 	clr.w   SILENT_MODE                           ; $00026B28 4279 0008 DAF8           ; 
 
-	lea     LONG_0008DB44,A0                        ; $00026B2E 41F9 0008 DB44           ; 
+	lea     PLAYER_INFO_STRUCT,A0                        ; $00026B2E 41F9 0008 DB44           ; 
 	move.w  #$1,4(A0)                               ; $00026B34 317C 0001 0004           ; 
 	clr.w   6(A0)                                   ; $00026B3A 4268 0006                ; 
 	clr.w   8(A0)                                   ; $00026B3E 4268 0008                ; 
@@ -12997,7 +12997,7 @@ L_00026B98:
 	cmp.w   #$1,D3                                  ; $00026B98 B67C 0001                ; 
 	bne.s   L_00026BC8                              ; $00026B9C 662A                     ; 
 
-	lea     LONG_0008DB44,A0                        ; $00026B9E 41F9 0008 DB44           ; 
+	lea     PLAYER_INFO_STRUCT,A0                        ; $00026B9E 41F9 0008 DB44           ; 
 	move.l  (A0)+,(A3)                              ; $00026BA4 2698                     ; 
 	lea     4(A3),A1                                ; $00026BA6 43EB 0004                ; 
 	move.l  (A0)+,(A1)+                             ; $00026BAA 22D8                     ; 
@@ -13011,7 +13011,7 @@ L_00026B98:
 L_00026BBC:
 	move.l  (A1)+,(A0)+                             ; $00026BBC 20D9                     ; J($00026B96) 
 	move.w  (A1),(A0)                               ; $00026BBE 3091                     ; 
-	clr.w   WORD_0008DB12                           ; $00026BC0 4279 0008 DB12           ; 
+	clr.w   DEMO_REPLAY_MODE_FLAG                           ; $00026BC0 4279 0008 DB12           ; 
 
 	bra.s   L_00026BE6                              ; $00026BC6 601E                     ; 
 
@@ -13026,7 +13026,7 @@ L_00026BC8:
 	move.l  (A1)+,(A0)+                             ; $00026BDA 20D9                     ; 
 	move.w  (A1),(A0)                               ; $00026BDC 3091                     ; 
 
-	move.w  #$1,WORD_0008DB12                       ; $00026BDE 33FC 0001 0008 DB12      ; 
+	move.w  #$1,DEMO_REPLAY_MODE_FLAG                       ; $00026BDE 33FC 0001 0008 DB12      ; 
 
 L_00026BE6:
 	bsr.s   PLAY_GAME                              ; $00026BE6 616A                     ; J($00026BC6) 
@@ -13038,7 +13038,7 @@ L_00026BE6:
 	bne.s   L_00026C04                              ; $00026BF0 6612                     ; 
 
 L_00026BF2:
-	lea     LONG_0008DB44,A0                        ; $00026BF2 41F9 0008 DB44           ; 
+	lea     PLAYER_INFO_STRUCT,A0                        ; $00026BF2 41F9 0008 DB44           ; 
 	move.l  (A3),(A0)+                              ; $00026BF8 20D3                     ; 
 	lea     4(A3),A1                                ; $00026BFA 43EB 0004                ; 
 	move.l  (A1)+,(A0)+                             ; $00026BFE 20D9                     ; 
@@ -13085,7 +13085,7 @@ PLAY_GAME:
 
 	clr.w   D4                                      ; $00026C5A 4244                     ; 
 	move.w  D4,WORD_0008DB22                        ; $00026C5C 33C4 0008 DB22           ; 
-	move.w  D4,WORD_0008DB2E                        ; $00026C62 33C4 0008 DB2E           ; 
+	move.w  D4,PLAY_GAME_ABORT_FLAG                        ; $00026C62 33C4 0008 DB2E           ; 
 
 	lea     PLAYER_SCORE,A3                        ; $00026C68 47F9 0008 DB52           ; 
 	moveq   #0,D1                                   ; $00026C6E 7200                     ; 
@@ -13094,7 +13094,7 @@ PLAY_GAME:
 	move.w  D4,WORD_0008DB20                        ; $00026C72 33C4 0008 DB20           ; 
 	move.l  #1000000,LONG_0008DB1C                   ; $00026C78 23FC 000F 4240 0008 DB1C ; 
 	move.l  D1,LONG_0008DB18                        ; $00026C82 23C1 0008 DB18           ; 
-	move.w  D4,WORD_0008DB34                        ; $00026C88 33C4 0008 DB34           ; 
+	move.w  D4,BACKGROUND_SCROLL_COUNTER                        ; $00026C88 33C4 0008 DB34           ; 
 	move.w  D4,WORD_0008DB32                        ; $00026C8E 33C4 0008 DB32           ; 
 	move.w  D4,WORD_0008DB28                        ; $00026C94 33C4 0008 DB28           ; 
 	move.w  D4,WORD_0008E760                        ; $00026C9A 33C4 0008 E760           ; 
@@ -13115,7 +13115,9 @@ PLAY_GAME:
 	lea     L_0008EB64,A1                           ; $00026CD4 43F9 0008 EB64           ; 
 	move.w  4(A3),D0                                ; $00026CDA 302B 0004                ; 
 	and.w   #%0000000000001111,D0                   ; $00026CDE C07C 000F                ; 
+
 	addq.w  #$8,A7                                  ; $00026CE2 504F                     ; 
+
 	cmp.w   #$1,D0                                  ; $00026CE4 B07C 0001                ; 
 	beq.s   L_00026CF0                              ; $00026CE8 6706                     ; 
 
@@ -13186,7 +13188,9 @@ L_00026D08:
 	addq.w  #$4,A0                                  ; $00026D8E 5848                     ; 
 	move.w  (A0),D0                                 ; $00026D90 3010                     ; 
 	and.w   #%0000000000001111,D0                   ; $00026D92 C07C 000F                ; 
+
 	addq.w  #$8,A7                                  ; $00026D96 504F                     ; 
+
 	cmp.w   #$1,D0                                  ; $00026D98 B07C 0001                ; 
 	bne.s   L_00026DB0                              ; $00026D9C 6612                     ; 
 
@@ -13197,7 +13201,7 @@ L_00026D08:
 	addq.w  #$4,A7                                  ; $00026DAE 584F                     ; 
 
 L_00026DB0:
-	lea     WORD_0008DB2E,A5                        ; $00026DB0 4BF9 0008 DB2E           ; 
+	lea     PLAY_GAME_ABORT_FLAG,A5                        ; $00026DB0 4BF9 0008 DB2E           ; 
 
 	bra.w   L_0002704A                              ; $00026DB6 6000 0292                ; 
 
@@ -13216,7 +13220,7 @@ L_00026DC6:
 	moveq   #1,D4                                   ; $00026DD2 7801                     ; 
 
 L_00026DD4:
-	move.w  WORD_0008DB34,D0                        ; $00026DD4 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $00026DD4 3039 0008 DB34           ; 
 	and.w   #%0000000000000011,D0                   ; $00026DDA C07C 0003                ; 
 	bne.s   L_00026E1A                              ; $00026DDE 663A                     ; 
 
@@ -13397,7 +13401,7 @@ L_00026F42:
 	addq.w  #$4,A7                                  ; $00026F80 584F                     ; 
 
 L_00026F82:
-	tst.w   WORD_0008DB12                           ; $00026F82 4A79 0008 DB12           ; 
+	tst.w   DEMO_REPLAY_MODE_FLAG                           ; $00026F82 4A79 0008 DB12           ; 
 	beq.s   L_00026FA0                              ; $00026F88 6716                     ; 
 
 	pea     $1.w                                    ; $00026F8A 4878 0001                ; 
@@ -13468,7 +13472,7 @@ L_00026FA0:
 	lea     16(A7),A7                               ; $00027040 4FEF 0010                ; 
 
 L_00027044:
-	addq.w  #$1,WORD_0008DB34                       ; $00027044 5279 0008 DB34           ; 
+	addq.w  #$1,BACKGROUND_SCROLL_COUNTER                       ; $00027044 5279 0008 DB34           ; 
 
 L_0002704A:
 	tst.w   (A5)                                    ; $0002704A 4A55                     ; J($00026DB6) 
@@ -13573,7 +13577,7 @@ L_00027134:
 	ble.w   L_000270B2                              ; $0002713A 6F00 FF76                ; 
 
 L_0002713E:
-	tst.w   WORD_0008DB12                           ; $0002713E 4A79 0008 DB12           ; 
+	tst.w   DEMO_REPLAY_MODE_FLAG                           ; $0002713E 4A79 0008 DB12           ; 
 	bne.s   L_00027184                              ; $00027144 663E                     ; 
 
 	tst.w   WORD_0008DB26                           ; $00027146 4A79 0008 DB26           ; 
@@ -14056,7 +14060,7 @@ L_00027532:
 L_0002753C:
 	movem.l A3-A4,-(A7)                             ; $0002753C 48E7 0018                ; S($00026FA0) 
 
-	move.w  WORD_0008DB34,D0                        ; $00027540 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $00027540 3039 0008 DB34           ; 
 	and.w   #%0000000001111111,D0                   ; $00027546 C07C 007F                ; 
 	bne.s   L_0002755E                              ; $0002754A 6612                     ; 
 
@@ -14302,7 +14306,7 @@ READ_JOYSTICK_FOR_MENU:
 	beq.s   L_000277BA                              ; $00027794 6724                     ; 
 
 	pea     $0.w                                    ; $00027796 4878 0000                ; 
-	jsr     GET_JOYSTICK_RAW                              ; $0002779A 4EB9 0005 A720           ; 
+	jsr     READ_JOYSTICK_RAW                              ; $0002779A 4EB9 0005 A720           ; 
 
 	move.w  D0,D1                                   ; $000277A0 3200                     ; 
 	move.w  D1,D0                                   ; $000277A2 3001                     ; 
@@ -18577,7 +18581,7 @@ L_0002A5D2:
 	bne.s   L_0002A61E                              ; $0002A5DA 6642                     ; 
 
 	clr.w   L_00E80000+$18                          ; $0002A5DC 4279 00E8 0018           ; [CRTC + $18]  
-	move.w  WORD_0008DB34,D0                        ; $0002A5E2 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $0002A5E2 3039 0008 DB34           ; 
 	moveq   #0,D1                                   ; $0002A5E8 7200                     ; 
 	move.w  D0,D1                                   ; $0002A5EA 3200                     ; 
 	neg.l   D1                                      ; $0002A5EC 4481                     ; 
@@ -18595,7 +18599,7 @@ L_0002A5D2:
 
 L_0002A61E:
 	clr.w   L_00E80000+$1A                          ; $0002A61E 4279 00E8 001A           ; [CRTC + $1A]  
-	move.w  WORD_0008DB34,D0                        ; $0002A624 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $0002A624 3039 0008 DB34           ; 
 	moveq   #0,D1                                   ; $0002A62A 7200                     ; 
 	move.w  D0,D1                                   ; $0002A62C 3200                     ; 
 	asl.l   #$2,D1                                  ; $0002A62E E581                     ; 
@@ -18657,7 +18661,7 @@ L_0002A6A8:
 	clr.w   WORD_0008E962                           ; $0002A6C0 4279 0008 E962           ; 
 
 L_0002A6C6:
-	move.w  WORD_0008DB34,D2                        ; $0002A6C6 3439 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D2                        ; $0002A6C6 3439 0008 DB34           ; 
 	addq.w  #$4,D2                                  ; $0002A6CC 5842                     ; 
 	and.w   #%0000000000011111,D2                   ; $0002A6CE C47C 001F                ; 
 	bne.s   L_0002A6E0                              ; $0002A6D2 660C                     ; 
@@ -18718,7 +18722,7 @@ L_0002A73E:
 	move.l  D0,LONG_0005DC54                        ; $0002A748 23C0 0005 DC54           ; 
 
 L_0002A74E:
-	move.w  WORD_0008DB34,D2                        ; $0002A74E 3439 0008 DB34           ; J($0002A73C) 
+	move.w  BACKGROUND_SCROLL_COUNTER,D2                        ; $0002A74E 3439 0008 DB34           ; J($0002A73C) 
 	and.w   #%0000000000001111,D2                   ; $0002A754 C47C 000F                ; 
 	bne.s   L_0002A766                              ; $0002A758 660C                     ; 
 
@@ -18872,7 +18876,9 @@ L_0002A8A4:
 
 L_0002A90A:
 	link    A6,#-128                                ; $0002A90A 4E56 FF80                ; S($00026FBA) 
+
 	movem.l D3-D4/A3-A4,-(A7)                       ; $0002A90E 48E7 1818                ; 
+
 	clr.w   D3                                      ; $0002A912 4243                     ; 
 	lea     WORD_000A8EFC,A0                        ; $0002A914 41F9 000A 8EFC           ; 
 	tst.w   (A0)                                    ; $0002A91A 4A50                     ; 
@@ -18891,11 +18897,12 @@ L_0002A920:
 	bra.w   L_0002A9F6                              ; $0002A936 6000 00BE                ; 
 
 L_0002A93A:
-	movea.w WORD_0008DB12,A1                        ; $0002A93A 3279 0008 DB12           ; 
+	movea.w DEMO_REPLAY_MODE_FLAG,A1                        ; $0002A93A 3279 0008 DB12           ; 
 	move.l  A1,-(A7)                                ; $0002A940 2F09                     ; 
-	jsr     L_000239E6                              ; $0002A942 4EB9 0002 39E6           ; 
+	jsr     DEMO_REPLAY_OR_RECORD                              ; $0002A942 4EB9 0002 39E6           ; 
 
 	addq.w  #$4,A7                                  ; $0002A948 584F                     ; 
+
 	tst.w   D0                                      ; $0002A94A 4A40                     ; 
 	beq.w   L_0002A9F6                              ; $0002A94C 6700 00A8                ; 
 
@@ -19069,7 +19076,7 @@ L_0002AAFC:
 	cmpi.w  #$68,WORD_000A8EFE                      ; $0002AAFC 0C79 0068 000A 8EFE      ; 
 	bne.s   L_0002AB0E                              ; $0002AB04 6608                     ; 
 
-	move.w  #$1,WORD_0008DB2E                       ; $0002AB06 33FC 0001 0008 DB2E      ; 
+	move.w  #$1,PLAY_GAME_ABORT_FLAG                       ; $0002AB06 33FC 0001 0008 DB2E      ; 
 
 L_0002AB0E:
 	tst.w   WORD_000A8EFE                           ; $0002AB0E 4A79 000A 8EFE           ; 
@@ -19221,7 +19228,7 @@ L_0002AC64:
 	tst.w   WORD_000A8EF4                           ; $0002AC64 4A79 000A 8EF4           ; 
 	beq.s   L_0002AC94                              ; $0002AC6A 6728                     ; 
 
-	move.w  WORD_0008DB34,D0                        ; $0002AC6C 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $0002AC6C 3039 0008 DB34           ; 
 	and.w   #%0000000000000011,D0                   ; $0002AC72 C07C 0003                ; 
 	bne.s   L_0002AC86                              ; $0002AC76 660E                     ; 
 
@@ -19247,7 +19254,7 @@ L_0002ACA0:
 	tst.w   WORD_000A8EFE                           ; $0002ACA0 4A79 000A 8EFE           ; J($0002AC84) J($0002AC92) 
 	beq.s   L_0002ACBE                              ; $0002ACA6 6716                     ; 
 
-	btst    #$1,L_0008DB35                          ; $0002ACA8 0839 0001 0008 DB35      ; 
+	btst    #$1,BACKGROUND_SCROLL_COUNTER+1                          ; $0002ACA8 0839 0001 0008 DB35      ; 
 	beq.s   L_0002ACBE                              ; $0002ACB0 670C                     ; 
 
 	lea     WORD_00098864,A0                        ; $0002ACB2 41F9 0009 8864           ; 
@@ -19258,7 +19265,7 @@ L_0002ACBE:
 	tst.w   WORD_000A8EFC                           ; $0002ACBE 4A79 000A 8EFC           ; 
 	beq.s   L_0002ACDC                              ; $0002ACC4 6716                     ; 
 
-	btst    #$0,L_0008DB35                          ; $0002ACC6 0839 0000 0008 DB35      ; 
+	btst    #$0,BACKGROUND_SCROLL_COUNTER+1                          ; $0002ACC6 0839 0000 0008 DB35      ; 
 	beq.s   L_0002ACDC                              ; $0002ACCE 670C                     ; 
 
 	lea     WORD_00098864,A0                        ; $0002ACD0 41F9 0009 8864           ; 
@@ -19272,7 +19279,7 @@ L_0002ACDC:
 	cmp.w   WORD_0008DADC,D0                        ; $0002ACE4 B079 0008 DADC           ; 
 	bgt.s   L_0002AD12                              ; $0002ACEA 6E26                     ; 
 
-	move.w  WORD_0008DB34,D0                        ; $0002ACEC 3039 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D0                        ; $0002ACEC 3039 0008 DB34           ; 
 	and.w   #%0000000000001010,D0                   ; $0002ACF2 C07C 000A                ; 
 	bne.s   L_0002AD06                              ; $0002ACF6 660E                     ; 
 
@@ -19435,7 +19442,7 @@ L_0002AE96:
 	lea     WORD_0005DC66,A4                        ; $0002AE9E 49F9 0005 DC66           ; 
 	lea     WORD_0005DC64,A3                        ; $0002AEA4 47F9 0005 DC64           ; 
 	move.w  (A3),(A4)                               ; $0002AEAA 3893                     ; 
-	movea.w WORD_0008DB12,A2                        ; $0002AEAC 3479 0008 DB12           ; 
+	movea.w DEMO_REPLAY_MODE_FLAG,A2                        ; $0002AEAC 3479 0008 DB12           ; 
 	move.l  A2,-(A7)                                ; $0002AEB2 2F0A                     ; 
 	jsr     L_00023AF6                              ; $0002AEB4 4EB9 0002 3AF6           ; 
 
@@ -35950,8 +35957,11 @@ L_00036300:
 
 L_000363D8:
 	move.l  A5,D0                                   ; $000363D8 200D                     ; J($000362FC) 
+
 	movem.l -152(A6),D3-D4/A3-A5                    ; $000363DA 4CEE 3818 FF68           ; 
+
 	unlk    A6                                      ; $000363E0 4E5E                     ; 
+
 	rts                                             ; $000363E2 4E75                     ; 
 
 L_000363E4:
@@ -35963,7 +35973,7 @@ L_000363E4:
 	lea     2(A3),A0                                ; $000363F4 41EB 0002                ; 
 	move.w  62(A3),D2                               ; $000363F8 342B 003E                ; 
 	add.w   D2,(A0)                                 ; $000363FC D550                     ; 
-	btst    #$0,L_0008DB35                          ; $000363FE 0839 0000 0008 DB35      ; 
+	btst    #$0,BACKGROUND_SCROLL_COUNTER+1                          ; $000363FE 0839 0000 0008 DB35      ; 
 	beq.s   L_00036410                              ; $00036406 6708                     ; 
 
 	move.w  24(A3),6(A3)                            ; $00036408 376B 0018 0006           ; 
@@ -48382,7 +48392,7 @@ L_0003E968:
 	bne.w   L_0003EA78                              ; $0003E986 6600 00F0                ; 
 
 	add.w   #$FFF0,D0                               ; $0003E98A D07C FFF0                ; 
-	move.w  WORD_0008DB34,D4                        ; $0003E98E 3839 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D4                        ; $0003E98E 3839 0008 DB34           ; 
 	and.w   #%0000000000000010,D4                   ; $0003E994 C87C 0002                ; 
 	lsl.w   #$6,D4                                  ; $0003E998 ED4C                     ; 
 	ext.l   D0                                      ; $0003E99A 48C0                     ; 
@@ -48567,7 +48577,7 @@ L_0003EB64:
 	bne.w   L_0003EC74                              ; $0003EB82 6600 00F0                ; 
 
 	add.w   #$FFF0,D0                               ; $0003EB86 D07C FFF0                ; 
-	move.w  WORD_0008DB34,D4                        ; $0003EB8A 3839 0008 DB34           ; 
+	move.w  BACKGROUND_SCROLL_COUNTER,D4                        ; $0003EB8A 3839 0008 DB34           ; 
 	and.w   #%0000000000000010,D4                   ; $0003EB90 C87C 0002                ; 
 	lsl.w   #$6,D4                                  ; $0003EB94 ED4C                     ; 
 	ext.l   D0                                      ; $0003EB96 48C0                     ; 
@@ -48835,12 +48845,16 @@ L_0003EE3E:
 
 L_0003EE6A:
 	movem.l -156(A6),D3-D4/A3-A5                    ; $0003EE6A 4CEE 3818 FF64           ; J($0003EE3C) 
+
 	unlk    A6                                      ; $0003EE70 4E5E                     ; 
+
 	rts                                             ; $0003EE72 4E75                     ; 
 
 L_0003EE74:
 	link    A6,#-4                                  ; $0003EE74 4E56 FFFC                ; 
+
 	movem.l A3-A5,-(A7)                             ; $0003EE78 48E7 001C                ; 
+
 	jsr     L_0002724A                              ; $0003EE7C 4EB9 0002 724A           ; 
 
 	movea.l D0,A2                                   ; $0003EE82 2440                     ; 
@@ -48888,13 +48902,18 @@ L_0003EE74:
 
 L_0003EF26:
 	move.l  A2,D0                                   ; $0003EF26 200A                     ; 
+
 	movem.l -16(A6),A3-A5                           ; $0003EF28 4CEE 3800 FFF0           ; 
+
 	unlk    A6                                      ; $0003EF2E 4E5E                     ; 
+
 	rts                                             ; $0003EF30 4E75                     ; 
 
 L_0003EF32:
 	link    A6,#-144                                ; $0003EF32 4E56 FF70                ; 
+
 	movem.l D3/A3-A5,-(A7)                          ; $0003EF36 48E7 101C                ; 
+
 	moveq   #120,D2                                 ; $0003EF3A 7478                     ; 
 	add.l   8(A6),D2                                ; $0003EF3C D4AE 0008                ; 
 	movea.l D2,A4                                   ; $0003EF40 2842                     ; 
@@ -90254,7 +90273,13 @@ L_0005A58E:
 
 	rts                                             ; $0005A590 4E75                     ; 
 
-READ_JOYSTICK:
+; 7 8 9
+;  \|/
+; 4-5-6
+;  /|\
+; 1 2 3
+
+READ_JOYSTICK_ENCODED:
 	move.l  4(A7),D1                                ; $0005A592 222F 0004                ; S($00024E88) 
 	subq.w  #$1,D1                                  ; $0005A596 5341                     ; 
 	bmi.s   L_0005A5D0                              ; $0005A598 6B36                     ; 
@@ -90517,7 +90542,7 @@ L_0005A71C:
 
 	rts                                             ; $0005A71E 4E75                     ; 
 
-GET_JOYSTICK_RAW:
+READ_JOYSTICK_RAW:
 	move.l  4(A7),D1                                ; $0005A720 222F 0004                ; S($0002779A) 
 	moveq   #59,D0                                  ; $0005A724 703B                     ; 
 	trap    #$F                                     ; $0005A726 4E4F                     ; _JOYGET 
@@ -98014,13 +98039,13 @@ CURRENT_DEMO_REPLAY_POINTER:
 LONG_0005D372:
 	dc.l    DEMO_REPLAY_DATA                              ; [Relocated]; 0x0005D372
 
-LONG_0005D376:
-	dc.l    BYTE_00086C41                              ; [Relocated]; 0x0005D376
+CURRENT_DEMO_REPLAY_END_POINTER:
+	dc.l    DEMO_REPLAY_DATA_END                              ; [Relocated]; 0x0005D376
 
 LONG_0005D37A:
-	dc.l    BYTE_00086C41                              ; [Relocated]; 0x0005D37A
+	dc.l    DEMO_REPLAY_DATA_END                              ; [Relocated]; 0x0005D37A
 
-WORD_0005D37E:
+JOYSTICK_TO_REPLAY_DATA_TABLE:
 	dc.w    $0000                                  ; ; 0x0005D37E
 	dc.w    $0003                                  ; ; 0x0005D380
 	dc.w    $0006                                  ; ; 0x0005D382
@@ -100934,17 +100959,11 @@ WORD_00066C38:
 WORD_00066C3A:
 	ds.b    $2
 
-WORD_00066C3C:
-	ds.b    $1
+DEMO_REPLAY_DIRECTION_REPEAT_COUNTER:
+	ds.w    $1
 
-BYTE_00066C3D:
-	ds.b    $1
-
-WORD_00066C3E:
-	ds.b    $1
-
-BYTE_00066C3F:
-	ds.b    $1
+DEMO_REPLAY_JOYSTICK_DIRECTION:
+	ds.w    $1
 
 WORD_00066C40:
 	ds.b    $2
@@ -100952,7 +100971,7 @@ WORD_00066C40:
 DEMO_REPLAY_DATA:
 	ds.b    $1FFFF
 
-BYTE_00086C41:
+DEMO_REPLAY_DATA_END:
 	ds.b    $1
 
 L_00086C42:
@@ -101345,7 +101364,7 @@ WORD_0008DB0E:
 CURRENT_XSP_MODE:
 	ds.w    1
 
-WORD_0008DB12:
+DEMO_REPLAY_MODE_FLAG:
 	ds.b    $2
 
 GAME_HIGHSCORE:
@@ -101378,7 +101397,7 @@ WORD_0008DB2A:
 WORD_0008DB2C:
 	ds.b    $2
 
-WORD_0008DB2E:
+PLAY_GAME_ABORT_FLAG:
 	ds.b    $2
 
 WORD_0008DB30:
@@ -101387,16 +101406,13 @@ WORD_0008DB30:
 WORD_0008DB32:
 	ds.b    $2
 
-WORD_0008DB34:
-	ds.b    $1
-
-L_0008DB35:
-	ds.b    $1
+BACKGROUND_SCROLL_COUNTER:
+	ds.w    $1
 
 LONG_0008DB36:
 	ds.b    $E
 
-LONG_0008DB44:
+PLAYER_INFO_STRUCT:
 	ds.b    $E
 
 PLAYER_SCORE:
