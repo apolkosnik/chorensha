@@ -715,7 +715,7 @@ vbl:
 
 	jeq		.skip_sprite
 
-	cmp		#240-16,d1
+	cmp		#240+16,d1
 	jge		.skip_sprite
 
 	move	d0,d2
