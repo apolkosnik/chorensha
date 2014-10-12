@@ -41,9 +41,6 @@ start:
 
 	jmp		_start
 
-	clr		-(sp)
-	trap	#1
-
 ; ------------------------------------------------------------------------------
 
 dummy_interrupt_handler:
@@ -119,6 +116,46 @@ init:
 	bclr	#3,$fffffa17.w
 
 	rts
+
+restore:
+	move	#$2700,sr
+
+	move	old_8900,$ffff8900.w
+	move	old_8920,$ffff8920.w
+	move.l	old_8930,$ffff8930.w
+	move.l	old_8934,$ffff8934.w
+	move.l	old_8938,$ffff8938.w
+	move.b	old_893c,$ffff893c.w
+	move.b	old_8941,$ffff8941.w
+
+	move.b	old_fa07,$fffffa07.w
+	move.b	old_fa09,$fffffa09.w
+	move.b	old_fa13,$fffffa13.w
+	move.b	old_fa15,$fffffa15.w
+
+	move.l	old_line_f,$2c.w
+	move.l	old_trap_2,$88.w
+	move.l	old_trap_4,$90.w
+	move.l	old_trap_f,$bc.w
+	move.l	old_vbl,$70.w
+	move.l	old_keyboard,$118.w
+
+	move.b	old_screen+1,$ffff8201.w
+	move.b	old_screen+2,$ffff8203.w
+	move.b	old_screen+3,$ffff820d.w
+
+	movem.l	old_videl,d0-a2
+	move.l	d0,$ffff820e.w
+	move.l	d1,$ffff8264.w
+	movem.l	d2-d5,$ffff8282.w
+	movem.l	d6-a0,$ffff82a2.w
+	move.l	a1,$ffff82c0.w
+	move	a2,$ffff820a.w
+
+	move	#$2300,sr
+
+	clr		-(sp)
+	trap	#1
 
 ; ------------------------------------------------------------------------------
 
@@ -720,6 +757,17 @@ screen_address:
 ; ------------------------------------------------------------------------------
 
 keyboard:
+	cmp.b	#$81,$fffffc02.w
+	jne		.no_esc
+
+.loop:
+	tst.b	$fffffc02.w
+	btst	#4,$fffffa01.w
+	jeq		.loop
+
+	bra		restore
+
+.no_esc
 	rte
 
 ; ------------------------------------------------------------------------------

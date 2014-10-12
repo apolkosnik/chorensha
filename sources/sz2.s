@@ -7360,7 +7360,7 @@ L_00023735:
 	dc.b    $00                                    ;  ; 0x00023762
 	dc.b    $00                                    ;  ; 0x00023763
 
-READ_DEMO_REPLAY_FILE:
+LOAD_DEMO_REPLAY_FILE:
 	link    A6,#-4                                  ; $00023764 4E56 FFFC                ; S($000290EC) 
 
 	movem.l D3-D4/A3,-(A7)                          ; $00023768 48E7 1810                ; 
@@ -16855,7 +16855,7 @@ INITIALIZE_GAME:
 	jsr     L_0005A72A                              ; $000290E2 4EB9 0005 A72A           ; 
 
 	pea     L_00028F87(pc)                          ; $000290E8 487A FE9D                ; 
-	jsr     READ_DEMO_REPLAY_FILE                              ; $000290EC 4EB9 0002 3764           ; 
+	jsr     LOAD_DEMO_REPLAY_FILE                              ; $000290EC 4EB9 0002 3764           ; 
 
 	pea     L_00028F98(pc)                          ; $000290F2 487A FEA4                ; 
 	jsr     READ_HIGHSCORE_FILE                              ; $000290F6 4EB9 0002 487C           ; 
@@ -101653,3 +101653,4 @@ PROGRAM_ARGUMENTS_POINTER_TABLE:
 NEW_STACK:
 
 	end
+
