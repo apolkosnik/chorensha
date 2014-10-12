@@ -56,6 +56,15 @@ init:
 
 	move	#$2700,sr
 
+	lea		$ffff9800.w,a0
+	lea		old_palette,a1
+	move	#256-1,d7
+
+.copy_palette_loop:
+	move.l	(a0)+,(a1)+
+
+	dbra	d7,.copy_palette_loop
+
 	move	$ffff8900.w,old_8900
 	move	$ffff8920.w,old_8920
 	move.l	$ffff8930.w,old_8930
@@ -98,6 +107,21 @@ init:
 	move	$ffff820a.w,a2
 	movem.l	d0-a2,old_videl
 
+	move.l	#$C7009E,$ffff8282.w
+	move.l	#$1E0009,$ffff8286.w
+	move.l	#$6100AB,$ffff828A.w
+	move.l	#$20D0201,$ffff82A2.w
+	move.l	#$170025,$ffff82A6.w
+	move.l	#$2050207,$ffff82AA.w
+	move	#$200,$ffff820A.w
+	move	#$185,$ffff82C0.w
+	clr		$ffff8266.w
+	move	#$10,$ffff8266.w
+	move	#$0,$ffff82C2.w
+	move	#$80,$ffff8210.w
+
+	move.b	#(512-256)/2,$ffff820f.w
+
 	clr.b	$fffffa07.w
 	clr.b	$fffffa09.w
 	clr.b	$fffffa13.w
@@ -119,6 +143,18 @@ init:
 
 restore:
 	move	#$2700,sr
+
+	clr		$ffff820e.w
+	clr.b	$ffff8265.w
+
+	lea		old_palette,a0
+	lea		$ffff9800.w,a1
+	move	#256-1,d7
+
+.copy_palette_loop:
+	move.l	(a0)+,(a1)+
+
+	dbra	d7,.copy_palette_loop
 
 	move	old_8900,$ffff8900.w
 	move	old_8920,$ffff8920.w
@@ -630,43 +666,43 @@ trap_f:
 vbl:
 	movem.l	d0-a6,-(sp)
 
-	lea		screen_address,a0
-	clr.b	(a0)
-	move.b	$ffff8201.w,1(a0)
-	move.b	$ffff8203.w,2(a0)
-	move.b	$ffff820d.w,3(a0)
+	move.l	work_screen_address,d0
+	move.l	show_screen_address,work_screen_address
+	move.l	d0,show_screen_address
 
-	move.l	(a0),a0
+	move.b	show_screen_address+1,$ffff8201.w
+	move.b	show_screen_address+2,$ffff8203.w
+	move.b	show_screen_address+3,$ffff820d.w
+
+	move.l	work_screen_address,a0
 
 	moveq	#0,d0
 	move	#240-1,d7
 
 .clear_screen_loop:
-	move	d0,8*00(a0)
-	move	d0,8*01(a0)
-	move	d0,8*02(a0)
-	move	d0,8*03(a0)
-	move	d0,8*04(a0)
-	move	d0,8*05(a0)
-	move	d0,8*06(a0)
-	move	d0,8*07(a0)
-	move	d0,8*08(a0)
-	move	d0,8*09(a0)
-	move	d0,8*10(a0)
-	move	d0,8*11(a0)
-	move	d0,8*12(a0)
-	move	d0,8*13(a0)
-	move	d0,8*14(a0)
-	move	d0,8*15(a0)
-	move	d0,8*16(a0)
-	move	d0,8*17(a0)
-	move	d0,8*18(a0)
-	move	d0,8*19(a0)
+	move	d0,16*00(a0)
+	move	d0,16*01(a0)
+	move	d0,16*02(a0)
+	move	d0,16*03(a0)
+	move	d0,16*04(a0)
+	move	d0,16*05(a0)
+	move	d0,16*06(a0)
+	move	d0,16*07(a0)
+	move	d0,16*08(a0)
+	move	d0,16*09(a0)
+	move	d0,16*10(a0)
+	move	d0,16*11(a0)
+	move	d0,16*12(a0)
+	move	d0,16*13(a0)
+	move	d0,16*14(a0)
+	move	d0,16*15(a0)
 
-	add.l	#160,a0
+	add.l	#512,a0
+
 	dbf		d7,.clear_screen_loop
 
-	move.l	screen_address,a0
+	move.l	work_screen_address,a0
+	sub.l	#512*16+16,a0
 	lea		L_00EB0000,a1
 
 	move	#128-1,d7
@@ -679,9 +715,6 @@ vbl:
 
 	jeq		.skip_sprite
 
-	cmp		#320-16,d0
-	jge		.skip_sprite
-
 	cmp		#240-16,d1
 	jge		.skip_sprite
 
@@ -693,52 +726,52 @@ vbl:
 	lsr.l	d2,d4
 
 	and		#$fff0,d0
-	lsr		#1,d0
 	lea		(a0,d0.w),a2
-	mulu	#160,d1
-	add.l	d1,a2
+	ext.l	d1
+	lsl.l	#8,d1
+	lea		(a2,d1.l*2),a2
 
-;	clr		160*0(a2)
-;	clr		160*0+8(a2)
+;	clr		512*0(a2)
+;	clr		512*0+16(a2)
 
-;	clr		160*15(a2)
-;	clr		160*15+8(a2)
+;	clr		512*15(a2)
+;	clr		512*15+16(a2)
 
-	or		d3,160*1+8(a2)
-	or		d3,160*14+8(a2)
+	or		d3,512*1+16(a2)
+	or		d3,512*14+16(a2)
 
 	swap	d3
 
-	or		d3,160*1(a2)
-	or		d3,160*14(a2)
+	or		d3,512*1(a2)
+	or		d3,512*14(a2)
 
-	or		d4,160*2+8(a2)
-	or		d4,160*3+8(a2)
-	or		d4,160*4+8(a2)
-	or		d4,160*5+8(a2)
-	or		d4,160*6+8(a2)
-	or		d4,160*7+8(a2)
-	or		d4,160*8+8(a2)
-	or		d4,160*9+8(a2)
-	or		d4,160*10+8(a2)
-	or		d4,160*11+8(a2)
-	or		d4,160*12+8(a2)
-	or		d4,160*13+8(a2)
+	or		d4,512*2+16(a2)
+	or		d4,512*3+16(a2)
+	or		d4,512*4+16(a2)
+	or		d4,512*5+16(a2)
+	or		d4,512*6+16(a2)
+	or		d4,512*7+16(a2)
+	or		d4,512*8+16(a2)
+	or		d4,512*9+16(a2)
+	or		d4,512*10+16(a2)
+	or		d4,512*11+16(a2)
+	or		d4,512*12+16(a2)
+	or		d4,512*13+16(a2)
 
 	swap	d4
 
-	or		d4,160*2(a2)
-	or		d4,160*3(a2)
-	or		d4,160*4(a2)
-	or		d4,160*5(a2)
-	or		d4,160*6(a2)
-	or		d4,160*7(a2)
-	or		d4,160*8(a2)
-	or		d4,160*9(a2)
-	or		d4,160*10(a2)
-	or		d4,160*11(a2)
-	or		d4,160*12(a2)
-	or		d4,160*13(a2)
+	or		d4,512*2(a2)
+	or		d4,512*3(a2)
+	or		d4,512*4(a2)
+	or		d4,512*5(a2)
+	or		d4,512*6(a2)
+	or		d4,512*7(a2)
+	or		d4,512*8(a2)
+	or		d4,512*9(a2)
+	or		d4,512*10(a2)
+	or		d4,512*11(a2)
+	or		d4,512*12(a2)
+	or		d4,512*13(a2)
 
 .skip_sprite:
 	dbf		d7,.sprite_loop
@@ -750,9 +783,6 @@ vbl:
 	move.l	L_00000118,-(sp)
 
 	rts
-
-screen_address:
-	dc.l	0
 
 ; ------------------------------------------------------------------------------
 
@@ -786,6 +816,12 @@ welcome_text:
 
 vbl_wait_counter:
 	dc		0
+
+work_screen_address:
+	dc.l	screen1
+
+show_screen_address:
+	dc.l	screen2
 
 	bss
 
@@ -832,5 +868,13 @@ old_fa13:
 	ds.b	1
 old_fa15:
 	ds.b	1
+
+	even
+
+screen1:
+	ds.b	256*2*(16+240+16)
+
+screen2:
+	ds.b	256*2*(16+240+16)
 
 
