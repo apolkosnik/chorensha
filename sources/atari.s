@@ -669,12 +669,14 @@ vbl:
 	move.l	work_screen_address,d0
 	move.l	show_screen_address,work_screen_address
 	move.l	d0,show_screen_address
-
-	move.b	show_screen_address+1,$ffff8201.w
-	move.b	show_screen_address+2,$ffff8203.w
-	move.b	show_screen_address+3,$ffff820d.w
+	add.l	#512*16+16,d0
+	move.l	d0,display_screen_address
+	move.b	display_screen_address+1,$ffff8201.w
+	move.b	display_screen_address+2,$ffff8203.w
+	move.b	display_screen_address+3,$ffff820d.w
 
 	move.l	work_screen_address,a0
+	add.l	#512*16+16,a0
 
 	moveq	#0,d0
 	move	#240-1,d7
@@ -702,13 +704,13 @@ vbl:
 	dbf		d7,.clear_screen_loop
 
 	move.l	work_screen_address,a0
-	sub.l	#512*16+16,a0
 	lea		L_00EB0000,a1
 
 	move	#128-1,d7
 
 .sprite_loop:
 	move	(a1)+,d0
+	clr.l	d1
 	move	(a1)+,d1
 	move	(a1)+,d2
 	move	(a1)+,d3
@@ -727,9 +729,9 @@ vbl:
 
 	and		#$fff0,d0
 	lea		(a0,d0.w),a2
-	ext.l	d1
 	lsl.l	#8,d1
-	lea		(a2,d1.l*2),a2
+	add.l	d1,d1
+	add.l	d1,a2
 
 ;	clr		512*0(a2)
 ;	clr		512*0+16(a2)
@@ -822,6 +824,9 @@ work_screen_address:
 
 show_screen_address:
 	dc.l	screen2
+
+display_screen_address:
+	dc.l	0
 
 	bss
 
