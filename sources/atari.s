@@ -205,9 +205,7 @@ line_f:
 	cmp		#$fe00,d1 ; __LMUL
 	jne		.not__lmul
 
-	move.l	(sp),d1
-
-	muls.l	d1,d0
+	muls.l	(sp),d0
 
 	jra		.exit
 
@@ -215,9 +213,7 @@ line_f:
 	cmp		#$fe01,d1 ; __LDIV
 	jne		.not__ldiv
 
-	move.l	(sp),d1
-
-	divs.l	d1,d0
+	divs.l	(sp),d0
 
 	jra		.exit
 
