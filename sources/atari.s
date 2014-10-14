@@ -789,17 +789,9 @@ vbl:
 ; ------------------------------------------------------------------------------
 
 keyboard:
-	cmp.b	#$81,$fffffc02.w
-	jne		.no_esc
+	cmp.b	#$01+$80,$fffffc02.w
+	jeq		restore
 
-.loop:
-	tst.b	$fffffc02.w
-	btst	#4,$fffffa01.w
-	jeq		.loop
-
-	bra		restore
-
-.no_esc
 	rte
 
 ; ------------------------------------------------------------------------------

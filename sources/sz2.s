@@ -13149,7 +13149,7 @@ L_00026D08:
 	lea     L_0005A5F6,A3                           ; $00026D14 47F9 0005 A5F6           ; 
 	jsr     (A3)                                    ; $00026D1A 4E93                     ; 
 
-	jsr     L_00029560                              ; $00026D1C 4EB9 0002 9560           ; 
+	jsr     INITIALIZE_SPRITES_AND_GRAPHICS                              ; $00026D1C 4EB9 0002 9560           ; 
 
 	pea     $0.w                                    ; $00026D22 4878 0000                ; 
 	pea     $0.w                                    ; $00026D26 4878 0000                ; 
@@ -17356,7 +17356,7 @@ L_00029530:
 
 	rts                                             ; $0002955E 4E75                     ; 
 
-L_00029560:
+INITIALIZE_SPRITES_AND_GRAPHICS:
 	link    A6,#-12                                 ; $00029560 4E56 FFF4                ; S($00026D1C) 
 
 	movem.l D3-D7/A3-A5,-(A7)                       ; $00029564 48E7 1F1C                ; 
