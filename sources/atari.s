@@ -65,6 +65,8 @@ init:
 
 	dbra	d7,.copy_palette_loop
 
+	clr.l	$ffff9800.w
+
 	move	$ffff8900.w,old_8900
 	move	$ffff8920.w,old_8920
 	move.l	$ffff8930.w,old_8930
