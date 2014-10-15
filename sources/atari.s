@@ -541,6 +541,12 @@ trap_f:
 
 	clr.l	d0
 
+	btst	#0,$ffff8901.w
+	jeq		.replay_not_running
+
+	moveq.l	#2,d0
+	
+.replay_not_running:
 	rte
 
 .no_adpcmsns:
