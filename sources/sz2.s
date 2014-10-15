@@ -5578,6 +5578,8 @@ L_00022BB8:
 L_00022BC0:
 	dc.b    'PCM8APCM8/048',0
 
+	even
+
 	movem.l D3-D7/A3-A6,-(A7)                       ; $00022BCE 48E7 1F1E                ; 
 
 	lea     -2(A7),A7                               ; $00022BD2 4FEF FFFE                ; 
@@ -7436,7 +7438,7 @@ L_00023810:
 	sub.l   -4(A6),D3                               ; $0002382E 96AE FFFC                ; 
 	move.l  D3,CURRENT_DEMO_RECORD_END_POINTER                        ; $00023832 23C3 0005 D37A           ; 
 	move.l  D4,-(A7)                                ; $00023838 2F04                     ; 
-	jsr     L_0005A2AA                              ; $0002383A 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $0002383A 4EB9 0005 A2AA           ; 
 
 	bra.s   L_00023878                              ; $00023840 6036                     ; 
 
@@ -7523,7 +7525,7 @@ L_00023908:
 
 	move.l  D0,D4                                   ; $00023918 2800                     ; 
 	move.l  D3,-(A7)                                ; $0002391A 2F03                     ; 
-	jsr     L_0005A2AA                              ; $0002391C 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $0002391C 4EB9 0005 A2AA           ; 
 
 	lea     12(A7),A7                               ; $00023922 4FEF 000C                ; 
 
@@ -7539,14 +7541,14 @@ L_00023926:
 
 	pea     REPLAY_FILE_OPEN_PARAMETER(pc)                          ; $0002393C 487A FF44                ; 
 	move.l  D6,-(A7)                                ; $00023940 2F06                     ; 
-	jsr     L_00027918                              ; $00023942 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00023942 4EB9 0002 7918           ; 
 
 	move.l  D0,D3                                   ; $00023948 2600                     ; 
 	move.l  D3,-(A7)                                ; $0002394A 2F03                     ; 
 	pea     $1.w                                    ; $0002394C 4878 0001                ; 
 	pea     $E.w                                    ; $00023950 4878 000E                ; 
 	pea     DEMO_REPLAY_HEADER                           ; $00023954 4879 0008 DB36           ; 
-	lea     L_0005A432,A3                           ; $0002395A 47F9 0005 A432           ; 
+	lea     WRITE_FILE,A3                           ; $0002395A 47F9 0005 A432           ; 
 	jsr     (A3)                                    ; $00023960 4E93                     ; 
 
 	move.l  D3,-(A7)                                ; $00023962 2F03                     ; 
@@ -7580,7 +7582,7 @@ L_00023926:
 	jsr     (A3)                                    ; $000239B2 4E93                     ; 
 
 	move.l  D3,-(A7)                                ; $000239B4 2F03                     ; 
-	jsr     L_0005A2AA                              ; $000239B6 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $000239B6 4EB9 0005 A2AA           ; 
 
 L_000239BC:
 	movem.l -36(A6),D3-D6/A3                        ; $000239BC 4CEE 0878 FFDC           ; 
@@ -9114,7 +9116,7 @@ READ_HIGHSCORE_FILE:
 	jsr     READ_FILE                              ; $000248A6 4EB9 0005 A13A           ; 
 
 	move.l  D3,-(A7)                                ; $000248AC 2F03                     ; 
-	jsr     L_0005A2AA                              ; $000248AE 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $000248AE 4EB9 0005 A2AA           ; 
 
 	lea     20(A7),A7                               ; $000248B4 4FEF 0014                ; 
 
@@ -9149,17 +9151,17 @@ WRITE_HIGHSCORE_FILE:
 	move.l  8(A7),D0                                ; $000248E8 202F 0008                ; 
 	pea     L_000248E2(pc)                          ; $000248EC 487A FFF4                ; 
 	move.l  D0,-(A7)                                ; $000248F0 2F00                     ; 
-	jsr     L_00027918                              ; $000248F2 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $000248F2 4EB9 0002 7918           ; 
 
 	move.l  D0,D3                                   ; $000248F8 2600                     ; 
 	move.l  D3,-(A7)                                ; $000248FA 2F03                     ; 
 	pea     $A.w                                    ; $000248FC 4878 000A                ; 
 	pea     $18.w                                   ; $00024900 4878 0018                ; 
 	pea     WORD_0008D994                           ; $00024904 4879 0008 D994           ; 
-	jsr     L_0005A432                              ; $0002490A 4EB9 0005 A432           ; 
+	jsr     WRITE_FILE                              ; $0002490A 4EB9 0005 A432           ; 
 
 	move.l  D3,-(A7)                                ; $00024910 2F03                     ; 
-	jsr     L_0005A2AA                              ; $00024912 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $00024912 4EB9 0005 A2AA           ; 
 
 	lea     28(A7),A7                               ; $00024918 4FEF 001C                ; 
 
@@ -11298,13 +11300,12 @@ L_00025C8A:
 	rts                                             ; $00025CAE 4E75                     ; 
 
 L_00025CB0:
-	dc.b    $72                                    ; r ; 0x00025CB0
-	dc.b    $62                                    ; b ; 0x00025CB1
-	dc.b    $00                                    ;  ; 0x00025CB2
+	dc.b	'rb',0
 
 L_00025CB3:
 	dc.b    'XSP_DAT\SZ_TEXT.pcg',0
-	dc.b    $00                                    ;  ; 0x00025CC7
+
+	even
 
 L_00025CC8:
 	move.l  D3,-(A7)                                ; $00025CC8 2F03                     ; S($0002942A) 
@@ -11320,7 +11321,7 @@ L_00025CC8:
 
 	pea     L_00025CB0(pc)                          ; $00025CEC 487A FFC2                ; 
 	pea     L_00025CB3(pc)                          ; $00025CF0 487A FFC1                ; 
-	jsr     L_00027918                              ; $00025CF4 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00025CF4 4EB9 0002 7918           ; 
 
 	move.l  D0,-(A7)                                ; $00025CFA 2F00                     ; 
 	pea     $20.w                                   ; $00025CFC 4878 0020                ; 
@@ -11329,6 +11330,7 @@ L_00025CC8:
 	jsr     READ_FILE                              ; $00025D06 4EB9 0005 A13A           ; 
 
 	lea     36(A7),A7                               ; $00025D0C 4FEF 0024                ; 
+
 	jsr     L_0005A72A                              ; $00025D10 4EB9 0005 A72A           ; 
 
 	move.l  (A7)+,D3                                ; $00025D16 261F                     ; 
@@ -11942,16 +11944,14 @@ L_00026256:
 	dc.b    $00                                    ;  ; 0x0002628F
 
 L_00026290:
-	dc.b    $72                                    ; r ; 0x00026290
-	dc.b    $62                                    ; b ; 0x00026291
-	dc.b    $00                                    ;  ; 0x00026292
+	dc.b	'rb',0
 
 L_00026293:
 	dc.b    ' PCM_No. %2X : FILE = %s',$0A;	dc.b    $20,$50,$43,$4D,$5F,$4E,$6F,$2E,$20,$25,$32,$58,$20,$3A,$20,$46,$49,$4C,$45,$20,$3D,$20,$25,$73,$0A ; 0x00026293
 	dc.b    $00                                    ;  ; 0x000262AC
 	dc.b    $00                                    ;  ; 0x000262AD
 
-L_000262AE:
+LOAD_PCM_SAMPLE_FILES:
 	link    A6,#-524                                ; $000262AE 4E56 FDF4                ; S($0002941C) 
 
 	movem.l D3-D7,-(A7)                             ; $000262B2 48E7 1F00                ; 
@@ -11972,7 +11972,7 @@ L_000262BE:
 
 	pea     L_0002620E(pc)                          ; $000262D6 487A FF36                ; 
 	pea     L_00026211(pc)                          ; $000262DA 487A FF35                ; 
-	jsr     L_00027918                              ; $000262DE 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $000262DE 4EB9 0002 7918           ; 
 
 	move.l  D0,D7                                   ; $000262E4 2E00                     ; 
 	addq.w  #$8,A7                                  ; $000262E6 504F                     ; 
@@ -12027,7 +12027,7 @@ L_0002633E:
 
 	pea     L_00026290(pc)                          ; $00026368 487A FF26                ; 
 	move.l  D5,-(A7)                                ; $0002636C 2F05                     ; 
-	jsr     L_00027918                              ; $0002636E 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $0002636E 4EB9 0002 7918           ; 
 
 	move.l  D0,D3                                   ; $00026374 2600                     ; 
 	move.l  D3,-(A7)                                ; $00026376 2F03                     ; 
@@ -12054,7 +12054,7 @@ L_0002633E:
 
 	lea     36(A7),A7                               ; $000263B2 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $000263B6 2F03                     ; 
-	jsr     L_0005A2AA                              ; $000263B8 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $000263B8 4EB9 0005 A2AA           ; 
 
 	addq.w  #$4,A7                                  ; $000263BE 584F                     ; 
 
@@ -12093,7 +12093,7 @@ L_000263F6:
 	bne.w   L_000262FA                              ; $0002640C 6600 FEEC                ; 
 
 	move.l  D7,-(A7)                                ; $00026410 2F07                     ; 
-	jsr     L_0005A2AA                              ; $00026412 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $00026412 4EB9 0005 A2AA           ; 
 
 	jsr     L_000235EC                              ; $00026418 4EB9 0002 35EC           ; 
 
@@ -12491,7 +12491,7 @@ L_0002672C:
 
 	pea     L_000265E6(pc)                          ; $0002673C 487A FEA8                ; 
 	pea     L_000265E9(pc)                          ; $00026740 487A FEA7                ; 
-	jsr     L_00027918                              ; $00026744 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00026744 4EB9 0002 7918           ; 
 
 	move.l  D0,D7                                   ; $0002674A 2E00                     ; 
 	addq.w  #$8,A7                                  ; $0002674C 504F                     ; 
@@ -12538,7 +12538,7 @@ L_0002679A:
 
 	pea     L_00026652(pc)                          ; $000267B0 487A FEA0                ; 
 	move.l  D6,-(A7)                                ; $000267B4 2F06                     ; 
-	jsr     L_00027918                              ; $000267B6 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $000267B6 4EB9 0002 7918           ; 
 
 	move.l  D0,D4                                   ; $000267BC 2800                     ; 
 	move.l  D4,-(A7)                                ; $000267BE 2F04                     ; 
@@ -12565,7 +12565,7 @@ L_0002679A:
 
 	lea     36(A7),A7                               ; $000267F8 4FEF 0024                ; 
 	move.l  D4,-(A7)                                ; $000267FC 2F04                     ; 
-	jsr     L_0005A2AA                              ; $000267FE 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $000267FE 4EB9 0005 A2AA           ; 
 
 	addq.w  #$4,A7                                  ; $00026804 584F                     ; 
 
@@ -12611,7 +12611,7 @@ L_00026848:
 
 	pea     L_00026652(pc)                          ; $00026862 487A FDEE                ; 
 	move.l  D6,-(A7)                                ; $00026866 2F06                     ; 
-	jsr     L_00027918                              ; $00026868 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00026868 4EB9 0002 7918           ; 
 
 	move.l  D0,D4                                   ; $0002686E 2800                     ; 
 	move.l  D4,-(A7)                                ; $00026870 2F04                     ; 
@@ -12634,7 +12634,7 @@ L_00026848:
 	lea     36(A7),A7                               ; $0002689C 4FEF 0024                ; 
 
 	move.l  D4,-(A7)                                ; $000268A0 2F04                     ; 
-	jsr     L_0005A2AA                              ; $000268A2 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $000268A2 4EB9 0005 A2AA           ; 
 
 	move.l  D3,-(A7)                                ; $000268A8 2F03                     ; 
 	move.l  D5,-(A7)                                ; $000268AA 2F05                     ; 
@@ -12681,7 +12681,7 @@ L_000268E6:
 	bne.w   L_00026760                              ; $000268FC 6600 FE62                ; 
 
 	move.l  D7,-(A7)                                ; $00026900 2F07                     ; 
-	jsr     L_0005A2AA                              ; $00026902 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $00026902 4EB9 0005 A2AA           ; 
 
 	jsr     L_000235EC                              ; $00026908 4EB9 0002 35EC           ; 
 
@@ -14446,7 +14446,7 @@ L_00027893:
 LOAD_RANDOM_TABLE:
 	pea     L_00027890(pc)                          ; $000278A6 487A FFE8                ; S($00029422) 
 	pea     L_00027893(pc)                          ; $000278AA 487A FFE7                ; 
-	bsr.s   L_00027918                              ; $000278AE 6168                     ; 
+	bsr.s   OPEN_FILE                              ; $000278AE 6168                     ; 
 
 	move.l  D0,-(A7)                                ; $000278B0 2F00                     ; 
 	pea     $400.w                                  ; $000278B2 4878 0400                ; 
@@ -14535,7 +14535,7 @@ ANOTHER_STRING_PRINT_FORMAT:
 	dc.b    $0A                                    ;  ; 0x00027916
 	dc.b    $00                                    ;  ; 0x00027917
 
-L_00027918:
+OPEN_FILE:
 	movem.l D3-D4/A3,-(A7)                          ; $00027918 48E7 1810                ; S($00026744) 
 
 	move.l  16(A7),D4                               ; $0002791C 282F 0010                ; 
@@ -15869,7 +15869,7 @@ L_00028864:
 	move.l  D1,LONG_0008966C                        ; $0002887A 23C1 0008 966C           ; 
 	pea     L_00028766(pc)                          ; $00028880 487A FEE4                ; 
 	pea     L_00028769(pc)                          ; $00028884 487A FEE3                ; 
-	jsr     L_00027918                              ; $00028888 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00028888 4EB9 0002 7918           ; 
 
 	move.l  D0,D5                                   ; $0002888E 2A00                     ; 
 	addq.w  #$8,A7                                  ; $00028890 504F                     ; 
@@ -15989,7 +15989,7 @@ L_000288FE:
 
 	move.l  D0,(A4)                                 ; $000289AE 2880                     ; 
 	move.l  D5,-(A7)                                ; $000289B0 2F05                     ; 
-	jsr     L_0005A2AA                              ; $000289B2 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $000289B2 4EB9 0005 A2AA           ; 
 
 	movem.l -284(A6),D3-D5/A3-A5                    ; $000289B8 4CEE 3838 FEE4           ; 
 
@@ -16170,7 +16170,7 @@ L_00028AE6:
 	move.l  (A3),D5                                 ; $00028AEC 2A13                     ; 
 	pea     L_00028A62(pc)                          ; $00028AEE 487A FF72                ; 
 	move.l  D6,-(A7)                                ; $00028AF2 2F06                     ; 
-	jsr     L_00027918                              ; $00028AF4 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00028AF4 4EB9 0002 7918           ; 
 
 	move.l  D0,D3                                   ; $00028AFA 2600                     ; 
 	move.l  D3,-(A7)                                ; $00028AFC 2F03                     ; 
@@ -16184,7 +16184,7 @@ L_00028AE6:
 
 	move.l  D0,D4                                   ; $00028B16 2800                     ; 
 	move.l  D3,-(A7)                                ; $00028B18 2F03                     ; 
-	jsr     L_0005A2AA                              ; $00028B1A 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $00028B1A 4EB9 0005 A2AA           ; 
 
 	lea     28(A7),A7                               ; $00028B20 4FEF 001C                ; 
 
@@ -16308,7 +16308,7 @@ L_00028BCA:
 	move.l  (A3),D6                                 ; $00028BDC 2C13                     ; 
 	pea     L_00028A62(pc)                          ; $00028BDE 487A FE82                ; 
 	move.l  D5,-(A7)                                ; $00028BE2 2F05                     ; 
-	jsr     L_00027918                              ; $00028BE4 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00028BE4 4EB9 0002 7918           ; 
 
 	move.l  D0,D3                                   ; $00028BEA 2600                     ; 
 	move.l  D3,-(A7)                                ; $00028BEC 2F03                     ; 
@@ -16324,7 +16324,7 @@ L_00028BCA:
 
 	move.l  D0,D4                                   ; $00028C0E 2800                     ; 
 	move.l  D3,-(A7)                                ; $00028C10 2F03                     ; 
-	jsr     L_0005A2AA                              ; $00028C12 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $00028C12 4EB9 0005 A2AA           ; 
 
 	lea     28(A7),A7                               ; $00028C18 4FEF 001C                ; 
 	tst.w   DEBUG_MODE                           ; $00028C1C 4A79 0008 DAFE           ; 
@@ -16468,7 +16468,7 @@ L_00028CF6:
 	move.l  (A3),D6                                 ; $00028D04 2C13                     ; 
 	pea     L_00028A62(pc)                          ; $00028D06 487A FD5A                ; 
 	move.l  D5,-(A7)                                ; $00028D0A 2F05                     ; 
-	jsr     L_00027918                              ; $00028D0C 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $00028D0C 4EB9 0002 7918           ; 
 
 	move.l  D0,D3                                   ; $00028D12 2600                     ; 
 	move.l  D3,-(A7)                                ; $00028D14 2F03                     ; 
@@ -16484,7 +16484,7 @@ L_00028CF6:
 
 	move.l  D0,D4                                   ; $00028D36 2800                     ; 
 	move.l  D3,-(A7)                                ; $00028D38 2F03                     ; 
-	jsr     L_0005A2AA                              ; $00028D3A 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $00028D3A 4EB9 0005 A2AA           ; 
 
 	lea     28(A7),A7                               ; $00028D40 4FEF 001C                ; 
 	tst.w   DEBUG_MODE                           ; $00028D44 4A79 0008 DAFE           ; 
@@ -16782,7 +16782,7 @@ INITIALIZE_GAME:
 	move.l  #L_00028F14,D4                          ; $0002900A 283C 0002 8F14           ; 
 	move.l  D4,-(A7)                                ; $00029010 2F04                     ; 
 	pea     L_00028F17(pc)                          ; $00029012 487A FF03                ; 
-	lea     L_00027918,A4                           ; $00029016 49F9 0002 7918           ; 
+	lea     OPEN_FILE,A4                           ; $00029016 49F9 0002 7918           ; 
 	jsr     (A4)                                    ; $0002901C 4E94                     ; 
 
 	move.l  D0,-(A7)                                ; $0002901E 2F00                     ; 
@@ -16911,7 +16911,7 @@ INITIALIZE_GAME:
 	lea     32(A7),A7                               ; $00029164 4FEF 0020                ; 
 
 	move.l  D5,-(A7)                                ; $00029168 2F05                     ; 
-	lea     L_0005A2AA,A5                           ; $0002916A 4BF9 0005 A2AA           ; 
+	lea     CLOSE_FILE,A5                           ; $0002916A 4BF9 0005 A2AA           ; 
 	jsr     (A5)                                    ; $00029170 4E95                     ; 
 
 	move.l  D4,-(A7)                                ; $00029172 2F04                     ; 
@@ -17217,7 +17217,7 @@ skip_sincos:
 
 	jsr     L_00029D20                              ; $00029416 4EB9 0002 9D20           ; 
 
-	jsr     L_000262AE                              ; $0002941C 4EB9 0002 62AE           ; 
+	jsr     LOAD_PCM_SAMPLE_FILES                              ; $0002941C 4EB9 0002 62AE           ; 
 
 	jsr     LOAD_RANDOM_TABLE                              ; $00029422 4EB9 0002 78A6           ; 
 
@@ -18525,7 +18525,7 @@ L_00029D44:
 
 	pea     L_00029CF6(pc)                          ; $0002A550 487A F7A4                ; 
 	pea     L_00029CF9(pc)                          ; $0002A554 487A F7A3                ; 
-	jsr     L_00027918                              ; $0002A558 4EB9 0002 7918           ; 
+	jsr     OPEN_FILE                              ; $0002A558 4EB9 0002 7918           ; 
 
 	move.l  D0,D4                                   ; $0002A55E 2800                     ; 
 	addq.w  #$8,A7                                  ; $0002A560 504F                     ; 
@@ -89881,7 +89881,7 @@ L_0005A2A6:
 
 	rts                                             ; $0005A2A8 4E75                     ; 
 
-L_0005A2AA:
+CLOSE_FILE:
 	movea.l 4(A7),A2                                ; $0005A2AA 246F 0004                ; S($0005A746) 
 	move.l  12(A2),D0                               ; $0005A2AE 202A 000C                ; 
 	beq.w   L_0005A3BC                              ; $0005A2B2 6700 0108                ; 
@@ -90060,6 +90060,7 @@ L_0005A3E8:
 	jsr     L_0005C398                              ; $0005A410 4EB9 0005 C398           ; 
 
 	addq.l  #$4,A7                                  ; $0005A416 588F                     ; 
+
 	move.l  (A7),D1                                 ; $0005A418 2217                     ; 
 	move.l  D0,(A7)                                 ; $0005A41A 2E80                     ; 
 	clr.l   -(A7)                                   ; $0005A41C 42A7                     ; 
@@ -90074,7 +90075,7 @@ L_0005A42E:
 
 	rts                                             ; $0005A430 4E75                     ; 
 
-L_0005A432:
+WRITE_FILE:
 	movem.l D6-D7/A5-A6,-(A7)                       ; $0005A432 48E7 0306                ; S($0002490A) 
 	movem.l 20(A7),D0-D2/A6                         ; $0005A436 4CEF 4007 0014           ; 
 	movea.l D0,A5                                   ; $0005A43C 2A40                     ; 
@@ -90565,7 +90566,7 @@ L_0005A73E:
 	beq.s   L_0005A750                              ; $0005A742 670C                     ; 
 
 	move.l  A6,(A7)                                 ; $0005A744 2E8E                     ; 
-	jsr     L_0005A2AA                              ; $0005A746 4EB9 0005 A2AA           ; 
+	jsr     CLOSE_FILE                              ; $0005A746 4EB9 0005 A2AA           ; 
 
 	addq.l  #$1,D6                                  ; $0005A74C 5286                     ; 
 	or.l    D0,D5                                   ; $0005A74E 8A80                     ; 
