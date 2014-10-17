@@ -865,6 +865,7 @@ keyboard:
 	jne		.skip_left_arrow1
 
 	bclr	#2,iocs_joystick_data+3 ; Joystick left.
+	bset	#3,iocs_joystick_data+3 ; Not joystick right.
 
 	move.l	(sp)+,d0
 
@@ -885,6 +886,7 @@ keyboard:
 	jne		.skip_right_arrow1
 
 	bclr	#3,iocs_joystick_data+3 ; Joystick right.
+	bset	#2,iocs_joystick_data+3 ; Not joystick left.
 
 	move.l	(sp)+,d0
 
@@ -905,6 +907,7 @@ keyboard:
 	jne		.skip_up_arrow1
 
 	bclr	#0,iocs_joystick_data+3 ; Joystick up.
+	bset	#1,iocs_joystick_data+3 ; Not joystick down.
 
 	move.l	(sp)+,d0
 
@@ -925,6 +928,7 @@ keyboard:
 	jne		.skip_down_arrow1
 
 	bclr	#1,iocs_joystick_data+3 ; Joystick down.
+	bset	#0,iocs_joystick_data+3 ; Not joystick up.
 
 	move.l	(sp)+,d0
 
@@ -957,25 +961,34 @@ keyboard:
 
 	rte
 
+.process_joystick_data:
+	; d0.b = %t000dddd (t = trigger, d = directions).
+
+	and.b	#$f,d0
+	not.b	d0
+	move.b	d0,iocs_joystick_data+3
+	
+	move.l	#.process_key_code,.processing_routine
+	
+	move.l	(sp)+,d0
+
+	rte
+
 .check_mouse:
 	cmp.b	#$f8,d0 ; Mouse?
 	jlo		.unsupported_code
 
 	; d0.b = %111110lr (l = left button, r = right button).
 
+	bset	#5,iocs_joystick_data+3 ; Joystick button #2 up.
+
+	btst	#0,d0
+	jeq		.not_button_down
+
+	bclr	#5,iocs_joystick_data+3 ; Joystick button #2 down.
+
+.not_button_down:
 	move.l	#.process_mouse_delta_x,.processing_routine
-
-	move.l	(sp)+,d0
-
-	rte
-
-.unsupported_code:
-	illegal
-
-.process_joystick_data:
-	; d0.b = %t000dddd (t = trigger, d = directions).
-
-	move.l	#.process_key_code,.processing_routine
 
 	move.l	(sp)+,d0
 
@@ -998,6 +1011,9 @@ keyboard:
 	move.l	(sp)+,d0
 
 	rte
+
+.unsupported_code:
+	illegal
 
 .processing_routine:
 	dc.l	.process_key_code
