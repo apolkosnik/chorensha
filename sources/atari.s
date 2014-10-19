@@ -109,20 +109,40 @@ init:
 	move	$ffff820a.w,a2
 	movem.l	d0-a2,old_videl
 
-	move.l	#$C7009E,$ffff8282.w
-	move.l	#$1E0009,$ffff8286.w
-	move.l	#$6100AB,$ffff828A.w
-	move.l	#$20D0201,$ffff82A2.w
-	move.l	#$170025,$ffff82A6.w
-	move.l	#$2050207,$ffff82AA.w
-	move	#$200,$ffff820A.w
-	move	#$185,$ffff82C0.w
-	clr		$ffff8266.w
-	move	#$10,$ffff8266.w
-	move	#$0,$ffff82C2.w
-	move	#$80,$ffff8210.w
+	; 256 * 240, 256 colors.
 
-	move.b	#(512-256)/2,$ffff820f.w
+	rem
+		move.l	#$c7009e,$ffff8282.w
+		move.l	#$1e0009,$ffff8286.w
+		move.l	#$6100ab,$ffff828a.w
+		move.l	#$20d0201,$ffff82a2.w
+		move.l	#$170025,$ffff82a6.w
+		move.l	#$2050207,$ffff82aa.w
+		move	#$200,$ffff820a.w
+		move	#$185,$ffff82c0.w
+		clr		$ffff8266.w
+		move	#$10,$ffff8266.w
+		move	#$0,$ffff82c2.w
+		move	#$80,$ffff8210.w
+	erem
+
+	; 256 * 240, high color.
+
+	move.l	#$c7009e,$ffff8282.w
+	move.l	#$1e001b,$ffff8286.w
+	move.l	#$7300ab,$ffff828a.w
+	move.l	#$20d0201,$ffff82a2.w
+	move.l	#$170025,$ffff82a6.w
+	move.l	#$2050207,$ffff82aa.w
+	move	#$200,$ffff820a.w
+	move	#$185,$ffff82c0.w
+	clr		$ffff8266.w
+	move	#$100,$ffff8266.w
+	move	#$0,$ffff82c2.w
+	move	#$100,$ffff8210.w
+
+;	move	#(512-256)/2,$ffff820e.w
+	move	#(512-256),$ffff820e.w
 
 	clr.b	$fffffa07.w
 	clr.b	$fffffa09.w
@@ -133,7 +153,8 @@ init:
 	move.l	#trap_2,$88.w
 	move.l	#trap_4,$90.w
 	move.l	#trap_f,$bc.w
-	move.l	#vbl,$70.w
+;	move.l	#vbl_256,$70.w
+	move.l	#vbl_tc,$70.w
 	move.l	#keyboard,$118.w
 
 	bset	#6,$fffffa09.w
@@ -670,7 +691,832 @@ iocs_joystick_data:
 
 ; ------------------------------------------------------------------------------
 
-vbl:
+convert_palettes:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	lea		L_00E82000+$200,a0
+	lea		converted_sprite_palettes,a1
+
+	move	#16*16-1,d7
+
+.loop:
+	move	(a0)+,d0
+
+	bfextu	d0{16+5:5},d1
+	bfextu	d0{16+0:5},d2
+	bfextu	d0{16+10:5},d3
+
+	clr		d0
+
+	bfins	d1,d0{16+0:5}
+	bfins	d2,d0{16+5:5}
+	bfins	d3,d0{16+11:5}
+
+	move	d0,(a1)+
+
+	dbf		d7,.loop
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
+
+	bss
+
+converted_sprite_palettes:
+	ds.w	16*16
+
+	text
+
+; ------------------------------------------------------------------------------
+
+vbl_tc:
+	move.b	display_screen_address+1,$ffff8201.w
+	move.b	display_screen_address+2,$ffff8203.w
+	move.b	display_screen_address+3,$ffff820d.w
+
+	addq	#1,vbl_wait_counter
+
+	move.l	L_00000118,-(sp)
+
+	rts
+
+; ------------------------------------------------------------------------------
+
+draw_tc_sprites:
+	movem.l	d0-a6,-(sp)
+
+	; Clear screen.
+
+	move.l	work_screen_address,a0
+	add.l	#512*2*16+16*2,a0
+
+	clr.l	d0
+	move.l	d0,d1
+	move.l	d0,d2
+	move.l	d0,d3
+	move.l	d0,d4
+	move.l	d0,d5
+	move.l	d0,d6
+	move.l	d0,a1
+	move.l	d0,a2
+	move.l	d0,a3
+	move.l	d0,a4
+	move.l	d0,a5
+
+	move	#240-1,d7
+
+.clear_loop:
+	movem.l	d0-d6/a1-a5,(a0)
+	movem.l	d0-d6/a1-a5,12*4(a0)
+	movem.l	d0-d6/a1-a5,12*4*2(a0)
+	movem.l	d0-d6/a1-a5,12*4*3(a0)
+	movem.l	d0-d6/a1-a5,12*4*4(a0)
+	movem.l	d0-d6/a1-a5,12*4*5(a0)
+	movem.l	d0-d6/a1-a5,12*4*6(a0)
+	movem.l	d0-d6/a1-a5,12*4*7(a0)
+	movem.l	d0-d6/a1-a5,12*4*8(a0)
+	movem.l	d0-d6/a1-a5,12*4*9(a0)
+	movem.l	d0-d6/a1,12*4*10(a0)
+
+	add.l	#256*2*2,a0
+
+	dbf		d7,.clear_loop
+
+	; Convert palettes.
+
+	jbsr	convert_palettes
+
+	; Draw sprites.
+
+	move.l	work_screen_address,a0
+	lea		L_00EB0000,a1 ; Sprite infos table.
+	lea		L_00EB8000,a2 ; Sprite data table.
+;	lea		L_00E82000+$200,a3 ; Sprite palette table.
+	lea		converted_sprite_palettes,a3 ; Sprite palette table.
+
+	move	#128-1,d7
+
+draw_tc_sprites_loop:
+	move	(a1)+,d0 ; X position.
+	move	(a1)+,d1 ; Y position.
+	move	(a1)+,d2 ; VF, HF, palette index, pattern index.
+	move	(a1)+,d3 ; Priority (0 = no display).
+
+	jeq		.skip_sprite
+
+	cmp		#16+240,d1
+	jge		.skip_sprite
+
+	lea		(a0,d0.w*2),a4
+	swap	d1
+	clr		d1
+	lsr.l	#6,d1
+	add.l	d1,a4 ; Screen address.
+
+	move	d2,d3
+
+	and		#$e000,d3
+	jeq		draw_tc_sprites_normal
+
+	cmp		#$8000,d3
+	jeq		draw_tc_sprites_vertical_flipped
+
+	cmp		#$4000,d3
+	jeq		draw_tc_sprites_horizontal_flipped
+
+; --------------------------------------
+; draw_tc_sprites_vertical_and_horizontal_flipped:
+; --------------------------------------
+	add.l	#15*512*2,a4
+
+	move	d2,d3
+	lsr		#3,d2
+	and.l	#$1e0,d2
+	lea		(a3,d2.l),a5 ; Palette address.
+
+	and.l	#$ff,d3
+	lsl.l	#2+3+2,d3
+	lea		(a2,d3.l),a6 ; Sprite data.
+
+	clr.l	d0
+	move	#$f0,d2
+	move	#$0f,d3
+
+	move	#2-1,d6
+
+.loop1:
+	move	#8-1,d5
+
+.loop2:
+	move.b	(a6),d0
+	jeq		.draw_sprite_pixel1l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0l
+
+	lsr		#3,d0
+	move	(a5,d0.w),30(a4)
+
+.draw_sprite_pixel0l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1l
+
+	move	(a5,d1.w*2),28(a4)
+
+.draw_sprite_pixel1l:
+	move.b	1(a6),d0
+	jeq		.draw_sprite_pixel3l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2l
+
+	lsr		#3,d0
+	move	(a5,d0.w),26(a4)
+
+.draw_sprite_pixel2l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3l
+
+	move	(a5,d1.w*2),24(a4)
+
+.draw_sprite_pixel3l:
+	move.b	2(a6),d0
+	jeq		.draw_sprite_pixel5l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4l
+
+	lsr		#3,d0
+	move	(a5,d0.w),22(a4)
+
+.draw_sprite_pixel4l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5l
+
+	move	(a5,d1.w*2),20(a4)
+
+.draw_sprite_pixel5l:
+	move.b	3(a6),d0
+	jeq		.draw_sprite_pixel7l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6l
+
+	lsr		#3,d0
+	move	(a5,d0.w),18(a4)
+
+.draw_sprite_pixel6l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7l
+
+	move	(a5,d1.w*2),16(a4)
+
+.draw_sprite_pixel7l:
+	move.b	4*16(a6),d0
+	jeq		.draw_sprite_pixel1r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0r
+
+	lsr		#3,d0
+	move	(a5,d0.w),14(a4)
+
+.draw_sprite_pixel0r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1r
+
+	move	(a5,d1.w*2),12(a4)
+
+.draw_sprite_pixel1r:
+	move.b	4*16+1(a6),d0
+	jeq		.draw_sprite_pixel3r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2r
+
+	lsr		#3,d0
+	move	(a5,d0.w),10(a4)
+
+.draw_sprite_pixel2r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3r
+
+	move	(a5,d1.w*2),8(a4)
+
+.draw_sprite_pixel3r:
+	move.b	4*16+2(a6),d0
+	jeq		.draw_sprite_pixel5r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4r
+
+	lsr		#3,d0
+	move	(a5,d0.w),6(a4)
+
+.draw_sprite_pixel4r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5r
+
+	move	(a5,d1.w*2),4(a4)
+
+.draw_sprite_pixel5r:
+	move.b	4*16+3(a6),d0
+	jeq		.draw_sprite_pixel7r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6r
+
+	lsr		#3,d0
+	move	(a5,d0.w),2(a4)
+
+.draw_sprite_pixel6r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7r
+
+	move	(a5,d1.w*2),(a4)
+
+.draw_sprite_pixel7r:
+	addq.l	#4,a6
+	lea		-512*2(a4),a4
+
+	dbf		d5,.loop2
+
+	dbf		d6,.loop1
+
+.skip_sprite:
+	dbf		d7,draw_tc_sprites_loop
+
+	jra		draw_tc_sprites_end
+
+; --------------------------------------
+draw_tc_sprites_normal:
+; --------------------------------------
+	move	d2,d3
+	lsr		#3,d2
+	and.l	#$1e0,d2
+	lea		(a3,d2.l),a5 ; Palette address.
+
+	and.l	#$ff,d3
+	lsl.l	#2+3+2,d3
+	lea		(a2,d3.l),a6 ; Sprite data.
+
+	clr.l	d0
+	move	#$f0,d2
+	move	#$0f,d3
+
+	move	#2-1,d6
+
+.loop1:
+	move	#8-1,d5
+
+.loop2:
+	move.b	(a6),d0
+	jeq		.draw_sprite_pixel1l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0l
+
+	lsr		#3,d0
+	move	(a5,d0.w),(a4)
+
+.draw_sprite_pixel0l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1l
+
+	move	(a5,d1.w*2),2(a4)
+
+.draw_sprite_pixel1l:
+	move.b	1(a6),d0
+	jeq		.draw_sprite_pixel3l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2l
+
+	lsr		#3,d0
+	move	(a5,d0.w),4(a4)
+
+.draw_sprite_pixel2l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3l
+
+	move	(a5,d1.w*2),6(a4)
+
+.draw_sprite_pixel3l:
+	move.b	2(a6),d0
+	jeq		.draw_sprite_pixel5l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4l
+
+	lsr		#3,d0
+	move	(a5,d0.w),8(a4)
+
+.draw_sprite_pixel4l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5l
+
+	move	(a5,d1.w*2),10(a4)
+
+.draw_sprite_pixel5l:
+	move.b	3(a6),d0
+	jeq		.draw_sprite_pixel7l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6l
+
+	lsr		#3,d0
+	move	(a5,d0.w),12(a4)
+
+.draw_sprite_pixel6l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7l
+
+	move	(a5,d1.w*2),14(a4)
+
+.draw_sprite_pixel7l:
+	move.b	4*16(a6),d0
+	jeq		.draw_sprite_pixel1r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0r
+
+	lsr		#3,d0
+	move	(a5,d0.w),16(a4)
+
+.draw_sprite_pixel0r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1r
+
+	move	(a5,d1.w*2),18(a4)
+
+.draw_sprite_pixel1r:
+	move.b	4*16+1(a6),d0
+	jeq		.draw_sprite_pixel3r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2r
+
+	lsr		#3,d0
+	move	(a5,d0.w),20(a4)
+
+.draw_sprite_pixel2r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3r
+
+	move	(a5,d1.w*2),22(a4)
+
+.draw_sprite_pixel3r:
+	move.b	4*16+2(a6),d0
+	jeq		.draw_sprite_pixel5r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4r
+
+	lsr		#3,d0
+	move	(a5,d0.w),24(a4)
+
+.draw_sprite_pixel4r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5r
+
+	move	(a5,d1.w*2),26(a4)
+
+.draw_sprite_pixel5r:
+	move.b	4*16+3(a6),d0
+	jeq		.draw_sprite_pixel7r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6r
+
+	lsr		#3,d0
+	move	(a5,d0.w),28(a4)
+
+.draw_sprite_pixel6r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7r
+
+	move	(a5,d1.w*2),30(a4)
+
+.draw_sprite_pixel7r:
+	addq.l	#4,a6
+	lea		512*2(a4),a4
+
+	dbf		d5,.loop2
+
+	dbf		d6,.loop1
+
+	dbf		d7,draw_tc_sprites_loop
+
+	jra		draw_tc_sprites_end
+
+; --------------------------------------
+draw_tc_sprites_vertical_flipped:
+; --------------------------------------
+	add.l	#15*512*2,a4
+
+	move	d2,d3
+	lsr		#3,d2
+	and.l	#$1e0,d2
+	lea		(a3,d2.l),a5 ; Palette address.
+
+	and.l	#$ff,d3
+	lsl.l	#2+3+2,d3
+	lea		(a2,d3.l),a6 ; Sprite data.
+
+	clr.l	d0
+	move	#$f0,d2
+	move	#$0f,d3
+
+	move	#2-1,d6
+
+.loop1:
+	move	#8-1,d5
+
+.loop2:
+	move.b	(a6),d0
+	jeq		.draw_sprite_pixel1l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0l
+
+	lsr		#3,d0
+	move	(a5,d0.w),(a4)
+
+.draw_sprite_pixel0l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1l
+
+	move	(a5,d1.w*2),2(a4)
+
+.draw_sprite_pixel1l:
+	move.b	1(a6),d0
+	jeq		.draw_sprite_pixel3l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2l
+
+	lsr		#3,d0
+	move	(a5,d0.w),4(a4)
+
+.draw_sprite_pixel2l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3l
+
+	move	(a5,d1.w*2),6(a4)
+
+.draw_sprite_pixel3l:
+	move.b	2(a6),d0
+	jeq		.draw_sprite_pixel5l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4l
+
+	lsr		#3,d0
+	move	(a5,d0.w),8(a4)
+
+.draw_sprite_pixel4l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5l
+
+	move	(a5,d1.w*2),10(a4)
+
+.draw_sprite_pixel5l:
+	move.b	3(a6),d0
+	jeq		.draw_sprite_pixel7l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6l
+
+	lsr		#3,d0
+	move	(a5,d0.w),12(a4)
+
+.draw_sprite_pixel6l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7l
+
+	move	(a5,d1.w*2),14(a4)
+
+.draw_sprite_pixel7l:
+	move.b	4*16(a6),d0
+	jeq		.draw_sprite_pixel1r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0r
+
+	lsr		#3,d0
+	move	(a5,d0.w),16(a4)
+
+.draw_sprite_pixel0r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1r
+
+	move	(a5,d1.w*2),18(a4)
+
+.draw_sprite_pixel1r:
+	move.b	4*16+1(a6),d0
+	jeq		.draw_sprite_pixel3r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2r
+
+	lsr		#3,d0
+	move	(a5,d0.w),20(a4)
+
+.draw_sprite_pixel2r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3r
+
+	move	(a5,d1.w*2),22(a4)
+
+.draw_sprite_pixel3r:
+	move.b	4*16+2(a6),d0
+	jeq		.draw_sprite_pixel5r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4r
+
+	lsr		#3,d0
+	move	(a5,d0.w),24(a4)
+
+.draw_sprite_pixel4r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5r
+
+	move	(a5,d1.w*2),26(a4)
+
+.draw_sprite_pixel5r:
+	move.b	4*16+3(a6),d0
+	jeq		.draw_sprite_pixel7r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6r
+
+	lsr		#3,d0
+	move	(a5,d0.w),28(a4)
+
+.draw_sprite_pixel6r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7r
+
+	move	(a5,d1.w*2),30(a4)
+
+.draw_sprite_pixel7r:
+	addq.l	#4,a6
+	lea		-512*2(a4),a4
+
+	dbf		d5,.loop2
+
+	dbf		d6,.loop1
+
+	dbf		d7,draw_tc_sprites_loop
+
+	jra		draw_tc_sprites_end
+
+; --------------------------------------
+draw_tc_sprites_horizontal_flipped:
+; --------------------------------------
+	move	d2,d3
+	lsr		#3,d2
+	and.l	#$1e0,d2
+	lea		(a3,d2.l),a5 ; Palette address.
+
+	and.l	#$ff,d3
+	lsl.l	#2+3+2,d3
+	lea		(a2,d3.l),a6 ; Sprite data.
+
+	clr.l	d0
+	move	#$f0,d2
+	move	#$0f,d3
+
+	move	#2-1,d6
+
+.loop1:
+	move	#8-1,d5
+
+.loop2:
+	move.b	(a6),d0
+	jeq		.draw_sprite_pixel1l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0l
+
+	lsr		#3,d0
+	move	(a5,d0.w),30(a4)
+
+.draw_sprite_pixel0l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1l
+
+	move	(a5,d1.w*2),28(a4)
+
+.draw_sprite_pixel1l:
+	move.b	1(a6),d0
+	jeq		.draw_sprite_pixel3l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2l
+
+	lsr		#3,d0
+	move	(a5,d0.w),26(a4)
+
+.draw_sprite_pixel2l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3l
+
+	move	(a5,d1.w*2),24(a4)
+
+.draw_sprite_pixel3l:
+	move.b	2(a6),d0
+	jeq		.draw_sprite_pixel5l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4l
+
+	lsr		#3,d0
+	move	(a5,d0.w),22(a4)
+
+.draw_sprite_pixel4l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5l
+
+	move	(a5,d1.w*2),20(a4)
+
+.draw_sprite_pixel5l:
+	move.b	3(a6),d0
+	jeq		.draw_sprite_pixel7l
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6l
+
+	lsr		#3,d0
+	move	(a5,d0.w),18(a4)
+
+.draw_sprite_pixel6l:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7l
+
+	move	(a5,d1.w*2),16(a4)
+
+.draw_sprite_pixel7l:
+	move.b	4*16(a6),d0
+	jeq		.draw_sprite_pixel1r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel0r
+
+	lsr		#3,d0
+	move	(a5,d0.w),14(a4)
+
+.draw_sprite_pixel0r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel1r
+
+	move	(a5,d1.w*2),12(a4)
+
+.draw_sprite_pixel1r:
+	move.b	4*16+1(a6),d0
+	jeq		.draw_sprite_pixel3r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel2r
+
+	lsr		#3,d0
+	move	(a5,d0.w),10(a4)
+
+.draw_sprite_pixel2r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel3r
+
+	move	(a5,d1.w*2),8(a4)
+
+.draw_sprite_pixel3r:
+	move.b	4*16+2(a6),d0
+	jeq		.draw_sprite_pixel5r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel4r
+
+	lsr		#3,d0
+	move	(a5,d0.w),6(a4)
+
+.draw_sprite_pixel4r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel5r
+
+	move	(a5,d1.w*2),4(a4)
+
+.draw_sprite_pixel5r:
+	move.b	4*16+3(a6),d0
+	jeq		.draw_sprite_pixel7r
+
+	move	d0,d1
+	and		d2,d0
+	jeq		.draw_sprite_pixel6r
+
+	lsr		#3,d0
+	move	(a5,d0.w),2(a4)
+
+.draw_sprite_pixel6r:
+	and		d3,d1
+	jeq		.draw_sprite_pixel7r
+
+	move	(a5,d1.w*2),(a4)
+
+.draw_sprite_pixel7r:
+	addq.l	#4,a6
+	lea		512*2(a4),a4
+
+	dbf		d5,.loop2
+
+	dbf		d6,.loop1
+
+	dbf		d7,draw_tc_sprites_loop
+
+draw_tc_sprites_end:
+	move.l	work_screen_address,d0
+	move.l	show_screen_address,work_screen_address
+	move.l	d0,show_screen_address
+	add.l	#512*2*16+16*2,d0
+	move.l	d0,display_screen_address
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+
+vbl_256:
 	movem.l	d0-a6,-(sp)
 
 	move.l	work_screen_address,d0
@@ -681,6 +1527,8 @@ vbl:
 	move.b	display_screen_address+1,$ffff8201.w
 	move.b	display_screen_address+2,$ffff8203.w
 	move.b	display_screen_address+3,$ffff820d.w
+
+	; Draw sprites.
 
 	move.l	work_screen_address,a0
 	add.l	#512*16+16,a0
@@ -1042,7 +1890,7 @@ show_screen_address:
 	dc.l	screen2
 
 display_screen_address:
-	dc.l	0
+	dc.l	screen1
 
 	bss
 
@@ -1090,12 +1938,13 @@ old_fa13:
 old_fa15:
 	ds.b	1
 
-	even
+	align 4
 
 screen1:
-	ds.b	256*2*(16+240+16)
+;	ds.b	256*2*(16+240+16)
+	ds.b	256*2*2*(16+240+16)
 
 screen2:
-	ds.b	256*2*(16+240+16)
-
+;	ds.b	256*2*(16+240+16)
+	ds.b	256*2*2*(16+240+16)
 

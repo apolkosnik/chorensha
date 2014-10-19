@@ -2808,6 +2808,18 @@ L_00021602:
 
 	movem.l (A7)+,D1-D7/A0-A6                       ; $0002161C 4CDF 7FFE                ; 
 
+	ifd __ATARI__
+
+	jbsr	draw_tc_sprites
+
+	endif
+
+	ifd __AMIGA__
+
+	illegal
+
+	endif
+
 	rts                                             ; $00021620 4E75                     ; 
 
 VBL_INTERRUPT_HANDLER:
@@ -2971,6 +2983,7 @@ L_000217BE:
 	movea.l #L_00E88000+$0,A0                       ; $000217C6 207C 00E8 8000           ; [MFP + $0]  
 	move.b  (A7)+,21(A0)                            ; $000217CC 115F 0015                ; 
 	move.b  (A7)+,19(A0)                            ; $000217D0 115F 0013                ; 
+
 	movem.l (A7)+,D0-D7/A0-A6                       ; $000217D4 4CDF 7FFF                ; 
 
 	rte                                             ; $000217D8 4E73                     ; 
@@ -7878,7 +7891,7 @@ L_00023C24:
 
 	lea     L_0008EB64,A4                           ; $00023CB6 49F9 0008 EB64           ; 
 	lea     WORD_0008E964,A2                        ; $00023CBC 45F9 0008 E964           ; 
-	lea     WORD_0008E762,A1                        ; $00023CC2 43F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A1                        ; $00023CC2 43F9 0008 E762           ; 
 	clr.w   D6                                      ; $00023CC8 4246                     ; 
 
 	lea     24(A7),A7                               ; $00023CCA 4FEF 0018                ; 
@@ -12916,6 +12929,18 @@ GAME_MAIN:
 L_00026A90:
 	move.w  #$2,CURRENT_XSP_MODE                       ; $00026A90 33FC 0002 0008 DB10      ; 
 
+	ifd __ATARI__
+
+	move	#1,CURRENT_XSP_MODE
+
+	endif
+
+	ifd __AMIGA__
+
+	move	#1,CURRENT_XSP_MODE
+
+	endif
+
 L_00026A98:
 	pea     $1.w                                    ; $00026A98 4878 0001                ; J($00026A8E) 
 	jsr     READ_JOYSTICK_BUTTONS                              ; $00026A9C 4EB9 0005 A5D4           ; 
@@ -13111,7 +13136,7 @@ PLAY_GAME:
 
 	jsr     L_00023ADE                              ; $00026CC8 4EB9 0002 3ADE           ; 
 
-	lea     WORD_0008E762,A0                        ; $00026CCE 41F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A0                        ; $00026CCE 41F9 0008 E762           ; 
 	lea     L_0008EB64,A1                           ; $00026CD4 43F9 0008 EB64           ; 
 	move.w  4(A3),D0                                ; $00026CDA 302B 0004                ; 
 	and.w   #%0000000000001111,D0                   ; $00026CDE C07C 000F                ; 
@@ -16854,7 +16879,7 @@ INITIALIZE_GAME:
 	move.l  D0,-(A7)                                ; $000290CC 2F00                     ; 
 	pea     $1000.w                                 ; $000290CE 4878 1000                ; 
 	pea     $2.w                                    ; $000290D2 4878 0002                ; 
-	pea     L_0008B8A4                              ; $000290D6 4879 0008 B8A4           ; 
+	pea     GAME_PALETTES                              ; $000290D6 4879 0008 B8A4           ; 
 	jsr     (A3)                                    ; $000290DC 4E93                     ; 
 
 	lea     48(A7),A7                               ; $000290DE 4FEF 0030                ; 
@@ -17363,7 +17388,7 @@ INITIALIZE_SPRITES_AND_GRAPHICS:
 
 	jsr     L_000289C2                              ; $00029568 4EB9 0002 89C2           ; 
 
-	lea     L_0008B8A4,A1                           ; $0002956E 43F9 0008 B8A4           ; 
+	lea     GAME_PALETTES,A1                           ; $0002956E 43F9 0008 B8A4           ; 
 	movea.l #L_00EB8000+$0,A0                       ; $00029574 207C 00EB 8000           ; [SPRITE VRAM + $0]  
 	movea.w #$0,A5                                  ; $0002957A 3A7C 0000                ; 
 	moveq   #63,D7                                  ; $0002957E 7E3F                     ; 
@@ -18615,7 +18640,7 @@ L_0002A65A:
 	tst.w   WORD_0008E760                           ; $0002A65A 4A79 0008 E760           ; J($0002A61C) 
 	beq.s   L_0002A68E                              ; $0002A660 672C                     ; 
 
-	lea     WORD_0008E762,A1                        ; $0002A662 43F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A1                        ; $0002A662 43F9 0008 E762           ; 
 	movea.l #L_00E82000+$0,A0                       ; $0002A668 207C 00E8 2000           ; [VIDEO CONTROLLER + $0]  
 	clr.w   D0                                      ; $0002A66E 4240                     ; 
 
@@ -20845,7 +20870,7 @@ L_0002BCB4:
 	btst    #$0,D1                                  ; $0002BCC8 0801 0000                ; 
 	beq.s   L_0002BD24                              ; $0002BCCC 6756                     ; 
 
-	lea     WORD_0008E762,A1                        ; $0002BCCE 43F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A1                        ; $0002BCCE 43F9 0008 E762           ; 
 	lea     L_0008EB64,A0                           ; $0002BCD4 41F9 0008 EB64           ; 
 	clr.w   D4                                      ; $0002BCDA 4244                     ; 
 	moveq   #11,D5                                  ; $0002BCDC 7A0B                     ; 
@@ -27670,7 +27695,7 @@ L_00030CF8:
 	cmpi.w  #$A0,WORD_000A8EEC                      ; $00030CF8 0C79 00A0 000A 8EEC      ; 
 	bne.s   L_00030D24                              ; $00030D00 6622                     ; 
 
-	lea     WORD_0008E762,A0                        ; $00030D02 41F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A0                        ; $00030D02 41F9 0008 E762           ; 
 	clr.w   D0                                      ; $00030D08 4240                     ; 
 	moveq   #0,D2                                   ; $00030D0A 7400                     ; 
 
@@ -27852,7 +27877,7 @@ L_00030E8E:
 	btst    #$0,D1                                  ; $00030EA2 0801 0000                ; 
 	beq.s   L_00030EFA                              ; $00030EA6 6752                     ; 
 
-	lea     WORD_0008E762,A4                        ; $00030EA8 49F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A4                        ; $00030EA8 49F9 0008 E762           ; 
 	lea     L_0008EB64,A3                           ; $00030EAE 47F9 0008 EB64           ; 
 	clr.w   D3                                      ; $00030EB4 4243                     ; 
 
@@ -29378,7 +29403,7 @@ L_00032008:
 	btst    #$0,D1                                  ; $0003201C 0801 0000                ; 
 	beq.s   L_00032078                              ; $00032020 6756                     ; 
 
-	lea     WORD_0008E762,A1                        ; $00032022 43F9 0008 E762           ; 
+	lea     GRAPHICS_PALETTE,A1                        ; $00032022 43F9 0008 E762           ; 
 	lea     L_0008EB64,A0                           ; $00032028 41F9 0008 EB64           ; 
 	clr.w   D4                                      ; $0003202E 4244                     ; 
 	moveq   #11,D5                                  ; $00032030 7A0B                     ; 
@@ -101076,7 +101101,7 @@ L_0008B6A4:
 L_0008B7A4:
 	ds.b    $100
 
-L_0008B8A4:
+GAME_PALETTES:
 	ds.b    $2000
 
 WORD_0008D8A4:
@@ -101436,7 +101461,7 @@ WORD_0008E362:
 WORD_0008E760:
 	ds.b    $2
 
-WORD_0008E762:
+GRAPHICS_PALETTE:
 	ds.b    $200
 
 WORD_0008E962:

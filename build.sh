@@ -12,6 +12,9 @@ cp binaries/sz2.tos binaries/atari/
 ./vasmm68k_mot sources/sz2.s -quiet -Ftos -m68030 -D__ATARI__ -o binaries/sz2_opt.tos
 cp binaries/sz2_opt.tos binaries/atari/
 
+#./vasmm68k_mot sources/sz2.s -quiet -Ftos -mcfv4e -D__ATARI__ -o binaries/sz2_cf.tos
+#cp binaries/sz2_cf.tos binaries/atari/
+
 ./vasmm68k_mot sources/sz2.s -quiet -Fhunkexe -no-opt -m68020 -rangewarnings -D__AMIGA__ -o binaries/sz2.exe
 cp binaries/sz2.exe binaries/amiga/
 
