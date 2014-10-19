@@ -101,6 +101,10 @@ init:
 	move.b	$ffff8203.w,old_screen+2
 	move.b	$ffff820d.w,old_screen+3
 
+	move.b	display_screen_address+1,$ffff8201.w
+	move.b	display_screen_address+2,$ffff8203.w
+	move.b	display_screen_address+3,$ffff820d.w
+
 	move.l	$ffff820e.w,d0
 	move.l	$ffff8264.w,d1
 	movem.l	$ffff8282.w,d2-d5
@@ -126,7 +130,10 @@ init:
 		move	#$80,$ffff8210.w
 	erem
 
-	; 256 * 240, high color.
+	; 256 * 240, TC.
+
+	btst	#6,$ffff8006.w
+	jeq		.set_vga_mode
 
 	move.l	#$c7009e,$ffff8282.w
 	move.l	#$1e001b,$ffff8286.w
@@ -141,6 +148,23 @@ init:
 	move	#$0,$ffff82c2.w
 	move	#$100,$ffff8210.w
 
+	jra		.skip_vga_mode
+
+.set_vga_mode:
+	move.l	#$c6008d,$ffff8282.w
+	move.l	#$150004,$ffff8286.w
+	move.l	#$6d0097,$ffff828a.w
+	move.l	#$41903ff,$ffff82a2.w
+	move.l	#$3f003d,$ffff82a6.w
+	move.l	#$3fd0415,$ffff82aa.w
+	move	#$200,$ffff820a.w
+	move	#$186,$ffff82c0.w
+	clr		$ffff8266.w
+	move	#$100,$ffff8266.w
+	move	#$5,$ffff82c2.w
+	move	#$100,$ffff8210.w
+
+.skip_vga_mode:
 ;	move	#(512-256)/2,$ffff820e.w
 	move	#(512-256),$ffff820e.w
 
@@ -1874,8 +1898,15 @@ welcome_text:
 	dc.b	'ChoRenSha 68k',10,13
 	dc.b	'-------------',10,13
 	dc.b	10,13
-	dc.b	'Atari Falcon 030 port by Sascha Springer',10,13
+
+	dc.b	'Original X68000 v1.01 (c) 1995 by',10,13
+	dc.b	'Famibe No Yosshin',10,13
 	dc.b	10,13
+
+	dc.b	'Atari Falcon 030 port v20141019 by',10,13
+	dc.b	'Sascha Springer',10,13
+	dc.b	10,13
+	
 	dc.b	'Press a key to start...',10,13,0
 
 	even
