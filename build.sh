@@ -6,11 +6,8 @@ xxd binaries/sz2.x > binaries/sz2.hex
 diff binaries/sz2.hex binaries/x68000/sz2.hex > binaries/sz2.dif
 diff binaries/sz2.dif binaries/x68000/sz2.dif
 
-./vasmm68k_mot sources/sz2.s -quiet -Ftos -no-opt -m68030 -rangewarnings -D__ATARI__ -o binaries/sz2_nopt.tos
-cp binaries/sz2_nopt.tos binaries/atari/
-
-./vasmm68k_mot sources/sz2.s -quiet -Ftos -m68030 -D__ATARI__ -o binaries/sz2_opt.tos
-cp binaries/sz2_opt.tos binaries/atari/
+./vasmm68k_mot sources/sz2.s -quiet -Ftos -m68030 -D__ATARI__ -o binaries/sz2_dbg.tos
+cp binaries/sz2_dbg.tos binaries/atari/
 
 ./vasmm68k_mot sources/sz2.s -quiet -Ftos -nosym -m68030 -D__ATARI__ -o binaries/sz2.tos
 cp binaries/sz2.tos binaries/atari/

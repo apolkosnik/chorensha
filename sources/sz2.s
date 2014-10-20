@@ -1,4 +1,3 @@
-
 	xdef _start
 
 	ifd __ATARI__
@@ -14,6 +13,8 @@
 	endif
 
 	include defines.s
+
+	opt o-
 
 	text
 

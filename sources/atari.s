@@ -828,8 +828,11 @@ draw_tc_sprites_loop:
 
 	jeq		.skip_sprite
 
+	cmp		#16+256,d0
+	jhs		.skip_sprite
+
 	cmp		#16+240,d1
-	jge		.skip_sprite
+	jhs		.skip_sprite
 
 	lea		(a0,d0.w*2),a4
 	swap	d1
