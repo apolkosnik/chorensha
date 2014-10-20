@@ -828,7 +828,7 @@ draw_tc_sprites:
 	; Draw sprites.
 
 	move.l	work_screen_address,a0
-	lea		L_00EB0000,a1 ; Sprite infos table.
+	lea		L_00EB0000+128*8+8,a1 ; Sprite infos table.
 	lea		L_00EB8000,a2 ; Sprite data table.
 ;	lea		L_00E82000+$200,a3 ; Sprite palette table.
 	lea		converted_sprite_palettes,a3 ; Sprite palette table.
@@ -836,6 +836,8 @@ draw_tc_sprites:
 	move	#128-1,d7
 
 draw_tc_sprites_loop:
+	sub		#16,a1
+
 	move	(a1)+,d0 ; X position.
 	move	(a1)+,d1 ; Y position.
 	move	(a1)+,d2 ; VF, HF, palette index, pattern index.
@@ -873,8 +875,8 @@ draw_tc_sprites_loop:
 
 	move	d2,d3
 	lsr		#3,d2
-	and.l	#$1e0,d2
-	lea		(a3,d2.l),a5 ; Palette address.
+	and		#$1e0,d2
+	lea		(a3,d2.w),a5 ; Palette address.
 
 	and.l	#$ff,d3
 	lsl.l	#2+3+2,d3
@@ -1043,8 +1045,8 @@ draw_tc_sprites_normal:
 ; --------------------------------------
 	move	d2,d3
 	lsr		#3,d2
-	and.l	#$1e0,d2
-	lea		(a3,d2.l),a5 ; Palette address.
+	and		#$1e0,d2
+	lea		(a3,d2.w),a5 ; Palette address.
 
 	and.l	#$ff,d3
 	lsl.l	#2+3+2,d3
@@ -1214,8 +1216,8 @@ draw_tc_sprites_vertical_flipped:
 
 	move	d2,d3
 	lsr		#3,d2
-	and.l	#$1e0,d2
-	lea		(a3,d2.l),a5 ; Palette address.
+	and		#$1e0,d2
+	lea		(a3,d2.w),a5 ; Palette address.
 
 	and.l	#$ff,d3
 	lsl.l	#2+3+2,d3
@@ -1383,8 +1385,8 @@ draw_tc_sprites_horizontal_flipped:
 ; --------------------------------------
 	move	d2,d3
 	lsr		#3,d2
-	and.l	#$1e0,d2
-	lea		(a3,d2.l),a5 ; Palette address.
+	and		#$1e0,d2
+	lea		(a3,d2.w),a5 ; Palette address.
 
 	and.l	#$ff,d3
 	lsl.l	#2+3+2,d3
@@ -1551,6 +1553,14 @@ draw_tc_sprites_end:
 	move.l	d0,show_screen_address
 	add.l	#512*2*16+16*2,d0
 	move.l	d0,display_screen_address
+
+	ifd __HATARI__
+
+	move.b	display_screen_address+1,$ffff8201.w
+	move.b	display_screen_address+2,$ffff8203.w
+	move.b	display_screen_address+3,$ffff820d.w
+
+	endif
 
 	movem.l	(sp)+,d0-a6
 

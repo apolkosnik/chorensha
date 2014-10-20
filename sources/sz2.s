@@ -4052,8 +4052,8 @@ L_00022116:
 	move.b  #$0,(A0)+                               ; $00022122 10FC 0000                ; 
 	move.b  #$4,OX_LEVEL                       ; $00022126 13FC 0004 0002 21F8      ; 
 	move.w  #$0,OX_MASK_RENEW                       ; $0002212E 33FC 0000 0002 21FA      ; 
-	move.l  #BYTE_000669B7,OX_CHK_TOP            ; $00022136 23FC 0006 69B7 0002 21FC ; 
-	move.l  #BYTE_000669B7,OX_CHK_POINTER            ; $00022140 23FC 0006 69B7 0002 2200 ; 
+	move.l  #OX_TABLE+1,OX_CHK_TOP            ; $00022136 23FC 0006 69B7 0002 21FC ; 
+	move.l  #OX_TABLE+1,OX_CHK_POINTER            ; $00022140 23FC 0006 69B7 0002 2200 ; 
 	move.w  #$FE,OX_CHK_SIZE                      ; $0002214A 33FC 00FE 0002 2204      ; 
 	lea     WORD_0005E202,A0                        ; $00022152 41F9 0005 E202           ; 
 	lea     264(A0),A1                              ; $00022158 43E8 0108                ; 
@@ -9731,7 +9731,7 @@ L_00024DAA:
 	asr.l   #$4,D0                                  ; $00024DAA E880                     ; 
 	move.w  D0,D5                                   ; $00024DAC 3A00                     ; 
 	pea     $E3F.w                                  ; $00024DAE 4878 0E3F                ; 
-	movea.w WORD_0008DAEC,A0                        ; $00024DB2 3079 0008 DAEC           ; 
+	movea.w XOBJ_CHO_68K,A0                        ; $00024DB2 3079 0008 DAEC           ; 
 	move.l  A0,-(A7)                                ; $00024DB8 2F08                     ; 
 	movea.w D5,A0                                   ; $00024DBA 3045                     ; 
 	move.l  A0,-(A7)                                ; $00024DBC 2F08                     ; 
@@ -14821,10 +14821,10 @@ L_00027B35:
 L_00027B46:
 	dc.b    'XSP_DAT\FRAGMENT.sp',0
 
-L_00027B5A:
+FILENAME_CHO_68K_XSP:
 	dc.b    'XSP_DAT\CHO_68K.xsp',0
 
-L_00027B6E:
+FILENAME_CHO_68K:
 	dc.b    'XSP_DAT\CHO_68K',0
 
 L_00027B7E:
@@ -15128,18 +15128,19 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A3)                                    ; $000281A8 4E93                     ; 
 
 	move.w  D0,(A5)                                 ; $000281AA 3A80                     ; 
-	move.l  #WORD_0008DAEC,D4                       ; $000281AC 283C 0008 DAEC           ; 
+
+	move.l  #XOBJ_CHO_68K,D4                       ; $000281AC 283C 0008 DAEC           ; 
 	move.l  A6,D3                                   ; $000281B2 260E                     ; 
 	subq.l  #$2,D3                                  ; $000281B4 5583                     ; 
 	move.l  D3,-(A7)                                ; $000281B6 2F03                     ; 
 	pea     -1.w                                    ; $000281B8 4878 FFFF                ; 
-	pea     L_00027B5A(pc)                          ; $000281BC 487A F99C                ; 
+	pea     FILENAME_CHO_68K_XSP(pc)                          ; $000281BC 487A F99C                ; 
 	jsr     (A3)                                    ; $000281C0 4E93                     ; 
 
 	addq.w  #$8,A7                                  ; $000281C2 504F                     ; 
 
 	move.l  D0,-(A7)                                ; $000281C4 2F00                     ; 
-	pea     L_00027B6E(pc)                          ; $000281C6 487A F9A6                ; 
+	pea     FILENAME_CHO_68K(pc)                          ; $000281C6 487A F9A6                ; 
 	lea     L_00028A02,A4                           ; $000281CA 49F9 0002 8A02           ; 
 	jsr     (A4)                                    ; $000281D0 4E94                     ; 
 
@@ -15297,6 +15298,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002835C 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002835E 3A80                     ; 
+
 	lea     WORD_0008DAC8,A5                        ; $00028360 4BF9 0008 DAC8           ; 
 	move.l  D3,-(A7)                                ; $00028366 2F03                     ; 
 	pea     -1.w                                    ; $00028368 4878 FFFF                ; 
@@ -15310,6 +15312,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002837A 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002837C 3A80                     ; 
+
 	lea     WORD_0008DAC6,A5                        ; $0002837E 4BF9 0008 DAC6           ; 
 	move.l  D3,-(A7)                                ; $00028384 2F03                     ; 
 	pea     -1.w                                    ; $00028386 4878 FFFF                ; 
@@ -15323,6 +15326,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028398 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002839A 3A80                     ; 
+
 	lea     WORD_0008DAC4,A5                        ; $0002839C 4BF9 0008 DAC4           ; 
 	lea     36(A7),A7                               ; $000283A2 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $000283A6 2F03                     ; 
@@ -15341,6 +15345,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000283C6 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000283C8 3A80                     ; 
+
 	lea     WORD_0008DAC0,A5                        ; $000283CA 4BF9 0008 DAC0           ; 
 	move.l  D3,-(A7)                                ; $000283D0 2F03                     ; 
 	pea     -1.w                                    ; $000283D2 4878 FFFF                ; 
@@ -15354,6 +15359,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000283E4 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000283E6 3A80                     ; 
+
 	lea     WORD_0008DABE,A5                        ; $000283E8 4BF9 0008 DABE           ; 
 	move.l  D3,-(A7)                                ; $000283EE 2F03                     ; 
 	pea     -1.w                                    ; $000283F0 4878 FFFF                ; 
@@ -15367,6 +15373,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028402 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028404 3A80                     ; 
+
 	lea     WORD_0008DABC,A5                        ; $00028406 4BF9 0008 DABC           ; 
 	lea     36(A7),A7                               ; $0002840C 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $00028410 2F03                     ; 
@@ -15381,6 +15388,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028424 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028426 3A80                     ; 
+
 	lea     WORD_0008DAB8,A5                        ; $00028428 4BF9 0008 DAB8           ; 
 	move.l  D3,-(A7)                                ; $0002842E 2F03                     ; 
 	pea     -1.w                                    ; $00028430 4878 FFFF                ; 
@@ -15394,6 +15402,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028442 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028444 3A80                     ; 
+
 	lea     WORD_0008DABA,A5                        ; $00028446 4BF9 0008 DABA           ; 
 	move.l  D3,-(A7)                                ; $0002844C 2F03                     ; 
 	pea     -1.w                                    ; $0002844E 4878 FFFF                ; 
@@ -15407,6 +15416,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028460 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028462 3A80                     ; 
+
 	lea     WORD_0008DAB6,A5                        ; $00028464 4BF9 0008 DAB6           ; 
 	lea     36(A7),A7                               ; $0002846A 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $0002846E 2F03                     ; 
@@ -15421,6 +15431,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028482 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028484 3A80                     ; 
+
 	lea     WORD_0008DAB4,A5                        ; $00028486 4BF9 0008 DAB4           ; 
 	move.l  D3,-(A7)                                ; $0002848C 2F03                     ; 
 	pea     -1.w                                    ; $0002848E 4878 FFFF                ; 
@@ -15434,6 +15445,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000284A0 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000284A2 3A80                     ; 
+
 	lea     WORD_0008DAB2,A5                        ; $000284A4 4BF9 0008 DAB2           ; 
 	move.l  D3,-(A7)                                ; $000284AA 2F03                     ; 
 	pea     -1.w                                    ; $000284AC 4878 FFFF                ; 
@@ -15447,6 +15459,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000284BE 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000284C0 3A80                     ; 
+
 	lea     WORD_0008DAB0,A5                        ; $000284C2 4BF9 0008 DAB0           ; 
 	lea     36(A7),A7                               ; $000284C8 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $000284CC 2F03                     ; 
@@ -15461,6 +15474,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000284E0 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000284E2 3A80                     ; 
+
 	lea     WORD_0008DAAE,A5                        ; $000284E4 4BF9 0008 DAAE           ; 
 	move.l  D3,-(A7)                                ; $000284EA 2F03                     ; 
 	pea     -1.w                                    ; $000284EC 4878 FFFF                ; 
@@ -15474,6 +15488,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000284FE 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028500 3A80                     ; 
+
 	lea     WORD_0008DAAC,A5                        ; $00028502 4BF9 0008 DAAC           ; 
 	move.l  D3,-(A7)                                ; $00028508 2F03                     ; 
 	pea     -1.w                                    ; $0002850A 4878 FFFF                ; 
@@ -15487,6 +15502,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002851C 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002851E 3A80                     ; 
+
 	lea     WORD_0008DAAA,A5                        ; $00028520 4BF9 0008 DAAA           ; 
 	lea     36(A7),A7                               ; $00028526 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $0002852A 2F03                     ; 
@@ -15501,6 +15517,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002853E 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028540 3A80                     ; 
+
 	lea     WORD_0008DAA6,A5                        ; $00028542 4BF9 0008 DAA6           ; 
 	move.l  D3,-(A7)                                ; $00028548 2F03                     ; 
 	pea     -1.w                                    ; $0002854A 4878 FFFF                ; 
@@ -15514,6 +15531,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002855C 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002855E 3A80                     ; 
+
 	lea     WORD_0008DAA4,A5                        ; $00028560 4BF9 0008 DAA4           ; 
 	move.l  D3,-(A7)                                ; $00028566 2F03                     ; 
 	pea     -1.w                                    ; $00028568 4878 FFFF                ; 
@@ -15527,6 +15545,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002857A 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002857C 3A80                     ; 
+
 	lea     WORD_0008DAA2,A5                        ; $0002857E 4BF9 0008 DAA2           ; 
 	lea     36(A7),A7                               ; $00028584 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $00028588 2F03                     ; 
@@ -15541,6 +15560,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $0002859C 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002859E 3A80                     ; 
+
 	lea     WORD_0008DAA0,A5                        ; $000285A0 4BF9 0008 DAA0           ; 
 	move.l  D3,-(A7)                                ; $000285A6 2F03                     ; 
 	pea     -1.w                                    ; $000285A8 4878 FFFF                ; 
@@ -15554,6 +15574,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000285BA 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000285BC 3A80                     ; 
+
 	lea     WORD_0008DA9E,A5                        ; $000285BE 4BF9 0008 DA9E           ; 
 	move.l  D3,-(A7)                                ; $000285C4 2F03                     ; 
 	pea     -1.w                                    ; $000285C6 4878 FFFF                ; 
@@ -15567,6 +15588,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000285D8 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000285DA 3A80                     ; 
+
 	lea     WORD_0008DA9C,A5                        ; $000285DC 4BF9 0008 DA9C           ; 
 	lea     36(A7),A7                               ; $000285E2 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $000285E6 2F03                     ; 
@@ -15581,6 +15603,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000285FA 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000285FC 3A80                     ; 
+
 	lea     WORD_0008DA9A,A5                        ; $000285FE 4BF9 0008 DA9A           ; 
 	move.l  D3,-(A7)                                ; $00028604 2F03                     ; 
 	pea     -1.w                                    ; $00028606 4878 FFFF                ; 
@@ -15594,6 +15617,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028618 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002861A 3A80                     ; 
+
 	lea     WORD_0008DA98,A5                        ; $0002861C 4BF9 0008 DA98           ; 
 	move.l  D3,-(A7)                                ; $00028622 2F03                     ; 
 	pea     -1.w                                    ; $00028624 4878 FFFF                ; 
@@ -15607,6 +15631,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028636 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028638 3A80                     ; 
+
 	lea     WORD_0008DA94,A5                        ; $0002863A 4BF9 0008 DA94           ; 
 	lea     36(A7),A7                               ; $00028640 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $00028644 2F03                     ; 
@@ -15621,6 +15646,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028658 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $0002865A 3A80                     ; 
+
 	lea     WORD_0008DA92,A5                        ; $0002865C 4BF9 0008 DA92           ; 
 	move.l  D3,-(A7)                                ; $00028662 2F03                     ; 
 	pea     -1.w                                    ; $00028664 4878 FFFF                ; 
@@ -15634,6 +15660,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028676 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028678 3A80                     ; 
+
 	lea     WORD_0008DA90,A5                        ; $0002867A 4BF9 0008 DA90           ; 
 	move.l  D3,-(A7)                                ; $00028680 2F03                     ; 
 	pea     -1.w                                    ; $00028682 4878 FFFF                ; 
@@ -15647,6 +15674,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028694 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028696 3A80                     ; 
+
 	lea     WORD_0008DA8E,A5                        ; $00028698 4BF9 0008 DA8E           ; 
 	lea     36(A7),A7                               ; $0002869E 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $000286A2 2F03                     ; 
@@ -15661,6 +15689,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000286B6 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000286B8 3A80                     ; 
+
 	lea     WORD_0008DA8C,A5                        ; $000286BA 4BF9 0008 DA8C           ; 
 	move.l  D3,-(A7)                                ; $000286C0 2F03                     ; 
 	pea     -1.w                                    ; $000286C2 4878 FFFF                ; 
@@ -15674,6 +15703,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000286D4 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000286D6 3A80                     ; 
+
 	lea     WORD_0008DA8A,A5                        ; $000286D8 4BF9 0008 DA8A           ; 
 	move.l  D3,-(A7)                                ; $000286DE 2F03                     ; 
 	pea     -1.w                                    ; $000286E0 4878 FFFF                ; 
@@ -15687,6 +15717,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $000286F2 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $000286F4 3A80                     ; 
+
 	lea     WORD_0008DA88,A5                        ; $000286F6 4BF9 0008 DA88           ; 
 	lea     36(A7),A7                               ; $000286FC 4FEF 0024                ; 
 	move.l  D3,-(A7)                                ; $00028700 2F03                     ; 
@@ -15701,6 +15732,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028714 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028716 3A80                     ; 
+
 	lea     WORD_0008DA86,A5                        ; $00028718 4BF9 0008 DA86           ; 
 	move.l  D3,-(A7)                                ; $0002871E 2F03                     ; 
 	pea     -1.w                                    ; $00028720 4878 FFFF                ; 
@@ -15714,6 +15746,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 	jsr     (A4)                                    ; $00028732 4E94                     ; 
 
 	move.w  D0,(A5)                                 ; $00028734 3A80                     ; 
+
 	lea     WORD_0008DA84,A5                        ; $00028736 4BF9 0008 DA84           ; 
 	move.l  D3,-(A7)                                ; $0002873C 2F03                     ; 
 	pea     -1.w                                    ; $0002873E 4878 FFFF                ; 
@@ -100972,10 +101005,7 @@ PCG_REV_ALT:
 	ds.b    $200
 
 OX_TABLE:
-	ds.b    $1
-
-BYTE_000669B7:
-	ds.b    $101
+	ds.b    $102
 
 OX_MASK:
 	ds.b    $100
@@ -101337,7 +101367,7 @@ WORD_0008DAE8:
 WORD_0008DAEA:
 	ds.b    $2
 
-WORD_0008DAEC:
+XOBJ_CHO_68K:
 	ds.b    $2
 
 WORD_0008DAEE:
