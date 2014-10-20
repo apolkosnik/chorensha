@@ -3,6 +3,21 @@
 ; iconv -c -f SHIFT-JIS -t UTF-8 programmers.man > programmers.man.txt
 ; sox -t vox -r 15600 out.pcm -t wav -c 2 -r 25033 out2.wav
 
+	xref NEW_STACK
+
+	xdef L_00C00000,L_00E00000,L_00E20000,L_00E40000,L_00E60000,L_00E80000
+	xdef L_00E82000,L_00E84000,L_00E86000,L_00E88000,L_00E8A000,L_00E8C000
+	xdef L_00E8E000,L_00E90000,L_00E92000,L_00E94000,L_00E96000,L_00E96021
+	xdef L_00E98000,L_00E9A000,L_00E9E000,L_00EA0000,L_00EAF900,L_00EAFA00
+	xdef L_00EAFA10,L_00EAFB00,L_00EB0000,L_00EB8000,L_00EC0000,L_00ED0000
+	xdef L_00ED4000,L_00EF0000,L_00F00000,L_00FC0000,L_00FE0000
+
+	xdef L_00000118,L_00000138
+
+	xdef draw_tc_sprites,vbl_wait_counter
+
+	xdef start
+
 LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
 
 	text
@@ -1906,7 +1921,7 @@ welcome_text:
 	dc.b	'Famibe No Yosshin',10,13
 	dc.b	10,13
 
-	dc.b	'Atari Falcon 030 port v20141019 by',10,13
+	dc.b	'Atari Falcon 030 port v20141020t by',10,13
 	dc.b	'Sascha Springer',10,13
 	dc.b	10,13
 	
@@ -1981,4 +1996,83 @@ screen1:
 screen2:
 ;	ds.b	256*2*(16+240+16)
 	ds.b	256*2*2*(16+240+16)
+
+L_00000118:
+	ds.l	1
+
+L_00000138:
+	ds.l	1
+
+L_00C00000:   ; VRAM
+	ds.b    $200000
+L_00E00000:   ; TEXT PLANE 1
+	ds.b    $20000
+L_00E20000:   ; TEXT PLANE 2
+	ds.b    $20000
+;L_00E40000:   ; TEXT PLANE 3
+;	ds.b    $20000
+;L_00E60000:   ; TEXT PLANE 4
+;	ds.b    $20000
+L_00E80000:   ; CRTC
+	ds.b    $2000
+L_00E82000:   ; VIDEO CONTROLLER
+	ds.b    $2000
+;L_00E84000:   ; DMAC
+;	ds.b    $2000
+;L_00E86000:   ; AREA
+;	ds.b    $2000
+L_00E88000:   ; MFP
+	ds.b    $2000
+;L_00E8A000:   ; RTC
+;	ds.b    $2000
+;L_00E8C000:   ; PRINTER
+;	ds.b    $2000
+L_00E8E000:   ; SYSTEM PORT
+	ds.b    $2000
+;L_00E90000:   ; FM
+;	ds.b    $2000
+;L_00E92000:   ; ADPCM
+;	ds.b    $2000
+;L_00E94000:   ; FDC
+;	ds.b    $2000
+;L_00E96000:   ; HDD
+;	ds.b    $21
+;L_00E96021:   ; SCSI (HDD)
+;	ds.b    $1FDF
+;L_00E98000:   ; SCC
+;	ds.b    $2000
+;L_00E9A000:   ; I/O
+;	ds.b    $4000
+;L_00E9E000:   ; FPU
+;	ds.b    $2000
+;L_00EA0000:   ; SCSI
+;	ds.b    $F900
+;L_00EAF900:   ; FAX
+;	ds.b    $100
+;L_00EAFA00:   ; MIDI 1
+;	ds.b    $10
+;L_00EAFA10:   ; MIDI 2
+;	ds.b    $F0
+;L_00EAFB00:   ; (ToDo)
+;	ds.b    $500
+L_00EB0000:   ; SPRITE REGISTERS
+	ds.b    $8000
+L_00EB8000:   ; SPRITE VRAM
+	ds.b    $8000
+;L_00EC0000:   ; USER I/O
+;	ds.b    $10000
+;L_00ED0000:   ; SRAM
+;	ds.b    $4000
+;L_00ED4000:   ; 'PRELIMINARY'
+;	ds.b    $1C000
+;L_00EF0000:   ; 'UNUSED'
+;	ds.b    $10000
+;L_00F00000:   ; CG ROM
+;	ds.b    $C0000
+;L_00FC0000:   ; 'PRELIMINARY'
+;	ds.b    $20000
+;L_00FE0000:   ; IPL ROM
+;	ds.b    $1FFFF
+
+	end
 

@@ -1,20 +1,22 @@
-	xdef _start
+
+	xref L_00C00000,L_00E00000,L_00E20000,L_00E40000,L_00E60000,L_00E80000
+	xref L_00E82000,L_00E84000,L_00E86000,L_00E88000,L_00E8A000,L_00E8C000
+	xref L_00E8E000,L_00E90000,L_00E92000,L_00E94000,L_00E96000,L_00E96021
+	xref L_00E98000,L_00E9A000,L_00E9E000,L_00EA0000,L_00EAF900,L_00EAFA00
+	xref L_00EAFA10,L_00EAFB00,L_00EB0000,L_00EB8000,L_00EC0000,L_00ED0000
+	xref L_00ED4000,L_00EF0000,L_00F00000,L_00FC0000,L_00FE0000
+
+	xref L_00000118,L_00000138
+
+	xref draw_tc_sprites,vbl_wait_counter
 
 	ifd __ATARI__
 
-	include sources/atari.s
+	xdef NEW_STACK
 
 	endif
 
-	ifd __AMIGA__
-
-	include sources/amiga.s
-
-	endif
-
-	include defines.s
-
-	opt o-
+	xdef _start
 
 	text
 
