@@ -8,9 +8,9 @@
 
 	xref L_00000118,L_00000138
 
-	xref draw_tc_sprites,vbl_wait_counter
-
 	ifd __ATARI__
+
+	xref draw_tc_sprites,vbl_wait_counter
 
 	xdef NEW_STACK
 
@@ -3256,7 +3256,6 @@ L_000219FE:
 	ori     #%0000011100000000,sr                   ; $00021A36 007C 0700                ; 
 
 	movea.l #L_00E88000+$0,A0                       ; $00021A3A 207C 00E8 8000           ; [MFP + $0]  
-
 	move.b  (A7)+,21(A0)                            ; $00021A40 115F 0015                ; 
 	move.b  (A7)+,19(A0)                            ; $00021A44 115F 0013                ; 
 
