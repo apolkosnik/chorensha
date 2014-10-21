@@ -488,15 +488,11 @@ line_f:
 ; ------------------------------------------------------------------------------
 
 trap_2:
-	add		#$0f0,$ffff8240.w
-
 	rte
 
 ; ------------------------------------------------------------------------------
 
 trap_4:
-	add		#$00f,$ffff8240.w
-
 	rte
 
 ; ------------------------------------------------------------------------------
@@ -521,7 +517,25 @@ trap_f:
 	cmp.b	#$14,d0 ; _TPALET2
 	jne		.no_tpalet2
 
+	movem.l	d1-d2/a0,-(sp)
+
+	lea		L_00E82000+$200,a0
+	and		#$f,d1
+
 	clr.l	d0
+
+	tst.l	d2
+	jmi		.tpalet2_get_color
+
+	move	d2,(a0,d1.w*2)
+
+	jra		.tpalet2_skip
+
+.tpalet2_get_color:
+	move	(a0,d1.w*2),d0
+
+.tpalet2_skip:
+	movem.l	(sp)+,d1-d2/a0
 
 	rte
 
@@ -718,7 +732,26 @@ trap_f:
 	cmp.b	#$cf,d0 ; _SPALET
 	jne		.no_spalet
 
+	movem.l	d1-d3/a0,-(sp)
+
+	lea		L_00E82000+$200,a0
+	lsl		#4,d2
+	add		d1,d2
+
 	clr.l	d0
+
+	tst.l	d3
+	jmi		.spalet_get_color
+
+	move	d3,(a0,d2.w*2)
+
+	jra		.spalet_skip
+
+.spalet_get_color:
+	move	(a0,d2.w*2),d0
+
+.spalet_skip:
+	movem.l	(sp)+,d1-d3/a0
 
 	rte
 

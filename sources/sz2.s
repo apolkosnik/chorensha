@@ -4602,7 +4602,7 @@ L_00022494:
 L_000225E0:
 	rts                                             ; $000225E0 4E75                     ; 
 
-L_000225E2:
+CLEAR_TEXT_PLANE:
 	movem.l D3-D7/A3-A6,-(A7)                       ; $000225E2 48E7 1F1E                ; S($00027A9C) 
 
 	suba.l  A1,A1                                   ; $000225E6 93C9                     ; 
@@ -4670,7 +4670,7 @@ L_0002265C:
 L_00022684:
 	rts                                             ; $00022684 4E75                     ; 
 
-L_00022686:
+TPALET2:
 	move.w  6(A7),D1                                ; $00022686 322F 0006                ; S($00029548) 
 	move.l  8(A7),D2                                ; $0002268A 242F 0008                ; 
 	moveq   #20,D0                                  ; $0002268E 7014                     ; 
@@ -7851,7 +7851,7 @@ L_00023C24:
 	pea     $1.w                                    ; $00023C34 4878 0001                ; 
 	jsr     WAIT_VBL                              ; $00023C38 4EB9 0002 2C92           ; 
 
-	jsr     L_000225E2                              ; $00023C3E 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00023C3E 4EB9 0002 25E2           ; 
 
 	jsr     XSP_OUT                              ; $00023C44 4EB9 0002 04C2           ; 
 
@@ -7891,7 +7891,7 @@ L_00023C24:
 	pea     $3.w                                    ; $00023CB0 4878 0003                ; 
 	jsr     (A3)                                    ; $00023CB4 4E93                     ; 
 
-	lea     L_0008EB64,A4                           ; $00023CB6 49F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A4                           ; $00023CB6 49F9 0008 EB64           ; 
 	lea     WORD_0008E964,A2                        ; $00023CBC 45F9 0008 E964           ; 
 	lea     GRAPHICS_PALETTE,A1                        ; $00023CC2 43F9 0008 E762           ; 
 	clr.w   D6                                      ; $00023CC8 4246                     ; 
@@ -9706,7 +9706,7 @@ L_00024D74:
 	pea     $10.w                                   ; $00024D74 4878 0010                ; J($00024D70) 
 	jsr     PLAY_BGM_MUSIC                              ; $00024D78 4EB9 0002 693A           ; 
 
-	jsr     L_000225E2                              ; $00024D7E 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00024D7E 4EB9 0002 25E2           ; 
 
 	jsr     XSP_OUT                              ; $00024D84 4EB9 0002 04C2           ; 
 
@@ -9753,7 +9753,7 @@ L_00024DDC:
 	tst.w   D5                                      ; $00024DDC 4A45                     ; 
 	bne.w   L_00024E78                              ; $00024DDE 6600 0098                ; 
 
-	jsr     L_000225E2                              ; $00024DE2 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00024DE2 4EB9 0002 25E2           ; 
 
 	move.l  PLAYER_INFO_STRUCT,PLAYER_SCORE             ; $00024DE8 23F9 0008 DB44 0008 DB52 ; 
 	jsr     DRAW_GAME_SCORE                              ; $00024DF2 4EB9 0002 4C2A           ; 
@@ -9928,7 +9928,7 @@ L_00024F62:
 	ble.w   L_00024DDC                              ; $00024F6A 6F00 FE70                ; 
 
 	clr.w   D5                                      ; $00024F6E 4245                     ; 
-	jsr     L_000225E2                              ; $00024F70 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00024F70 4EB9 0002 25E2           ; 
 
 	pea     $A.w                                    ; $00024F76 4878 000A                ; 
 	pea     $0.w                                    ; $00024F7A 4878 0000                ; 
@@ -10036,7 +10036,7 @@ L_00025030:
 L_0002504C:
 	jsr     PLAY_BGM_MUSIC                              ; $0002504C 4EB9 0002 693A           ; J($0002502E) 
 
-	jsr     L_000225E2                              ; $00025052 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00025052 4EB9 0002 25E2           ; 
 
 	jsr     XSP_OUT                              ; $00025058 4EB9 0002 04C2           ; 
 
@@ -10069,7 +10069,7 @@ L_00025084:
 L_0002508C:
 	jsr     L_000269A4                              ; $0002508C 4EB9 0002 69A4           ; 
 
-	jsr     L_000225E2                              ; $00025092 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00025092 4EB9 0002 25E2           ; 
 
 	jsr     XSP_OUT                              ; $00025098 4EB9 0002 04C2           ; 
 
@@ -10143,7 +10143,7 @@ CONFIG_MODE_MENU:
 	moveq   #-1,D6                                  ; $000251BE 7CFF                     ; 
 	move.w  D6,-2(A6)                               ; $000251C0 3D46 FFFE                ; 
 	clr.w   D5                                      ; $000251C4 4245                     ; 
-	jsr     L_000225E2                              ; $000251C6 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $000251C6 4EB9 0002 25E2           ; 
 
 	lea     DRAW_TEXT,A4                           ; $000251CC 49F9 0002 5D1A           ; 
 
@@ -10698,7 +10698,7 @@ L_000256CE:
 	pea     $C.w                                    ; $000256E0 4878 000C                ; 
 	jsr     L_0002698C                              ; $000256E4 4EB9 0002 698C           ; 
 
-	jsr     L_000225E2                              ; $000256EA 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $000256EA 4EB9 0002 25E2           ; 
 
 	moveq   #0,D0                                   ; $000256F0 7000                     ; 
 	addq.w  #$8,A7                                  ; $000256F2 504F                     ; 
@@ -10761,7 +10761,7 @@ KAKUSI_MODE_MENU:
 	moveq   #-1,D6                                  ; $00025788 7CFF                     ; 
 	move.w  D6,-2(A6)                               ; $0002578A 3D46 FFFE                ; 
 	clr.w   D5                                      ; $0002578E 4245                     ; 
-	jsr     L_000225E2                              ; $00025790 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00025790 4EB9 0002 25E2           ; 
 
 	lea     HEX_PREFIX(pc),A5                       ; $00025796 4BFA FFD3                ; 
 
@@ -11302,7 +11302,7 @@ L_00025C8A:
 	pea     $40.w                                   ; $00025C92 4878 0040                ; 
 	jsr     PLAY_PCM_SAMPLE                              ; $00025C96 4EB9 0002 64F4           ; 
 
-	jsr     L_000225E2                              ; $00025C9C 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00025C9C 4EB9 0002 25E2           ; 
 
 	moveq   #0,D0                                   ; $00025CA2 7000                     ; 
 
@@ -11332,7 +11332,7 @@ L_00025CC8:
 	pea     $0.w                                    ; $00025CDC 4878 0000                ; 
 	jsr     L_0002265C                              ; $00025CE0 4EB9 0002 265C           ; 
 
-	jsr     L_000225E2                              ; $00025CE6 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00025CE6 4EB9 0002 25E2           ; 
 
 	pea     L_00025CB0(pc)                          ; $00025CEC 487A FFC2                ; 
 	pea     L_00025CB3(pc)                          ; $00025CF0 487A FFC1                ; 
@@ -13139,7 +13139,7 @@ PLAY_GAME:
 	jsr     L_00023ADE                              ; $00026CC8 4EB9 0002 3ADE           ; 
 
 	lea     GRAPHICS_PALETTE,A0                        ; $00026CCE 41F9 0008 E762           ; 
-	lea     L_0008EB64,A1                           ; $00026CD4 43F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A1                           ; $00026CD4 43F9 0008 EB64           ; 
 	move.w  4(A3),D0                                ; $00026CDA 302B 0004                ; 
 	and.w   #%0000000000001111,D0                   ; $00026CDE C07C 000F                ; 
 
@@ -14762,7 +14762,7 @@ L_00027A74:
 	pea     $3.w                                    ; $00027A92 4878 0003                ; 
 	jsr     L_0005B154                              ; $00027A96 4EB9 0005 B154           ; 
 
-	jsr     L_000225E2                              ; $00027A9C 4EB9 0002 25E2           ; 
+	jsr     CLEAR_TEXT_PLANE                              ; $00027A9C 4EB9 0002 25E2           ; 
 
 	moveq   #2,D3                                   ; $00027AA2 7602                     ; 
 	addq.w  #$8,A7                                  ; $00027AA4 504F                     ; 
@@ -16797,10 +16797,10 @@ L_00028F3E:
 L_00028F4F:
 	dc.b    'ETC_DAT\KANG_3_3',0
 
-L_00028F60:
+FILENAME_SZ_PALET_PAL:
 	dc.b    'XSP_DAT\SZ_PALET.pal',0
 
-L_00028F75:
+FILENAME_BG_PCG_SP:
 	dc.b    'XSP_DAT\BG_PCG.SP',0
 
 L_00028F87:
@@ -16835,7 +16835,7 @@ INITIALIZE_GAME:
 	pea     $AF.w                                   ; $00028FF8 4878 00AF                ; 
 	jsr     (A3)                                    ; $00028FFC 4E93                     ; _OS_CUROF
 
-	jsr     L_00029D20                              ; $00028FFE 4EB9 0002 9D20           ; 
+	jsr     LOAD_STATUS_CNF                              ; $00028FFE 4EB9 0002 9D20           ; 
 
 	jsr     INITIALIZE_GRAPHICS_ENGINE                              ; $00029004 4EB9 0002 8122           ; 
 
@@ -16898,17 +16898,17 @@ INITIALIZE_GAME:
 	lea     48(A7),A7                               ; $000290A6 4FEF 0030                ; 
 
 	move.l  D4,-(A7)                                ; $000290AA 2F04                     ; 
-	pea     L_00028F60(pc)                          ; $000290AC 487A FEB2                ; 
+	pea     FILENAME_SZ_PALET_PAL(pc)                          ; $000290AC 487A FEB2                ; 
 	jsr     (A4)                                    ; $000290B0 4E94                     ; 
-
+xxx:
 	move.l  D0,-(A7)                                ; $000290B2 2F00                     ; 
 	pea     $100.w                                  ; $000290B4 4878 0100                ; 
 	pea     $2.w                                    ; $000290B8 4878 0002                ; 
-	pea     L_0008EB64                              ; $000290BC 4879 0008 EB64           ; 
+	pea     SPRITES_PALETTE                              ; $000290BC 4879 0008 EB64           ; 
 	jsr     (A3)                                    ; $000290C2 4E93                     ; 
 
 	move.l  D4,-(A7)                                ; $000290C4 2F04                     ; 
-	pea     L_00028F75(pc)                          ; $000290C6 487A FEAD                ; 
+	pea     FILENAME_BG_PCG_SP(pc)                          ; $000290C6 487A FEAD                ; 
 	jsr     (A4)                                    ; $000290CA 4E94                     ; 
 
 	move.l  D0,-(A7)                                ; $000290CC 2F00                     ; 
@@ -17275,7 +17275,7 @@ skip_sincos:
 
 	jsr     L_0003C316                              ; $00029410 4EB9 0003 C316           ; 
 
-	jsr     L_00029D20                              ; $00029416 4EB9 0002 9D20           ; 
+	jsr     LOAD_STATUS_CNF                              ; $00029416 4EB9 0002 9D20           ; 
 
 	jsr     LOAD_PCM_SAMPLE_FILES                              ; $0002941C 4EB9 0002 62AE           ; 
 
@@ -17373,7 +17373,7 @@ L_000294EC:
 L_000294FA:
 	movem.l D3/A3,-(A7)                             ; $000294FA 48E7 1010                ; S($00029430) 
 
-	lea     L_0008EB64,A1                           ; $000294FE 43F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A1                           ; $000294FE 43F9 0008 EB64           ; 
 	movea.l #L_00E82000+$200,A0                     ; $00029504 207C 00E8 2200           ; [VIDEO CONTROLLER + $200]  
 	clr.w   D3                                      ; $0002950A 4243                     ; 
 
@@ -17383,7 +17383,7 @@ L_0002950C:
 	cmp.w   #$FF,D3                                 ; $00029510 B67C 00FF                ; 
 	ble.s   L_0002950C                              ; $00029514 6FF6                     ; 
 
-	lea     L_0008EB64,A1                           ; $00029516 43F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A1                           ; $00029516 43F9 0008 EB64           ; 
 	movea.l #L_00E82000+$0,A0                       ; $0002951C 207C 00E8 2000           ; [VIDEO CONTROLLER + $0]  
 	clr.w   D3                                      ; $00029522 4243                     ; 
 
@@ -17400,11 +17400,11 @@ L_00029530:
 	move.l  #$4E415349,-(A7)                        ; $00029534 2F3C 4E41 5349           ; 
 	movea.w D3,A3                                   ; $0002953A 3643                     ; 
 	move.l  A3,-(A7)                                ; $0002953C 2F0B                     ; 
-	jsr     L_0005B622                              ; $0002953E 4EB9 0005 B622           ; 
+	jsr     SPALET                              ; $0002953E 4EB9 0005 B622           ; 
 
 	move.l  D0,-(A7)                                ; $00029544 2F00                     ; 
 	move.l  A3,-(A7)                                ; $00029546 2F0B                     ; 
-	jsr     L_00022686                              ; $00029548 4EB9 0002 2686           ; 
+	jsr     TPALET2                              ; $00029548 4EB9 0002 2686           ; 
 
 	lea     20(A7),A7                               ; $0002954E 4FEF 0014                ; 
 
@@ -18304,7 +18304,7 @@ L_00029D0C:
 
 	even
 
-L_00029D20:
+LOAD_STATUS_CNF:
 	link    A6,#-268                                ; $00029D20 4E56 FEF4                ; S($00028FFE) 
 
 	movem.l D3-D6,-(A7)                             ; $00029D24 48E7 1E00                ; 
@@ -20906,7 +20906,7 @@ L_0002BCB4:
 	beq.s   L_0002BD24                              ; $0002BCCC 6756                     ; 
 
 	lea     GRAPHICS_PALETTE,A1                        ; $0002BCCE 43F9 0008 E762           ; 
-	lea     L_0008EB64,A0                           ; $0002BCD4 41F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A0                           ; $0002BCD4 41F9 0008 EB64           ; 
 	clr.w   D4                                      ; $0002BCDA 4244                     ; 
 	moveq   #11,D5                                  ; $0002BCDC 7A0B                     ; 
 
@@ -27913,7 +27913,7 @@ L_00030E8E:
 	beq.s   L_00030EFA                              ; $00030EA6 6752                     ; 
 
 	lea     GRAPHICS_PALETTE,A4                        ; $00030EA8 49F9 0008 E762           ; 
-	lea     L_0008EB64,A3                           ; $00030EAE 47F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A3                           ; $00030EAE 47F9 0008 EB64           ; 
 	clr.w   D3                                      ; $00030EB4 4243                     ; 
 
 L_00030EB6:
@@ -29439,7 +29439,7 @@ L_00032008:
 	beq.s   L_00032078                              ; $00032020 6756                     ; 
 
 	lea     GRAPHICS_PALETTE,A1                        ; $00032022 43F9 0008 E762           ; 
-	lea     L_0008EB64,A0                           ; $00032028 41F9 0008 EB64           ; 
+	lea     SPRITES_PALETTE,A0                           ; $00032028 41F9 0008 EB64           ; 
 	clr.w   D4                                      ; $0003202E 4244                     ; 
 	moveq   #11,D5                                  ; $00032030 7A0B                     ; 
 
@@ -92671,7 +92671,7 @@ L_0005B618:
 
 	rts                                             ; $0005B620 4E75                     ; 
 
-L_0005B622:
+SPALET:
 	movem.l D3,-(A7)                                ; $0005B622 48E7 1000                ; S($0002953E) 
 
 	movem.l 8(A7),D1-D3                             ; $0005B626 4CEF 000E 0008           ; 
@@ -101502,7 +101502,7 @@ WORD_0008E962:
 WORD_0008E964:
 	ds.b    $200
 
-L_0008EB64:
+SPRITES_PALETTE:
 	ds.b    $200
 
 L_0008ED64:
