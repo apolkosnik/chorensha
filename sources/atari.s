@@ -1964,7 +1964,7 @@ welcome_text:
 	dc.b	'Famibe No Yosshin',10,13
 	dc.b	10,13
 
-	dc.b	'Atari Falcon 030 port v20141020t by',10,13
+	dc.b	'Atari Falcon 030 port v20141021t by',10,13
 	dc.b	'Sascha Springer',10,13
 	dc.b	10,13
 	
