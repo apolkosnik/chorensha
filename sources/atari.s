@@ -18,7 +18,7 @@
 
 	xdef start
 
-LINE_F_OFFSET = 2																| 0 = 68000, 2 = 68030
+LINE_F_OFFSET=2 ; 0 = 68000, 2 = 68030
 
 	text
 
@@ -2052,10 +2052,10 @@ L_00E00000:   ; TEXT PLANE 1
 	ds.b    $20000
 L_00E20000:   ; TEXT PLANE 2
 	ds.b    $20000
-;L_00E40000:   ; TEXT PLANE 3
-;	ds.b    $20000
-;L_00E60000:   ; TEXT PLANE 4
-;	ds.b    $20000
+L_00E40000:   ; TEXT PLANE 3
+	ds.b    $20000
+L_00E60000:   ; TEXT PLANE 4
+	ds.b    $20000
 L_00E80000:   ; CRTC
 	ds.b    $2000
 L_00E82000:   ; VIDEO CONTROLLER
