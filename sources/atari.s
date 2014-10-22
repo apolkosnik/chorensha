@@ -25,6 +25,14 @@ LINE_F_OFFSET=2 ; 0 = 68000, 2 = 68030
 ; ------------------------------------------------------------------------------
 
 start:
+	move.l	4(sp),a6
+	move.l	#$100,d0
+	add.l	$c(a6),d0
+	add.l	$14(a6),d0
+	add.l	$1c(a6),d0
+	add.l	d0,a6
+	move.l	a6,-(sp)
+
 	pea		welcome_text
 	move	#9,-(sp)
 	trap	#1
@@ -48,10 +56,10 @@ start:
 ; usp	親のスタック "Stack of the parent"
 ; ssp	システムのスタック "Stack of the system"
 
-	lea		NEW_STACK,a0
-	lea		NEW_STACK,a1
-	lea		NEW_STACK,a2
-	lea		NEW_STACK,a3
+	move.l	(sp)+,a0
+	move.l	a0,a1
+	move.l	a0,a2
+	move.l	a0,a3
 	lea		_start,a4
 
 	jmp		_start
@@ -1878,6 +1886,22 @@ keyboard:
 	rte
 
 .skip_down_arrow2:
+	cmp.b	#$39,d0 ; "SPACE" pressed?
+	jne		.skip_space1
+
+	move.l	(sp)+,d0
+
+	rte
+
+.skip_space1:
+	cmp.b	#$39+$80,d0 ; "SPACE" released?
+	jne		.skip_space2
+
+	move.l	(sp)+,d0
+
+	rte
+
+.skip_space2:
 	move.l	(sp)+,d0
 
 	rte
@@ -1960,11 +1984,11 @@ welcome_text:
 	dc.b	'-------------',10,13
 	dc.b	10,13
 
-	dc.b	'Original X68000 v1.01 (c) 1995 by',10,13
+	dc.b	'Original X68000 version (c) 1995 by',10,13
 	dc.b	'Famibe No Yosshin',10,13
 	dc.b	10,13
 
-	dc.b	'Atari Falcon 030 port v20141021t by',10,13
+	dc.b	'Atari Falcon 030 port v20141022t by',10,13
 	dc.b	'Sascha Springer',10,13
 	dc.b	10,13
 	
