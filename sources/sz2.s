@@ -15083,12 +15083,12 @@ L_00028111:
 
 	even
 
-INITIALIZE_GRAPHICS_ENGINE:
+INITIALIZE_XSP_ENGINE:
 	link    A6,#-2                                  ; $00028122 4E56 FFFE                ; S($00029004) 
 
 	movem.l D3-D4/A3-A5,-(A7)                       ; $00028126 48E7 181C                ; 
 
-	bsr.w   L_00028864                              ; $0002812A 6100 0738                ; 
+	bsr.w   LOAD_SPRITE_MEMORY_CONFIGURATION                              ; $0002812A 6100 0738                ; 
 
 	jsr     XSP_ON                              ; $0002812E 4EB9 0002 0316           ; 
 
@@ -15143,7 +15143,7 @@ INITIALIZE_GRAPHICS_ENGINE:
 
 	move.l  D0,-(A7)                                ; $000281C4 2F00                     ; 
 	pea     FILENAME_CHO_68K(pc)                          ; $000281C6 487A F9A6                ; 
-	lea     L_00028A02,A4                           ; $000281CA 49F9 0002 8A02           ; 
+	lea     LOAD_SPRITE_INFOS,A4                           ; $000281CA 49F9 0002 8A02           ; 
 	jsr     (A4)                                    ; $000281D0 4E94                     ; 
 
 	movea.l D4,A1                                   ; $000281D2 2244                     ; 
@@ -15920,7 +15920,7 @@ L_0002883D:
 	dc.b    $0A                                    ;  ; 0x00028862
 	dc.b    $00                                    ;  ; 0x00028863
 
-L_00028864:
+LOAD_SPRITE_MEMORY_CONFIGURATION:
 	link    A6,#-260                                ; $00028864 4E56 FEFC                ; S($0002812A) 
 
 	movem.l D3-D5/A3-A5,-(A7)                       ; $00028868 48E7 1C1C                ; 
@@ -15929,12 +15929,15 @@ L_00028864:
 	move.l  D1,LONG_00089674                        ; $0002886E 23C1 0008 9674           ; 
 	move.l  D1,LONG_00089670                        ; $00028874 23C1 0008 9670           ; 
 	move.l  D1,LONG_0008966C                        ; $0002887A 23C1 0008 966C           ; 
+
 	pea     L_00028766(pc)                          ; $00028880 487A FEE4                ; 
 	pea     L_00028769(pc)                          ; $00028884 487A FEE3                ; 
 	jsr     OPEN_FILE                              ; $00028888 4EB9 0002 7918           ; 
 
 	move.l  D0,D5                                   ; $0002888E 2A00                     ; 
+
 	addq.w  #$8,A7                                  ; $00028890 504F                     ; 
+
 	move.l  A6,D3                                   ; $00028892 260E                     ; 
 	add.l   #$FFFFFF00,D3                           ; $00028894 D6BC FFFF FF00           ; 
 	move.l  A6,D4                                   ; $0002889A 280E                     ; 
@@ -16085,7 +16088,7 @@ L_000289FA:
 L_000289FE:
 	dc.b    'frm',0
 
-L_00028A02:
+LOAD_SPRITE_INFOS:
 	link    A6,#-256                                ; $00028A02 4E56 FF00                ; 
 
 	movem.l D3-D6/A3-A4,-(A7)                       ; $00028A06 48E7 1E18                ; 
@@ -16839,7 +16842,7 @@ INITIALIZE_GAME:
 
 	jsr     LOAD_STATUS_CNF                              ; $00028FFE 4EB9 0002 9D20           ; 
 
-	jsr     INITIALIZE_GRAPHICS_ENGINE                              ; $00029004 4EB9 0002 8122           ; 
+	jsr     INITIALIZE_XSP_ENGINE                              ; $00029004 4EB9 0002 8122           ; 
 
 	move.l  #L_00028F14,D4                          ; $0002900A 283C 0002 8F14           ; 
 	move.l  D4,-(A7)                                ; $00029010 2F04                     ; 
@@ -88958,7 +88961,9 @@ L_00059CA6:
 
 L_00059CD2:
 	movem.l -568(A6),D3-D7/A3-A5                    ; $00059CD2 4CEE 38F8 FDC8           ; J($00059CA4) 
+
 	unlk    A6                                      ; $00059CD8 4E5E                     ; 
+
 	rts                                             ; $00059CDA 4E75                     ; 
 
 L_00059CDC:
@@ -89646,6 +89651,7 @@ L_0005A0AA:
 
 L_0005A0AE:
 	clr.l   D0                                      ; $0005A0AE 4280                     ; 
+
 	rts                                             ; $0005A0B0 4E75                     ; 
 
 L_0005A0B2:
