@@ -566,11 +566,11 @@ L_00020328:
 
 	ifd __ATARI__ || __AMIGA__
 
-	move.l  #L_000217DA,L_00000138                      ; $000203A4 21FC 0002 17DA 0138      ; 
+	move.l  #RASTER_INTERRUPT_HANDLER,L_00000138                      ; $000203A4 21FC 0002 17DA 0138      ; 
 
 	else
 
-	move.l  #L_000217DA,L_00000138.w                      ; $000203A4 21FC 0002 17DA 0138      ; 
+	move.l  #RASTER_INTERRUPT_HANDLER,L_00000138.w                      ; $000203A4 21FC 0002 17DA 0138      ; 
 
 	endif
 
@@ -2858,6 +2858,7 @@ L_0002167A:
 	bne.w   L_000217BE                              ; $00021682 6600 013A                ; 
 
 	bclr    #$1,L_00EB0000+$808                     ; $00021686 08B9 0001 00EB 0808      ; [SPRITE REGISTERS + $808]  
+
 	movea.l LONG_000221E6(pc),A0                    ; $0002168E 207A 0B56                ; 
 	btst    #$4,L_00E80000+$29                      ; $00021692 0839 0004 00E8 0029      ; [CRTC + $29]  
 	beq.s   L_000216AE                              ; $0002169A 6712                     ; 
@@ -2991,8 +2992,9 @@ L_000217BE:
 
 	rte                                             ; $000217D8 4E73                     ; 
 
-L_000217DA:
+RASTER_INTERRUPT_HANDLER:
 	movem.l D0-D2/A0-A2,-(A7)                       ; $000217DA 48E7 E0E0                ; 
+
 	movea.l LONG_000221D2(pc),A0                    ; $000217DE 207A 09F2                ; 
 	movea.l LONG_000221D6(pc),A1                    ; $000217E2 227A 09F2                ; 
 	move.w  (A0)+,D0                                ; $000217E6 3018                     ; 
@@ -16900,7 +16902,7 @@ INITIALIZE_GAME:
 	move.l  D4,-(A7)                                ; $000290AA 2F04                     ; 
 	pea     FILENAME_SZ_PALET_PAL(pc)                          ; $000290AC 487A FEB2                ; 
 	jsr     (A4)                                    ; $000290B0 4E94                     ; 
-xxx:
+
 	move.l  D0,-(A7)                                ; $000290B2 2F00                     ; 
 	pea     $100.w                                  ; $000290B4 4878 0100                ; 
 	pea     $2.w                                    ; $000290B8 4878 0002                ; 
