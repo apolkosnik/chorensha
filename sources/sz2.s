@@ -7098,7 +7098,7 @@ L_000235EC:
 
 L_000235F8:
 	move.l  (A4),-(A7)                              ; $000235F8 2F14                     ; 
-	lea     L_00059CDC,A3                           ; $000235FA 47F9 0005 9CDC           ; 
+	lea     REMOVE_HEAP_LINKED_LIST_NODE,A3                           ; $000235FA 47F9 0005 9CDC           ; 
 	jsr     (A3)                                    ; $00023600 4E93                     ; 
 
 	move.l  A4,-(A7)                                ; $00023602 2F0C                     ; 
@@ -11910,9 +11910,7 @@ L_00026204:
 	rts                                             ; $0002620C 4E75                     ; 
 
 L_0002620E:
-	dc.b    $72                                    ; r ; 0x0002620E
-	dc.b    $74                                    ; t ; 0x0002620F
-	dc.b    $00                                    ;  ; 0x00026210
+	dc.b	'rt',0
 
 L_00026211:
 	dc.b    'PCM_DAT\SZ2_PCM.CNF',0
@@ -11981,6 +11979,7 @@ L_000262BE:
 	ext.l   D0                                      ; $000262C0 48C0                     ; 
 	asl.l   #$4,D0                                  ; $000262C2 E980                     ; 
 	clr.w   10(A0,D0.l)                             ; $000262C4 4270 080A                ; 
+
 	addq.w  #$1,D1                                  ; $000262C8 5241                     ; 
 	cmp.w   #$FF,D1                                 ; $000262CA B27C 00FF                ; 
 	ble.s   L_000262BE                              ; $000262CE 6FEE                     ; 
@@ -12033,6 +12032,7 @@ L_0002633E:
 	adda.l  D1,A0                                   ; $00026348 D1C1                     ; 
 	move.w  -518(A6),(A0)                           ; $0002634A 30AE FDFA                ; 
 	move.w  -522(A6),10(A0)                         ; $0002634E 316E FDF6 000A           ; 
+
 	move.l  D0,-(A7)                                ; $00026354 2F00                     ; 
 	move.l  D5,-(A7)                                ; $00026356 2F05                     ; 
 	jsr     L_00023528                              ; $00026358 4EB9 0002 3528           ; 
@@ -12063,6 +12063,7 @@ L_0002633E:
 	adda.l  D1,A0                                   ; $00026398 D1C1                     ; 
 	move.l  D0,6(A0)                                ; $0002639A 2140 0006                ; 
 	move.l  D4,2(A0)                                ; $0002639E 2144 0002                ; 
+
 	move.l  D3,-(A7)                                ; $000263A2 2F03                     ; 
 	move.l  D4,-(A7)                                ; $000263A4 2F04                     ; 
 	pea     $1.w                                    ; $000263A6 4878 0001                ; 
@@ -12681,7 +12682,7 @@ L_000268CE:
 
 L_000268DC:
 	move.l  D5,-(A7)                                ; $000268DC 2F05                     ; J($000268CC) 
-	jsr     L_00059CDC                              ; $000268DE 4EB9 0005 9CDC           ; 
+	jsr     REMOVE_HEAP_LINKED_LIST_NODE                              ; $000268DE 4EB9 0005 9CDC           ; 
 
 L_000268E4:
 	addq.w  #$4,A7                                  ; $000268E4 584F                     ; J($00026844) 
@@ -14653,7 +14654,7 @@ L_000279A4:
 	and.l   D3,D0                                   ; $000279AE C083                     ; 
 	add.l   D0,D3                                   ; $000279B0 D680                     ; 
 	move.l  D3,-(A7)                                ; $000279B2 2F03                     ; 
-	jsr     L_0005B176                              ; $000279B4 4EB9 0005 B176           ; 
+	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $000279B4 4EB9 0005 B176           ; 
 
 	move.l  D0,D4                                   ; $000279BA 2800                     ; 
 
@@ -88433,11 +88434,14 @@ L_0005958E:
 
 L_000596BA:
 	movem.l -60(A6),D3-D7/A3-A5                     ; $000596BA 4CEE 38F8 FFC4           ; J($00059348) 
+
 	unlk    A6                                      ; $000596C0 4E5E                     ; 
+
 	rts                                             ; $000596C2 4E75                     ; 
 
 L_000596C4:
 	move.l  A3,-(A7)                                ; $000596C4 2F0B                     ; 
+
 	movea.l 8(A7),A3                                ; $000596C6 266F 0008                ; 
 	jsr     L_0002724A                              ; $000596CA 4EB9 0002 724A           ; 
 
@@ -88479,12 +88483,16 @@ L_000596C4:
 
 L_00059768:
 	move.l  A2,D0                                   ; $00059768 200A                     ; 
+
 	movea.l (A7)+,A3                                ; $0005976A 265F                     ; 
+
 	rts                                             ; $0005976C 4E75                     ; 
 
 L_0005976E:
 	link    A6,#-536                                ; $0005976E 4E56 FDE8                ; 
+
 	movem.l D3-D7/A3-A5,-(A7)                       ; $00059772 48E7 1F1C                ; 
+
 	movea.l 8(A6),A2                                ; $00059776 246E 0008                ; 
 	addq.w  #$1,120(A2)                             ; $0005977A 526A 0078                ; 
 	movea.l 44(A2),A0                               ; $0005977E 206A 002C                ; 
@@ -88971,20 +88979,20 @@ L_00059CD2:
 
 	rts                                             ; $00059CDA 4E75                     ; 
 
-L_00059CDC:
+REMOVE_HEAP_LINKED_LIST_NODE:
 	move.l  4(A7),D0                                ; $00059CDC 202F 0004                ; S($0005A03C) 
 	beq.s   L_00059D0C                              ; $00059CE0 672A                     ; 
 
 	movea.l D0,A2                                   ; $00059CE2 2440                     ; 
 	lea     -12(A2),A2                              ; $00059CE4 45EA FFF4                ; 
-	cmpa.l  LONG_000AB356,A2                        ; $00059CE8 B5F9 000A B356           ; 
+	cmpa.l  HEAP_LINKED_LIST_START,A2                        ; $00059CE8 B5F9 000A B356           ; 
 	bcs.s   L_00059D0E                              ; $00059CEE 651E                     ; 
 
 	cmpa.l  LONG_000AB35E,A2                        ; $00059CF0 B5F9 000A B35E           ; 
 	bcc.s   L_00059D0E                              ; $00059CF6 6416                     ; 
 
 	move.b  #$FE,4(A2)                              ; $00059CF8 157C 00FE 0004           ; 
-	lea     LONG_000AB362,A1                        ; $00059CFE 43F9 000A B362           ; 
+	lea     HEAP_LINKED_LIST_CURRENT,A1                        ; $00059CFE 43F9 000A B362           ; 
 	cmpa.l  (A1),A2                                 ; $00059D04 B5D1                     ; 
 	bcc.s   L_00059D0A                              ; $00059D06 6402                     ; 
 
@@ -89541,7 +89549,7 @@ L_00059FF2:
 	movem.l D1/A2,-(A7)                             ; $00059FF8 48E7 4020                ; 
 
 	move.l  #$400,-(A7)                             ; $00059FFC 2F3C 0000 0400           ; 
-	jsr     L_0005B176                              ; $0005A002 4EB9 0005 B176           ; 
+	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $0005A002 4EB9 0005 B176           ; 
 
 	addq.l  #$4,A7                                  ; $0005A008 588F                     ; 
 
@@ -89570,7 +89578,7 @@ L_0005A034:
 	beq.s   L_0005A044                              ; $0005A038 670A                     ; 
 
 	move.l  D0,-(A7)                                ; $0005A03A 2F00                     ; 
-	jsr     L_00059CDC                              ; $0005A03C 4EB9 0005 9CDC           ; 
+	jsr     REMOVE_HEAP_LINKED_LIST_NODE                              ; $0005A03C 4EB9 0005 9CDC           ; 
 
 	addq.l  #$4,A7                                  ; $0005A042 588F                     ; 
 
@@ -89726,7 +89734,7 @@ L_0005A114:
 	bne.s   L_0005A114                              ; $0005A118 66FA                     ; 
 
 	move.l  D0,-(A7)                                ; $0005A11A 2F00                     ; 
-	jsr     L_0005B176                              ; $0005A11C 4EB9 0005 B176           ; 
+	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $0005A11C 4EB9 0005 B176           ; 
 
 	addq.l  #$4,A7                                  ; $0005A122 588F                     ; 
 	tst.l   D0                                      ; $0005A124 4A80                     ; 
@@ -89974,7 +89982,7 @@ CLOSE_FILE:
 	bne.s   L_0005A2E0                              ; $0005A2D2 660C                     ; 
 
 	move.l  8(A2),-(A7)                             ; $0005A2D4 2F2A 0008                ; 
-	jsr     L_00059CDC                              ; $0005A2D8 4EB9 0005 9CDC           ; 
+	jsr     REMOVE_HEAP_LINKED_LIST_NODE                              ; $0005A2D8 4EB9 0005 9CDC           ; 
 
 	addq.l  #$4,A7                                  ; $0005A2DE 588F                     ; 
 
@@ -90005,8 +90013,9 @@ L_0005A30E:
 	beq.s   L_0005A326                              ; $0005A316 670E                     ; 
 
 	clr.l   22(A2)                                  ; $0005A318 42AA 0016                ; 
+
 	move.l  D0,-(A7)                                ; $0005A31C 2F00                     ; 
-	jsr     L_00059CDC                              ; $0005A31E 4EB9 0005 9CDC           ; 
+	jsr     REMOVE_HEAP_LINKED_LIST_NODE                              ; $0005A31E 4EB9 0005 9CDC           ; 
 
 	addq.l  #$4,A7                                  ; $0005A324 588F                     ; 
 
@@ -90045,7 +90054,7 @@ L_0005A36A:
 	move.l  A0,-(A7)                                ; $0005A374 2F08                     ; 
 
 	move.l  #$400,-(A7)                             ; $0005A376 2F3C 0000 0400           ; 
-	jsr     L_0005B176                              ; $0005A37C 4EB9 0005 B176           ; 
+	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $0005A37C 4EB9 0005 B176           ; 
 
 	addq.l  #$4,A7                                  ; $0005A382 588F                     ; 
 
@@ -90774,7 +90783,7 @@ _start:
 	add.l   #$400,D1                                ; $0005A87E D2BC 0000 0400           ; 
 	move.l  D1,LONG_000AB34E                        ; $0005A884 23C1 000A B34E           ; 
 
-	move.l  LONG_0005AC60,D0                        ; $0005A88A 2039 0005 AC60           ; 
+	move.l  GAME_STACK_SIZE,D0                        ; $0005A88A 2039 0005 AC60           ; 
 	cmp.l   #$1000,D0                               ; $0005A890 B0BC 0000 1000           ; 
 	bcc.s   L_0005A89E                              ; $0005A896 6406                     ; 
 
@@ -90784,7 +90793,7 @@ L_0005A89E:
 	addq.l  #$1,D0                                  ; $0005A89E 5280                     ; 
 	and.l   #%00000000111111111111111111111110,D0   ; $0005A8A0 C0BC 00FF FFFE           ; 
 	add.l   D0,D1                                   ; $0005A8A6 D280                     ; 
-	move.l  D1,LONG_000AB352                        ; $0005A8A8 23C1 000A B352           ; 
+	move.l  D1,GAME_STACK_ADDRESS                        ; $0005A8A8 23C1 000A B352           ; 
 	move.l  D1,LONG_000AB36E                        ; $0005A8AE 23C1 000A B36E           ; 
 
 	movea.l ENVIRONMENT_ADDRESS,A0                        ; $0005A8B4 2079 000A B366           ; 
@@ -90814,9 +90823,9 @@ L_0005A8E4:
 	addq.l  #$1,D0                                  ; $0005A8E4 5280                     ; 
 	and.l   #%00000000111111111111111111111110,D0   ; $0005A8E6 C0BC 00FF FFFE           ;   
 	add.l   D0,D1                                   ; $0005A8EC D280                     ; 
-	move.l  D1,LONG_000AB356                        ; $0005A8EE 23C1 000A B356           ; 
+	move.l  D1,HEAP_LINKED_LIST_START                        ; $0005A8EE 23C1 000A B356           ; 
 
-	move.l  LONG_0005AC64,D0                        ; $0005A8F4 2039 0005 AC64           ; 
+	move.l  GAME_HEAP_SIZE,D0                        ; $0005A8F4 2039 0005 AC64           ; 
 	cmp.l   #$2000,D0                               ; $0005A8FA B0BC 0000 2000           ; 
 	bcc.s   L_0005A908                              ; $0005A900 6406                     ; 
 
@@ -90838,15 +90847,15 @@ L_0005A908:
 	tst.l   D0                                      ; $0005A932 4A80                     ; 
 	bmi.w   L_0005AAD0                              ; $0005A934 6B00 019A                ; 
 
-	movea.l LONG_000AB352,A7                        ; $0005A938 2E79 000A B352           ; 
+	movea.l GAME_STACK_ADDRESS,A7                        ; $0005A938 2E79 000A B352           ; 
 
-	movea.l LONG_000AB356,A0                        ; $0005A93E 2079 000A B356           ; 
-	move.l  A0,LONG_000AB362                        ; $0005A944 23C8 000A B362           ; 
+	movea.l HEAP_LINKED_LIST_START,A0                        ; $0005A93E 2079 000A B356           ; 
+	move.l  A0,HEAP_LINKED_LIST_CURRENT                        ; $0005A944 23C8 000A B362           ; 
 	lea     16(A0),A1                               ; $0005A94A 43E8 0010                ; 
 	clr.l   (A0)+                                   ; $0005A94E 4298                     ; 
 	move.l  A1,(A0)+                                ; $0005A950 20C9                     ; 
 	clr.l   (A0)+                                   ; $0005A952 4298                     ; 
-	move.l  #$48454150,(A0)                         ; $0005A954 20BC 4845 4150           ; 
+	move.l  #'HEAP',(A0)                         ; $0005A954 20BC 4845 4150           ; 
 
 	movea.l ENVIRONMENT_ADDRESS,A0                        ; $0005A95A 2079 000A B366           ; 
 	movea.l LONG_000AB36A,A1                        ; $0005A960 2279 000A B36A           ; 
@@ -90930,7 +90939,7 @@ L_0005A9EE:
 
 	move.l  A0,-(A7)                                ; $0005A9F8 2F08                     ; 
 	move.l  #$400,-(A7)                             ; $0005A9FA 2F3C 0000 0400           ; 
-	jsr     L_0005B176                              ; $0005AA00 4EB9 0005 B176           ; 
+	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $0005AA00 4EB9 0005 B176           ; 
 
 	addq.l  #$4,A7                                  ; $0005AA06 588F                     ; 
 
@@ -91136,7 +91145,7 @@ L_0005AB92:
 
 	bsr.s   L_0005AC08                              ; $0005ABA6 6160                     ; 
 
-	move.l  D1,LONG_0005AC64                        ; $0005ABA8 23C1 0005 AC64           ; 
+	move.l  D1,GAME_HEAP_SIZE                        ; $0005ABA8 23C1 0005 AC64           ; 
 
 L_0005ABAE:
 	movem.l (A7)+,D1/A0/A2                          ; $0005ABAE 4CDF 0502                ; J($0005ABC0) 
@@ -91149,7 +91158,7 @@ L_0005ABAE:
 L_0005ABB8:
 	bsr.s   L_0005AC08                              ; $0005ABB8 614E                     ; 
 
-	move.l  D1,LONG_0005AC60                        ; $0005ABBA 23C1 0005 AC60           ; 
+	move.l  D1,GAME_STACK_SIZE                        ; $0005ABBA 23C1 0005 AC60           ; 
 
 	bra.s   L_0005ABAE                              ; $0005ABC0 60EC                     ; 
 
@@ -91262,10 +91271,10 @@ LONG_0005AC58:
 LONG_0005AC5C:
 	dc.l    $FFFF8170                              ; p; 0x0005AC5C
 
-LONG_0005AC60:
+GAME_STACK_SIZE:
 	dc.l    $00010000                              ; ; 0x0005AC60
 
-LONG_0005AC64:
+GAME_HEAP_SIZE:
 	dc.l    $00010000                              ; ; 0x0005AC64
 
 SOME_JAPANESE_TEXT:
@@ -92001,14 +92010,14 @@ INPOUT:
 
 	dc.b    'NqN',$71;	dc.b    $4E,$71,$4E,$71 ; 0x0005B172
 
-L_0005B176:
+ADD_HEAP_LINKED_LIST_NODE:
 	move.l  4(A7),D2                                ; $0005B176 242F 0004                ; S($0005A11C) 
 	ble.w   L_0005B252                              ; $0005B17A 6F00 00D6                ; 
 
 	moveq   #12,D0                                  ; $0005B17E 700C                     ; 
 	add.l   D0,D2                                   ; $0005B180 D480                     ; 
 	movea.l D0,A1                                   ; $0005B182 2240                     ; 
-	movea.l LONG_000AB362,A2                        ; $0005B184 2479 000A B362           ; 
+	movea.l HEAP_LINKED_LIST_CURRENT,A2                        ; $0005B184 2479 000A B362           ; 
 
 L_0005B18A:
 	cmpi.b  #$FE,4(A2)                              ; $0005B18A 0C2A 00FE 0004           ; J($0005B1B8) 
@@ -92031,7 +92040,7 @@ L_0005B1A8:
 
 	moveq   #-1,D0                                  ; $0005B1AC 70FF                     ; 
 	movea.l D0,A1                                   ; $0005B1AE 2240                     ; 
-	move.l  0(A2),LONG_000AB362                     ; $0005B1B0 23EA 0000 000A B362      ; 
+	move.l  0(A2),HEAP_LINKED_LIST_CURRENT                     ; $0005B1B0 23EA 0000 000A B362      ; 
 
 	bra.s   L_0005B18A                              ; $0005B1B8 60D0                     ; 
 
@@ -92107,7 +92116,7 @@ L_0005B23C:
 	cmpa.l  #$FFFFFFFF,A1                           ; $0005B23C B3FC FFFF FFFF           ; 
 	beq.s   L_0005B24A                              ; $0005B242 6706                     ; 
 
-	move.l  A2,LONG_000AB362                        ; $0005B244 23CA 000A B362           ; 
+	move.l  A2,HEAP_LINKED_LIST_CURRENT                        ; $0005B244 23CA 000A B362           ; 
 
 L_0005B24A:
 	lea     12(A2),A2                               ; $0005B24A 45EA 000C                ; 
@@ -94721,7 +94730,7 @@ L_0005C366:
 	beq.s   L_0005C378                              ; $0005C36C 670A                     ; 
 
 	move.l  D0,-(A7)                                ; $0005C36E 2F00                     ; 
-	jsr     L_00059CDC                              ; $0005C370 4EB9 0005 9CDC           ; 
+	jsr     REMOVE_HEAP_LINKED_LIST_NODE                              ; $0005C370 4EB9 0005 9CDC           ; 
 
 	addq.l  #$4,A7                                  ; $0005C376 588F                     ; 
 
@@ -94730,12 +94739,15 @@ L_0005C378:
 
 L_0005C37A:
 	movem.l D1-D2,-(A7)                             ; $0005C37A 48E7 6000                ; S($0005C2D2) 
+
 	move.l  #$1,-(A7)                               ; $0005C37E 2F3C 0000 0001           ; 
 	move.l  D1,-(A7)                                ; $0005C384 2F01                     ; 
 	jsr     L_0005CFFE                              ; $0005C386 4EB9 0005 CFFE           ; 
 
 	addq.l  #$8,A7                                  ; $0005C38C 508F                     ; 
+
 	movem.l (A7)+,D1-D2                             ; $0005C38E 4CDF 0006                ; 
+
 	tst.l   D0                                      ; $0005C392 4A80                     ; 
 
 	rts                                             ; $0005C394 4E75                     ; 
@@ -97341,7 +97353,7 @@ L_0005CFFE:
 	bcs.s   L_0005D034                              ; $0005D010 6522                     ; 
 
 	move.l  D0,-(A7)                                ; $0005D012 2F00                     ; 
-	jsr     L_0005B176                              ; $0005D014 4EB9 0005 B176           ; 
+	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $0005D014 4EB9 0005 B176           ; 
 
 	move.l  (A7)+,D1                                ; $0005D01A 221F                     ; 
 	tst.l   D0                                      ; $0005D01C 4A80                     ; 
@@ -101707,10 +101719,10 @@ PROGRAM_END_ADDRESS_PLUS_ONE:
 LONG_000AB34E:
 	ds.b    $4
 
-LONG_000AB352:
+GAME_STACK_ADDRESS:
 	ds.b    $4
 
-LONG_000AB356:
+HEAP_LINKED_LIST_START:
 	ds.b    $4
 
 LONG_000AB35A:
@@ -101719,7 +101731,7 @@ LONG_000AB35A:
 LONG_000AB35E:
 	ds.b    $4
 
-LONG_000AB362:
+HEAP_LINKED_LIST_CURRENT:
 	ds.b    $4
 
 ENVIRONMENT_ADDRESS:
