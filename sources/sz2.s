@@ -1055,6 +1055,7 @@ L_000206BA:
 	lea     SPRITE_DATA_TABLE,A0                        ; $000206BA 41F9 0005 E522           ; J($000205B6) 
 	move.l  CURRENT_SPRITE_DATA_ENTRY(pc),D0                    ; $000206C0 203A 1B04                ; 
 	sub.l   A0,D0                                   ; $000206C4 9088                     ; 
+
 	move.w  SP_MODE(pc),D1                    ; $000206C6 323A 1B16                ; 
 	cmpi.w  #$1,D1                                  ; $000206CA 0C41 0001                ; 
 	bne.s   L_000206E6                              ; $000206CE 6616                     ; 
@@ -1108,6 +1109,7 @@ L_000206F4:
 	movem.l D0-D7,160(A1)                           ; $0002074A 48E9 00FF 00A0           ; 
 	movem.l D0-D7,192(A1)                           ; $00020750 48E9 00FF 00C0           ; 
 	movem.l D0-D7,224(A1)                           ; $00020756 48E9 00FF 00E0           ; 
+
 	moveq   #0,D1                                   ; $0002075C 7200                     ; 
 	moveq   #0,D3                                   ; $0002075E 7600                     ; 
 	moveq   #0,D4                                   ; $00020760 7800                     ; 
@@ -2784,7 +2786,7 @@ L_000215C0:
 L_000215D4:
 	movea.l LONG_000221E2(pc),A0                    ; $000215D4 207A 0C0C                ; J($00020A48) J($00020E9E) 
 	lea     264(A0),A0                              ; $000215D8 41E8 0108                ; 
-	cmpa.l  #L_0005E51A,A0                          ; $000215DC B1FC 0005 E51A           ; 
+	cmpa.l  #SPRITE_DATA_TABLE_OVERHEAD,A0                          ; $000215DC B1FC 0005 E51A           ; 
 	bne.s   L_000215EA                              ; $000215E2 6606                     ; 
 
 	lea     WORD_0005E202,A0                        ; $000215E4 41F9 0005 E202           ; 
@@ -2794,6 +2796,7 @@ L_000215EA:
 	beq.s   L_000215EA                              ; $000215EE 67FA                     ; 
 
 	move.l  A0,LONG_000221E2                        ; $000215F0 23C8 0002 21E2           ; 
+
 	move.l  SAVED_STACK_POINTER(pc),D0                    ; $000215F6 203A 0C12                ; 
 	bmi.s   L_00021602                              ; $000215FA 6B06                     ; 
 
@@ -2842,7 +2845,7 @@ VBL_INTERRUPT_HANDLER:
 
 	movea.l LONG_000221E6(pc),A0                    ; $00021658 207A 0B8C                ; 
 	lea     264(A0),A0                              ; $0002165C 41E8 0108                ; 
-	cmpa.l  #L_0005E51A,A0                          ; $00021660 B1FC 0005 E51A           ; 
+	cmpa.l  #SPRITE_DATA_TABLE_OVERHEAD,A0                          ; $00021660 B1FC 0005 E51A           ; 
 	bne.s   L_0002166E                              ; $00021666 6606                     ; 
 
 	lea     WORD_0005E202,A0                        ; $00021668 41F9 0005 E202           ; 
@@ -101015,7 +101018,7 @@ L_0005E1F4:
 WORD_0005E202:
 	ds.b    $318
 
-L_0005E51A:
+SPRITE_DATA_TABLE_OVERHEAD:
 	ds.b    $8
 
 SPRITE_DATA_TABLE:

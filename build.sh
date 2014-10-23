@@ -13,12 +13,12 @@ diff binaries/sz2.dif binaries/x68000/sz2.dif
 #
 # Atari
 #
-./vasmm68k_mot sources/sz2.s -quiet -nosym -no-opt -Felf -m68030 -D__ATARI__ -o binaries/sz2_atari.o
-./vasmm68k_mot sources/atari.s -quiet -nosym -Felf -m68030 -o binaries/atari.o
+./vasmm68k_mot sources/sz2.s -quiet -nosym -no-opt -Faout -m68030 -D__ATARI__ -o binaries/sz2_atari.o
+./vasmm68k_mot sources/atari.s -quiet -nosym -Faout -m68030 -o binaries/atari.o
 ./vlink binaries/atari.o binaries/sz2_atari.o -b ataritos -e start -o binaries/atari/sz2.tos
 
-./vasmm68k_mot sources/sz2.s -quiet -no-opt -Felf -m68030 -D__ATARI__ -o binaries/sz2_atari.o
-./vasmm68k_mot sources/atari.s -quiet -Felf -m68030 -o binaries/atari.o
+./vasmm68k_mot sources/sz2.s -quiet -no-opt -Faout -m68030 -D__ATARI__ -o binaries/sz2_atari.o
+./vasmm68k_mot sources/atari.s -quiet -Faout -m68030 -o binaries/atari.o
 ./vlink binaries/atari.o binaries/sz2_atari.o -b ataritos -e start -o binaries/atari/sz2_dbg.tos
 
 #
