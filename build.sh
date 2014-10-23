@@ -17,6 +17,9 @@ diff binaries/sz2.dif binaries/x68000/sz2.dif
 ./vasmm68k_mot sources/atari.s -quiet -nosym -Faout -m68030 -o binaries/atari.o
 ./vlink binaries/atari.o binaries/sz2_atari.o -b ataritos -e start -o binaries/atari/sz2.tos
 
+./vasmm68k_mot sources/atari.s -quiet -nosym -Faout -m68030 -D__HATARI__ -o binaries/atari.o
+./vlink binaries/atari.o binaries/sz2_atari.o -b ataritos -e start -o binaries/atari/sz2_hata.tos
+
 ./vasmm68k_mot sources/sz2.s -quiet -no-opt -Faout -m68030 -D__ATARI__ -o binaries/sz2_atari.o
 ./vasmm68k_mot sources/atari.s -quiet -Faout -m68030 -o binaries/atari.o
 ./vlink binaries/atari.o binaries/sz2_atari.o -b ataritos -e start -o binaries/atari/sz2_dbg.tos
