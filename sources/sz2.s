@@ -7000,7 +7000,7 @@ L_0002353A:
 	sub.l   D5,D3                                   ; $0002354A 9685                     ; 
 	addq.l  #$1,D3                                  ; $0002354C 5283                     ; 
 	pea     $10.w                                   ; $0002354E 4878 0010                ; 
-	lea     L_000279A4,A3                           ; $00023552 47F9 0002 79A4           ; 
+	lea     GET_HEAP_MEMORY,A3                           ; $00023552 47F9 0002 79A4           ; 
 	jsr     (A3)                                    ; $00023558 4E93                     ; 
 
 	movea.l D0,A4                                   ; $0002355A 2840                     ; 
@@ -11991,7 +11991,9 @@ L_000262BE:
 	jsr     OPEN_FILE                              ; $000262DE 4EB9 0002 7918           ; 
 
 	move.l  D0,D7                                   ; $000262E4 2E00                     ; 
+
 	addq.w  #$8,A7                                  ; $000262E6 504F                     ; 
+
 	move.l  A6,D5                                   ; $000262E8 2A0E                     ; 
 	add.l   #$FFFFFF00,D5                           ; $000262EA DABC FFFF FF00           ; 
 	move.l  #PCM_SAMPLE_INFO_TABLE,D6                       ; $000262F0 2C3C 0008 7C6C           ; 
@@ -12038,7 +12040,9 @@ L_0002633E:
 	jsr     L_00023528                              ; $00026358 4EB9 0002 3528           ; 
 
 	move.w  D0,D1                                   ; $0002635E 3200                     ; 
+
 	addq.w  #$8,A7                                  ; $00026360 504F                     ; 
+
 	cmp.w   #$FFFF,D1                               ; $00026362 B27C FFFF                ; 
 	bne.s   L_000263C2                              ; $00026366 665A                     ; 
 
@@ -12055,7 +12059,7 @@ L_0002633E:
 
 	move.l  D0,D4                                   ; $00026386 2800                     ; 
 	move.l  D4,-(A7)                                ; $00026388 2F04                     ; 
-	jsr     L_000279A4                              ; $0002638A 4EB9 0002 79A4           ; 
+	jsr     GET_HEAP_MEMORY                              ; $0002638A 4EB9 0002 79A4           ; 
 
 	move.l  -516(A6),D1                             ; $00026390 222E FDFC                ; 
 	asl.l   #$4,D1                                  ; $00026394 E981                     ; 
@@ -12071,6 +12075,7 @@ L_0002633E:
 	jsr     READ_FILE                              ; $000263AC 4EB9 0005 A13A           ; 
 
 	lea     36(A7),A7                               ; $000263B2 4FEF 0024                ; 
+
 	move.l  D3,-(A7)                                ; $000263B6 2F03                     ; 
 	jsr     CLOSE_FILE                              ; $000263B8 4EB9 0005 A2AA           ; 
 
@@ -12567,7 +12572,7 @@ L_0002679A:
 
 	move.l  D0,D3                                   ; $000267CE 2600                     ; 
 	move.l  D3,-(A7)                                ; $000267D0 2F03                     ; 
-	jsr     L_000279A4                              ; $000267D2 4EB9 0002 79A4           ; 
+	jsr     GET_HEAP_MEMORY                              ; $000267D2 4EB9 0002 79A4           ; 
 
 	move.l  D0,D5                                   ; $000267D8 2A00                     ; 
 	move.l  -516(A6),D0                             ; $000267DA 202E FDFC                ; 
@@ -12640,7 +12645,7 @@ L_00026848:
 
 	move.l  D0,D3                                   ; $00026880 2600                     ; 
 	move.l  D3,-(A7)                                ; $00026882 2F03                     ; 
-	jsr     L_000279A4                              ; $00026884 4EB9 0002 79A4           ; 
+	jsr     GET_HEAP_MEMORY                              ; $00026884 4EB9 0002 79A4           ; 
 
 	move.l  D0,D5                                   ; $0002688A 2A00                     ; 
 	move.l  D4,-(A7)                                ; $0002688C 2F04                     ; 
@@ -14646,7 +14651,7 @@ BYTE_PRINT_FORMAT:
 
 	even
 
-L_000279A4:
+GET_HEAP_MEMORY:
 	movem.l D3-D4/A3,-(A7)                          ; $000279A4 48E7 1810                ; S($000267D2) 
 
 	move.l  16(A7),D3                               ; $000279A8 262F 0010                ; 
@@ -15095,7 +15100,7 @@ INITIALIZE_XSP_ENGINE:
 
 	jsr     XSP_ON                              ; $0002812E 4EB9 0002 0316           ; 
 
-	move.l  LONG_00089690,-(A7)                     ; $00028134 2F39 0008 9690           ; 
+	move.l  OBJECT_MANAGEMENT_TABLE_ADDRESS,-(A7)                     ; $00028134 2F39 0008 9690           ; 
 	jsr     XSP_OBJDAT_SET                              ; $0002813A 4EB9 0002 021C           ; 
 
 	bsr.w   L_000289C2                              ; $00028140 6100 0880                ; 
@@ -15115,6 +15120,7 @@ INITIALIZE_XSP_ENGINE:
 	jsr     (A3)                                    ; $00028170 4E93                     ; 
 
 	move.w  D0,(A4)                                 ; $00028172 3880                     ; 
+
 	pea     -1.w                                    ; $00028174 4878 FFFF                ; 
 	pea     L_00027B24(pc)                          ; $00028178 487A F9AA                ; 
 	jsr     (A3)                                    ; $0002817C 4E93                     ; 
@@ -15126,6 +15132,7 @@ INITIALIZE_XSP_ENGINE:
 	jsr     (A3)                                    ; $00028192 4E93                     ; 
 
 	move.w  D0,(A4)                                 ; $00028194 3880                     ; 
+
 	lea     WORD_0008DAEE,A5                        ; $00028196 4BF9 0008 DAEE           ; 
 	lea     32(A7),A7                               ; $0002819C 4FEF 0020                ; 
 	pea     -1.w                                    ; $000281A0 4878 FFFF                ; 
@@ -15929,9 +15936,9 @@ LOAD_SPRITE_MEMORY_CONFIGURATION:
 	movem.l D3-D5/A3-A5,-(A7)                       ; $00028868 48E7 1C1C                ; 
 
 	moveq   #0,D1                                   ; $0002886C 7200                     ; 
-	move.l  D1,LONG_00089674                        ; $0002886E 23C1 0008 9674           ; 
-	move.l  D1,LONG_00089670                        ; $00028874 23C1 0008 9670           ; 
-	move.l  D1,LONG_0008966C                        ; $0002887A 23C1 0008 966C           ; 
+	move.l  D1,SPRITE_MANAGEMENT_TABLE_SIZE                        ; $0002886E 23C1 0008 9674           ; 
+	move.l  D1,OBJECT_MANAGEMENT_TABLE_SIZE                        ; $00028874 23C1 0008 9670           ; 
+	move.l  D1,FRAME_MANAGEMENT_TABLE_SIZE                        ; $0002887A 23C1 0008 966C           ; 
 
 	pea     L_00028766(pc)                          ; $00028880 487A FEE4                ; 
 	pea     L_00028769(pc)                          ; $00028884 487A FEE3                ; 
@@ -15959,7 +15966,7 @@ L_000288A4:
 	tst.l   D0                                      ; $000288B6 4A80                     ; 
 	beq.s   L_000288C2                              ; $000288B8 6708                     ; 
 
-	move.l  -260(A6),LONG_00089674                  ; $000288BA 23EE FEFC 0008 9674      ; 
+	move.l  -260(A6),SPRITE_MANAGEMENT_TABLE_SIZE                  ; $000288BA 23EE FEFC 0008 9674      ; 
 
 L_000288C2:
 	move.l  D4,-(A7)                                ; $000288C2 2F04                     ; 
@@ -15972,7 +15979,7 @@ L_000288C2:
 	tst.l   D0                                      ; $000288D4 4A80                     ; 
 	beq.s   L_000288E0                              ; $000288D6 6708                     ; 
 
-	move.l  -260(A6),LONG_00089670                  ; $000288D8 23EE FEFC 0008 9670      ; 
+	move.l  -260(A6),OBJECT_MANAGEMENT_TABLE_SIZE                  ; $000288D8 23EE FEFC 0008 9670      ; 
 
 L_000288E0:
 	move.l  D4,-(A7)                                ; $000288E0 2F04                     ; 
@@ -15985,7 +15992,7 @@ L_000288E0:
 	tst.l   D0                                      ; $000288F2 4A80                     ; 
 	beq.s   L_000288FE                              ; $000288F4 6708                     ; 
 
-	move.l  -260(A6),LONG_0008966C                  ; $000288F6 23EE FEFC 0008 966C      ; 
+	move.l  -260(A6),FRAME_MANAGEMENT_TABLE_SIZE                  ; $000288F6 23EE FEFC 0008 966C      ; 
 
 L_000288FE:
 	move.l  D5,-(A7)                                ; $000288FE 2F05                     ; J($000288A2) 
@@ -15999,30 +16006,30 @@ L_000288FE:
 	bne.s   L_000288A4                              ; $00028912 6690                     ; 
 
 	pea     $80.w                                   ; $00028914 4878 0080                ; 
-	lea     LONG_00089674,A3                        ; $00028918 47F9 0008 9674           ; 
+	lea     SPRITE_MANAGEMENT_TABLE_SIZE,A3                        ; $00028918 47F9 0008 9674           ; 
 	move.l  (A3),-(A7)                              ; $0002891E 2F13                     ; 
 	pea     L_000287B0(pc)                          ; $00028920 487A FE8E                ; 
 	lea     PRINTF,A4                           ; $00028924 49F9 0005 9F16           ; 
 	jsr     (A4)                                    ; $0002892A 4E94                     ; 
 
-	move.l  #LONG_00089688,D3                       ; $0002892C 263C 0008 9688           ; 
+	move.l  #SPRITE_DATA_ADDRESS,D3                       ; $0002892C 263C 0008 9688           ; 
 
 	move.l  (A3),D1                                 ; $00028932 2213                     ; 
 	asl.l   #$7,D1                                  ; $00028934 EF81                     ; 
 	move.l  D1,-(A7)                                ; $00028936 2F01                     ; 
-	lea     L_000279A4,A5                           ; $00028938 4BF9 0002 79A4           ; 
+	lea     GET_HEAP_MEMORY,A5                           ; $00028938 4BF9 0002 79A4           ; 
 	jsr     (A5)                                    ; $0002893E 4E95                     ; 
 
 	movea.l D3,A0                                   ; $00028940 2043                     ; 
 	move.l  D0,(A0)                                 ; $00028942 2080                     ; 
 
 	pea     $8.w                                    ; $00028944 4878 0008                ; 
-	move.l  LONG_00089670,-(A7)                     ; $00028948 2F39 0008 9670           ; 
+	move.l  OBJECT_MANAGEMENT_TABLE_SIZE,-(A7)                     ; $00028948 2F39 0008 9670           ; 
 	pea     L_000287DF(pc)                          ; $0002894E 487A FE8F                ; 
 	jsr     (A4)                                    ; $00028952 4E94                     ; 
 
-	move.l  #LONG_00089690,D3                       ; $00028954 263C 0008 9690           ; 
-	move.l  LONG_00089670,D1                        ; $0002895A 2239 0008 9670           ; 
+	move.l  #OBJECT_MANAGEMENT_TABLE_ADDRESS,D3                       ; $00028954 263C 0008 9690           ; 
+	move.l  OBJECT_MANAGEMENT_TABLE_SIZE,D1                        ; $0002895A 2239 0008 9670           ; 
 	asl.l   #$3,D1                                  ; $00028960 E781                     ; 
 	move.l  D1,-(A7)                                ; $00028962 2F01                     ; 
 	jsr     (A5)                                    ; $00028964 4E95                     ; 
@@ -16033,12 +16040,12 @@ L_000288FE:
 	lea     32(A7),A7                               ; $0002896A 4FEF 0020                ; 
 
 	pea     $8.w                                    ; $0002896E 4878 0008                ; 
-	move.l  LONG_0008966C,-(A7)                     ; $00028972 2F39 0008 966C           ; 
+	move.l  FRAME_MANAGEMENT_TABLE_SIZE,-(A7)                     ; $00028972 2F39 0008 966C           ; 
 	pea     L_0002880E(pc)                          ; $00028978 487A FE94                ; 
 	jsr     (A4)                                    ; $0002897C 4E94                     ; 
 
 	move.l  #LONG_0008968C,D3                       ; $0002897E 263C 0008 968C           ; 
-	move.l  LONG_0008966C,D1                        ; $00028984 2239 0008 966C           ; 
+	move.l  FRAME_MANAGEMENT_TABLE_SIZE,D1                        ; $00028984 2239 0008 966C           ; 
 	asl.l   #$3,D1                                  ; $0002898A E781                     ; 
 	move.l  D1,-(A7)                                ; $0002898C 2F01                     ; 
 	jsr     (A5)                                    ; $0002898E 4E95                     ; 
@@ -16052,13 +16059,15 @@ L_000288FE:
 	pea     L_0002883D(pc)                          ; $0002899A 487A FEA1                ; 
 	jsr     (A4)                                    ; $0002899E 4E94                     ; 
 
-	lea     LONG_00089684,A4                        ; $000289A0 49F9 0008 9684           ; 
+	lea     SPRITE_MANAGEMENT_TABLE_ADDRESS,A4                        ; $000289A0 49F9 0008 9684           ; 
+
 	move.l  (A3),D1                                 ; $000289A6 2213                     ; 
 	addq.l  #$1,D1                                  ; $000289A8 5281                     ; 
 	move.l  D1,-(A7)                                ; $000289AA 2F01                     ; 
 	jsr     (A5)                                    ; $000289AC 4E95                     ; 
 
 	move.l  D0,(A4)                                 ; $000289AE 2880                     ; 
+
 	move.l  D5,-(A7)                                ; $000289B0 2F05                     ; 
 	jsr     CLOSE_FILE                              ; $000289B2 4EB9 0005 A2AA           ; 
 
@@ -16069,11 +16078,11 @@ L_000288FE:
 	rts                                             ; $000289C0 4E75                     ; 
 
 L_000289C2:
-	move.l  LONG_00089674,D0                        ; $000289C2 2039 0008 9674           ; S($00028140) 
+	move.l  SPRITE_MANAGEMENT_TABLE_SIZE,D0                        ; $000289C2 2039 0008 9674           ; S($00028140) 
 	addq.l  #$1,D0                                  ; $000289C8 5280                     ; 
 	move.l  D0,-(A7)                                ; $000289CA 2F00                     ; 
-	move.l  LONG_00089684,-(A7)                     ; $000289CC 2F39 0008 9684           ; 
-	move.l  LONG_00089688,-(A7)                     ; $000289D2 2F39 0008 9688           ; 
+	move.l  SPRITE_MANAGEMENT_TABLE_ADDRESS,-(A7)                     ; $000289CC 2F39 0008 9684           ; 
+	move.l  SPRITE_DATA_ADDRESS,-(A7)                     ; $000289D2 2F39 0008 9688           ; 
 	jsr     XSP_PCGDAT_SET                              ; $000289D8 4EB9 0002 0226           ; 
 
 	lea     12(A7),A7                               ; $000289DE 4FEF 000C                ; 
@@ -16228,7 +16237,7 @@ LOAD_SPRITE_FILE:
 	cmp.l   D0,D1                                   ; $00028AD2 B280                     ; 
 	bne.s   L_00028AE4                              ; $00028AD4 660E                     ; 
 
-	move.l  LONG_00089674,D4                        ; $00028AD6 2839 0008 9674           ; 
+	move.l  SPRITE_MANAGEMENT_TABLE_SIZE,D4                        ; $00028AD6 2839 0008 9674           ; 
 	sub.l   LONG_00089680,D4                        ; $00028ADC 98B9 0008 9680           ; 
 
 	bra.s   L_00028AE6                              ; $00028AE2 6002                     ; 
@@ -16249,7 +16258,7 @@ L_00028AE6:
 	pea     $80.w                                   ; $00028B00 4878 0080                ; 
 	move.l  (A3),D0                                 ; $00028B04 2013                     ; 
 	asl.l   #$7,D0                                  ; $00028B06 EF80                     ; 
-	add.l   LONG_00089688,D0                        ; $00028B08 D0B9 0008 9688           ; 
+	add.l   SPRITE_DATA_ADDRESS,D0                        ; $00028B08 D0B9 0008 9688           ; 
 	move.l  D0,-(A7)                                ; $00028B0E 2F00                     ; 
 	jsr     READ_FILE                              ; $00028B10 4EB9 0005 A13A           ; 
 
@@ -16275,7 +16284,7 @@ L_00028B40:
 	move.l  (A0),D0                                 ; $00028B46 2010                     ; 
 	add.l   D4,D0                                   ; $00028B48 D084                     ; 
 	move.l  D0,(A0)                                 ; $00028B4A 2080                     ; 
-	cmp.l   LONG_00089674,D0                        ; $00028B4C B0B9 0008 9674           ; 
+	cmp.l   SPRITE_MANAGEMENT_TABLE_SIZE,D0                        ; $00028B4C B0B9 0008 9674           ; 
 	blt.s   L_00028B66                              ; $00028B52 6D12                     ; 
 
 	pea     L_00028A99(pc)                          ; $00028B54 487A FF43                ; 
@@ -16384,7 +16393,7 @@ L_00028BCA:
 	move.l  D0,D3                                   ; $00028BEA 2600                     ; 
 	move.l  D3,-(A7)                                ; $00028BEC 2F03                     ; 
 	move.l  (A3),D0                                 ; $00028BEE 2013                     ; 
-	move.l  LONG_0008966C,D7                        ; $00028BF0 2E39 0008 966C           ; 
+	move.l  FRAME_MANAGEMENT_TABLE_SIZE,D7                        ; $00028BF0 2E39 0008 966C           ; 
 	sub.l   D0,D7                                   ; $00028BF6 9E80                     ; 
 	move.l  D7,-(A7)                                ; $00028BF8 2F07                     ; 
 	pea     $8.w                                    ; $00028BFA 4878 0008                ; 
@@ -16436,7 +16445,7 @@ L_00028C60:
 	move.l  (A0),D0                                 ; $00028C6E 2010                     ; 
 	add.l   D4,D0                                   ; $00028C70 D084                     ; 
 	move.l  D0,(A0)                                 ; $00028C72 2080                     ; 
-	cmp.l   LONG_0008966C,D0                        ; $00028C74 B0B9 0008 966C           ; 
+	cmp.l   FRAME_MANAGEMENT_TABLE_SIZE,D0                        ; $00028C74 B0B9 0008 966C           ; 
 	blt.s   L_00028C8E                              ; $00028C7A 6D12                     ; 
 
 	pea     L_00028B9E(pc)                          ; $00028C7C 487A FF20                ; 
@@ -16544,12 +16553,12 @@ L_00028CF6:
 	move.l  D0,D3                                   ; $00028D12 2600                     ; 
 	move.l  D3,-(A7)                                ; $00028D14 2F03                     ; 
 	move.l  (A3),D0                                 ; $00028D16 2013                     ; 
-	move.l  LONG_00089670,D7                        ; $00028D18 2E39 0008 9670           ; 
+	move.l  OBJECT_MANAGEMENT_TABLE_SIZE,D7                        ; $00028D18 2E39 0008 9670           ; 
 	sub.l   D0,D7                                   ; $00028D1E 9E80                     ; 
 	move.l  D7,-(A7)                                ; $00028D20 2F07                     ; 
 	pea     $8.w                                    ; $00028D22 4878 0008                ; 
 	asl.l   #$3,D0                                  ; $00028D26 E780                     ; 
-	add.l   LONG_00089690,D0                        ; $00028D28 D0B9 0008 9690           ; 
+	add.l   OBJECT_MANAGEMENT_TABLE_ADDRESS,D0                        ; $00028D28 D0B9 0008 9690           ; 
 	move.l  D0,-(A7)                                ; $00028D2E 2F00                     ; 
 	jsr     READ_FILE                              ; $00028D30 4EB9 0005 A13A           ; 
 
@@ -16571,7 +16580,7 @@ L_00028CF6:
 
 L_00028D60:
 	move.l  WORD_00089678,D1                        ; $00028D60 2239 0008 9678           ; 
-	lea     LONG_00089690,A2                        ; $00028D66 45F9 0008 9690           ; 
+	lea     OBJECT_MANAGEMENT_TABLE_ADDRESS,A2                        ; $00028D66 45F9 0008 9690           ; 
 	lea     LONG_0008968C,A1                        ; $00028D6C 43F9 0008 968C           ; 
 	move.l  D1,D2                                   ; $00028D72 2401                     ; 
 	asl.l   #$3,D2                                  ; $00028D74 E782                     ; 
@@ -16601,7 +16610,7 @@ L_00028D92:
 	move.l  (A0),D0                                 ; $00028DA4 2010                     ; 
 	add.l   D4,D0                                   ; $00028DA6 D084                     ; 
 	move.l  D0,(A0)                                 ; $00028DA8 2080                     ; 
-	cmp.l   LONG_00089670,D0                        ; $00028DAA B0B9 0008 9670           ; 
+	cmp.l   OBJECT_MANAGEMENT_TABLE_SIZE,D0                        ; $00028DAA B0B9 0008 9670           ; 
 	blt.s   L_00028DC4                              ; $00028DB0 6D12                     ; 
 
 	pea     L_00028CCA(pc)                          ; $00028DB2 487A FF16                ; 
@@ -16719,8 +16728,9 @@ L_00028E2C:
 
 L_00028E5C:
 	move.l  A3,-(A7)                                ; $00028E5C 2F0B                     ; S($00028758) 
+
 	move.l  LONG_00089680,D0                        ; $00028E5E 2039 0008 9680           ; 
-	move.l  LONG_00089674,D1                        ; $00028E64 2239 0008 9674           ; 
+	move.l  SPRITE_MANAGEMENT_TABLE_SIZE,D1                        ; $00028E64 2239 0008 9674           ; 
 	sub.l   D0,D1                                   ; $00028E6A 9280                     ; 
 	move.l  D1,-(A7)                                ; $00028E6C 2F01                     ; 
 	move.l  D0,-(A7)                                ; $00028E6E 2F00                     ; 
@@ -16729,7 +16739,7 @@ L_00028E5C:
 	jsr     (A3)                                    ; $00028E7A 4E93                     ; 
 
 	move.l  WORD_00089678,D0                        ; $00028E7C 2039 0008 9678           ; 
-	move.l  LONG_00089670,D1                        ; $00028E82 2239 0008 9670           ; 
+	move.l  OBJECT_MANAGEMENT_TABLE_SIZE,D1                        ; $00028E82 2239 0008 9670           ; 
 	sub.l   D0,D1                                   ; $00028E88 9280                     ; 
 	move.l  D1,-(A7)                                ; $00028E8A 2F01                     ; 
 	move.l  D0,-(A7)                                ; $00028E8C 2F00                     ; 
@@ -16737,7 +16747,7 @@ L_00028E5C:
 	jsr     (A3)                                    ; $00028E92 4E93                     ; 
 
 	move.l  LONG_0008967C,D0                        ; $00028E94 2039 0008 967C           ; 
-	move.l  LONG_0008966C,D1                        ; $00028E9A 2239 0008 966C           ; 
+	move.l  FRAME_MANAGEMENT_TABLE_SIZE,D1                        ; $00028E9A 2239 0008 966C           ; 
 	sub.l   D0,D1                                   ; $00028EA0 9280                     ; 
 	move.l  D1,-(A7)                                ; $00028EA2 2F01                     ; 
 	move.l  D0,-(A7)                                ; $00028EA4 2F00                     ; 
@@ -16745,7 +16755,9 @@ L_00028E5C:
 	jsr     (A3)                                    ; $00028EAA 4E93                     ; 
 
 	lea     36(A7),A7                               ; $00028EAC 4FEF 0024                ; 
+
 	movea.l (A7)+,A3                                ; $00028EB0 265F                     ; 
+
 	rts                                             ; $00028EB2 4E75                     ; 
 
 L_00028EB4:
@@ -16756,7 +16768,7 @@ L_00028EB4:
 	move.l  8(A6),D5                                ; $00028EBC 2A2E 0008                ; 
 	moveq   #0,D4                                   ; $00028EC0 7800                     ; 
 	lea     LONG_00089680,A4                        ; $00028EC2 49F9 0008 9680           ; 
-	lea     LONG_00089688,A3                        ; $00028EC8 47F9 0008 9688           ; 
+	lea     SPRITE_DATA_ADDRESS,A3                        ; $00028EC8 47F9 0008 9688           ; 
 	moveq   #0,D3                                   ; $00028ECE 7600                     ; 
 
 	bra.s   L_00028EEA                              ; $00028ED0 6018                     ; 
@@ -16777,11 +16789,11 @@ L_00028EEA:
 	cmp.l   (A4),D4                                 ; $00028EEA B894                     ; J($00028ED0) 
 	blt.s   L_00028ED2                              ; $00028EEC 6DE4                     ; 
 
-	move.l  LONG_00089674,D0                        ; $00028EEE 2039 0008 9674           ; 
+	move.l  SPRITE_MANAGEMENT_TABLE_SIZE,D0                        ; $00028EEE 2039 0008 9674           ; 
 	addq.l  #$1,D0                                  ; $00028EF4 5280                     ; 
 	move.l  D0,-(A7)                                ; $00028EF6 2F00                     ; 
-	move.l  LONG_00089684,-(A7)                     ; $00028EF8 2F39 0008 9684           ; 
-	move.l  LONG_00089688,-(A7)                     ; $00028EFE 2F39 0008 9688           ; 
+	move.l  SPRITE_MANAGEMENT_TABLE_ADDRESS,-(A7)                     ; $00028EF8 2F39 0008 9684           ; 
+	move.l  SPRITE_DATA_ADDRESS,-(A7)                     ; $00028EFE 2F39 0008 9688           ; 
 	jsr     XSP_PCGDAT_SET                              ; $00028F04 4EB9 0002 0226           ; 
 
 	movem.l -20(A6),D3-D5/A3-A4                     ; $00028F0A 4CEE 1838 FFEC           ; 
@@ -89737,6 +89749,7 @@ L_0005A114:
 	jsr     ADD_HEAP_LINKED_LIST_NODE                              ; $0005A11C 4EB9 0005 B176           ; 
 
 	addq.l  #$4,A7                                  ; $0005A122 588F                     ; 
+
 	tst.l   D0                                      ; $0005A124 4A80                     ; 
 	beq.s   L_0005A132                              ; $0005A126 670A                     ; 
 
@@ -101107,13 +101120,13 @@ WORD_00088E6C:
 WORD_00088E6E:
 	ds.b    $7FE
 
-LONG_0008966C:
+FRAME_MANAGEMENT_TABLE_SIZE:
 	ds.b    $4
 
-LONG_00089670:
+OBJECT_MANAGEMENT_TABLE_SIZE:
 	ds.b    $4
 
-LONG_00089674:
+SPRITE_MANAGEMENT_TABLE_SIZE:
 	ds.b    $4
 
 WORD_00089678:
@@ -101125,16 +101138,16 @@ LONG_0008967C:
 LONG_00089680:
 	ds.b    $4
 
-LONG_00089684:
+SPRITE_MANAGEMENT_TABLE_ADDRESS:
 	ds.b    $4
 
-LONG_00089688:
+SPRITE_DATA_ADDRESS:
 	ds.b    $4
 
 LONG_0008968C:
 	ds.b    $4
 
-LONG_00089690:
+OBJECT_MANAGEMENT_TABLE_ADDRESS:
 	ds.b    $4
 
 LONG_00089694:
