@@ -869,12 +869,19 @@ draw_tc_sprites:
 	; Draw sprites.
 
 	move.l	work_screen_address,a0
-	lea		L_00EB0000+128*8+8,a1 ; Sprite infos table.
+	move.l	CURRENT_SPRITE_DATA_ENTRY,a1
+	addq.l	#8,a1
+;	lea		SPRITE_DATA_TABLE+512*8+8,a1 ; Sprite infos table.
 	lea		L_00EB8000,a2 ; Sprite data table.
 ;	lea		L_00E82000+$200,a3 ; Sprite palette table.
 	lea		converted_sprite_palettes,a3 ; Sprite palette table.
 
-	move	#128-1,d7
+	move.l	a1,d7
+	sub.l	#SPRITE_DATA_TABLE,d7
+	lsr		#3,d7
+	subq	#1,d7
+
+;	move	#512-1,d7
 
 draw_tc_sprites_loop:
 	sub		#16,a1

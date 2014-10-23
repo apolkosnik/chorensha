@@ -12,7 +12,7 @@
 
 	xref draw_tc_sprites,vbl_wait_counter
 
-	xdef NEW_STACK
+	xdef NEW_STACK,SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
 	endif
 
@@ -2805,15 +2805,6 @@ L_000215EA:
 	trap    #$F                                     ; $00021600 4E4F                     ; _B_SUPER 
 
 L_00021602:
-	move.l  CURRENT_SPRITE_DATA_ENTRY(pc),D0                    ; $00021602 203A 0BC2                ; 
-	sub.l   #SPRITE_DATA_TABLE,D0                       ; $00021606 90BC 0005 E522           ; 
-	asr.l   #$3,D0                                  ; $0002160C E680                     ; 
-	move.l  #SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY            ; $0002160E 23FC 0005 E522 0002 21C6 ; 
-
-	movea.l SAVED_STACK_ADDRESS(pc),A7                    ; $00021618 2E7A 0BEC                ; 
-
-	movem.l (A7)+,D1-D7/A0-A6                       ; $0002161C 4CDF 7FFE                ; 
-
 	ifd __ATARI__
 
 	jbsr	draw_tc_sprites
@@ -2825,6 +2816,15 @@ L_00021602:
 	illegal
 
 	endif
+
+	move.l  CURRENT_SPRITE_DATA_ENTRY(pc),D0                    ; $00021602 203A 0BC2                ; 
+	sub.l   #SPRITE_DATA_TABLE,D0                       ; $00021606 90BC 0005 E522           ; 
+	asr.l   #$3,D0                                  ; $0002160C E680                     ; 
+	move.l  #SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY            ; $0002160E 23FC 0005 E522 0002 21C6 ; 
+
+	movea.l SAVED_STACK_ADDRESS(pc),A7                    ; $00021618 2E7A 0BEC                ; 
+
+	movem.l (A7)+,D1-D7/A0-A6                       ; $0002161C 4CDF 7FFE                ; 
 
 	rts                                             ; $00021620 4E75                     ; 
 
