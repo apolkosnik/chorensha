@@ -396,6 +396,7 @@ XSP_PCGDAT_SET:
 	movem.l (A7)+,D0-D2/A0-A2                       ; $00020248 4CDF 0707                ; 
 
 	move.l  A0,PCG_DAT_ADDRESS                        ; $0002024C 23C8 0002 21F4           ; 
+
 	addq.w  #$1,A1                                  ; $00020252 5249                     ; 
 	move.l  A1,PCG_ALT_ADDRESS                        ; $00020254 23C9 0002 21F0           ; 
 	subq.w  #$2,D0                                  ; $0002025A 5540                     ; 
@@ -1302,7 +1303,17 @@ L_000208C0:
 	move.b  D1,0(A3,D0.w)                           ; $000208CA 1781 0000                ; 
 	add.w   D1,D1                                   ; $000208CE D241                     ; 
 	move.w  0(A4,D1.w),D3                           ; $000208D0 3634 1000                ; 
+
+	ifd __ATARI__
+
+	clr.b  (A3,D3.w)
+
+	else
+
 	move.b  D4,0(A3,D3.w)                           ; $000208D4 1784 3000                ; 
+
+	endif
+
 	move.w  D0,0(A4,D1.w)                           ; $000208D8 3980 1000                ; 
 	ext.l   D0                                      ; $000208DC 48C0                     ; 
 	lsl.l   #$7,D0                                  ; $000208DE EF88                     ; 
@@ -17992,6 +18003,7 @@ L_00029A22:
 	movea.l D0,A0                                   ; $00029A2C 2040                     ; 
 	adda.l  #L_00EB8000+$0,A0                       ; $00029A2E D1FC 00EB 8000           ; [SPRITE VRAM + $0]  
 	move.l  (A0),D2                                 ; $00029A34 2410                     ; 
+
 	moveq   #7,D0                                   ; $00029A36 7007                     ; 
 	sub.l   D1,D0                                   ; $00029A38 9081                     ; 
 	add.l   D0,D0                                   ; $00029A3A D080                     ; 
