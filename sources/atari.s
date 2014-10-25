@@ -862,6 +862,46 @@ draw_tc_sprites:
 
 	dbf		d7,.clear_loop
 
+	rem
+
+	; Draw background.
+
+	lea		background_image,a0
+	move.l	work_screen_address,a1
+	add.l	#512*2*16+16*2,a1
+
+	move	#240-1,d7
+
+.copy_loop:
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*2(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*3(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*4(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*5(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*6(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*7(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*8(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*9(a1)
+	movem.l	(a0)+,d0-d6/a2
+	movem.l	d0-d6/a2,12*4*10(a1)
+
+	add.l	#256*2*2,a1
+
+	dbf		d7,.copy_loop
+
+	erem
+
 	; Convert palettes.
 
 	jbsr	convert_palettes
@@ -1995,7 +2035,7 @@ welcome_text:
 	dc.b	'Famibe No Yosshin',10,13
 	dc.b	10,13
 
-	dc.b	'Atari Falcon 030 port v20141022t by',10,13
+	dc.b	'Atari Falcon 030 port v20141023t by',10,13
 	dc.b	'Sascha Springer',10,13
 	dc.b	10,13
 	
@@ -2014,6 +2054,13 @@ show_screen_address:
 
 display_screen_address:
 	dc.l	screen1
+
+	rem
+
+background_image:
+	incbin "surface.dat"
+
+	erem
 
 	bss
 
