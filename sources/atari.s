@@ -1636,6 +1636,11 @@ draw_tc_sprites_horizontal_flipped:
 	dbf		d7,draw_tc_sprites_loop
 
 draw_tc_sprites_end:
+
+	move	sr,-(sp)
+
+	move	#$2700,sr
+
 	move.l	work_screen_address,d0
 	move.l	show_screen_address,work_screen_address
 	move.l	d0,show_screen_address
@@ -1649,6 +1654,8 @@ draw_tc_sprites_end:
 	move.b	display_screen_address+3,$ffff820d.w
 
 	endif
+
+	move	(sp)+,sr
 
 	movem.l	(sp)+,d0-a6
 
