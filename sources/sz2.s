@@ -16093,7 +16093,7 @@ L_000289C2:
 
 L_000289E4:
 	moveq   #0,D0                                   ; $000289E4 7000                     ; S($00028158) 
-	move.l  D0,LONG_00089680                        ; $000289E6 23C0 0008 9680           ; 
+	move.l  D0,SPRITE_MANAGEMENT_TABLE_INDEX                        ; $000289E6 23C0 0008 9680           ; 
 	move.l  D0,LONG_0008967C                        ; $000289EC 23C0 0008 967C           ; 
 	move.l  D0,WORD_00089678                        ; $000289F2 23C0 0008 9678           ; 
 
@@ -16240,7 +16240,7 @@ LOAD_SPRITE_FILE:
 	bne.s   L_00028AE4                              ; $00028AD4 660E                     ; 
 
 	move.l  SPRITE_MANAGEMENT_TABLE_SIZE,D4                        ; $00028AD6 2839 0008 9674           ; 
-	sub.l   LONG_00089680,D4                        ; $00028ADC 98B9 0008 9680           ; 
+	sub.l   SPRITE_MANAGEMENT_TABLE_INDEX,D4                        ; $00028ADC 98B9 0008 9680           ; 
 
 	bra.s   L_00028AE6                              ; $00028AE2 6002                     ; 
 
@@ -16248,7 +16248,7 @@ L_00028AE4:
 	move.l  D0,D4                                   ; $00028AE4 2800                     ; 
 
 L_00028AE6:
-	lea     LONG_00089680,A3                        ; $00028AE6 47F9 0008 9680           ; J($00028AE2) 
+	lea     SPRITE_MANAGEMENT_TABLE_INDEX,A3                        ; $00028AE6 47F9 0008 9680           ; J($00028AE2) 
 	move.l  (A3),D5                                 ; $00028AEC 2A13                     ; 
 	pea     L_00028A62(pc)                          ; $00028AEE 487A FF72                ; 
 	move.l  D6,-(A7)                                ; $00028AF2 2F06                     ; 
@@ -16265,6 +16265,7 @@ L_00028AE6:
 	jsr     READ_FILE                              ; $00028B10 4EB9 0005 A13A           ; 
 
 	move.l  D0,D4                                   ; $00028B16 2800                     ; 
+
 	move.l  D3,-(A7)                                ; $00028B18 2F03                     ; 
 	jsr     CLOSE_FILE                              ; $00028B1A 4EB9 0005 A2AA           ; 
 
@@ -16282,7 +16283,7 @@ L_00028AE6:
 	lea     16(A7),A7                               ; $00028B3C 4FEF 0010                ; 
 
 L_00028B40:
-	lea     LONG_00089680,A0                        ; $00028B40 41F9 0008 9680           ; 
+	lea     SPRITE_MANAGEMENT_TABLE_INDEX,A0                        ; $00028B40 41F9 0008 9680           ; 
 	move.l  (A0),D0                                 ; $00028B46 2010                     ; 
 	add.l   D4,D0                                   ; $00028B48 D084                     ; 
 	move.l  D0,(A0)                                 ; $00028B4A 2080                     ; 
@@ -16731,7 +16732,7 @@ L_00028E2C:
 L_00028E5C:
 	move.l  A3,-(A7)                                ; $00028E5C 2F0B                     ; S($00028758) 
 
-	move.l  LONG_00089680,D0                        ; $00028E5E 2039 0008 9680           ; 
+	move.l  SPRITE_MANAGEMENT_TABLE_INDEX,D0                        ; $00028E5E 2039 0008 9680           ; 
 	move.l  SPRITE_MANAGEMENT_TABLE_SIZE,D1                        ; $00028E64 2239 0008 9674           ; 
 	sub.l   D0,D1                                   ; $00028E6A 9280                     ; 
 	move.l  D1,-(A7)                                ; $00028E6C 2F01                     ; 
@@ -16769,7 +16770,7 @@ L_00028EB4:
 
 	move.l  8(A6),D5                                ; $00028EBC 2A2E 0008                ; 
 	moveq   #0,D4                                   ; $00028EC0 7800                     ; 
-	lea     LONG_00089680,A4                        ; $00028EC2 49F9 0008 9680           ; 
+	lea     SPRITE_MANAGEMENT_TABLE_INDEX,A4                        ; $00028EC2 49F9 0008 9680           ; 
 	lea     SPRITE_DATA_ADDRESS,A3                        ; $00028EC8 47F9 0008 9688           ; 
 	moveq   #0,D3                                   ; $00028ECE 7600                     ; 
 
@@ -101138,7 +101139,7 @@ WORD_00089678:
 LONG_0008967C:
 	ds.b    $4
 
-LONG_00089680:
+SPRITE_MANAGEMENT_TABLE_INDEX:
 	ds.b    $4
 
 SPRITE_MANAGEMENT_TABLE_ADDRESS:
