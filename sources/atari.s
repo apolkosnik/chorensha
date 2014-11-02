@@ -14,7 +14,7 @@
 
 	xdef L_00000118,L_00000138
 
-	xdef draw_tc_sprites,vbl_wait_counter
+	xdef draw_tc_sprites,vbl_wait_counter,compile_sprite,text_bitmaps
 
 	xdef start
 
@@ -804,6 +804,90 @@ convert_palettes:
 
 converted_sprite_palettes:
 	ds.w	16*16
+
+	text
+
+; ------------------------------------------------------------------------------
+
+compile_sprite:
+	rts
+
+	movem.l	d0-a6,-(sp)
+
+	move	d0,d7
+	subq	#1,d7
+
+.sprites_loop:
+	clr		d0
+	lea		compiled_sprite_temp_data,a1
+
+	move	#16-1,d6
+
+.lines_loop:
+	clr		d1
+	move.l	(a0)+,d2
+
+	move	#8-1,d5
+
+.pixels_loop1:
+	bfextu	d2{d1:4},d3
+	bset	d3,d0
+	move.b	d3,(a1)+
+	addq	#4,d1
+
+	dbf		d5,.pixels_loop1
+
+	clr		d1
+	move.l	64-4(a0),d2
+
+	move	#8-1,d5
+
+.pixels_loop2:
+	bfextu	d2{d1:4},d3
+	bset	d3,d0
+	move.b	d3,(a1)+
+	addq	#4,d1
+
+	dbf		d5,.pixels_loop2
+
+	dbf		d6,.lines_loop
+
+	; Count colours.
+
+	clr		d1
+	clr		d2
+
+.colors_loop:
+	add		d0,d0
+	addx	d2,d1
+
+	tst		d0
+	jne		.colors_loop
+
+
+
+
+
+
+
+	dbf		d7,.sprites_loop
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+	data
+
+compiled_sprites_pointer:
+	dc.l	compiled_sprites_data
+
+	bss
+
+compiled_sprite_temp_data:
+	ds.b	16*16
+
+compiled_sprites_data:
+	ds.b	1024*1024
 
 	text
 
@@ -1637,6 +1721,103 @@ draw_tc_sprites_horizontal_flipped:
 
 draw_tc_sprites_end:
 
+	; Draw texts.
+	
+	lea		text_bitmaps,a0
+	lea		L_00E00000,a1
+	move.l	work_screen_address,a2
+	add.l	#512*2*16+16*2,a2
+	lea		converted_sprite_palettes,a3
+
+	move	#32-1,d7
+
+.text_lines_loop:
+	move.l	(a0),d0
+	jeq		.skip_text_line	
+
+	move	#32-1,d6
+
+.characters_loop:
+	add.l	d0,d0
+	jcc		.skip_character
+
+	move	#8-1,d5
+
+.lines_loop:
+	move.l	a1,a4
+	move.b	(a4),d1
+	swap	d1
+
+	add.l	#$20000,a4
+	move.b	(a4),d1
+	swap	d1
+
+	add.l	#$20000,a4
+	move.b	(a4),d2
+	swap	d2
+
+	add.l	#$20000,a4
+	move.b	(a4),d2
+	swap	d2
+
+	move.l	a2,a4
+
+	move	#8-1,d4
+
+.pixels_loop:
+	clr		d3
+
+	swap	d2
+	add.b	d2,d2
+	addx	d3,d3
+	swap	d2
+	add.b	d2,d2
+	addx	d3,d3
+	swap	d1
+	add.b	d1,d1
+	addx	d3,d3
+	swap	d1
+	add.b	d1,d1
+	addx	d3,d3
+	jeq		.skip_pixel
+
+	move	(a3,d3.w*2),(a4)
+
+.skip_pixel:
+	addq	#2,a4
+
+	dbf		d4,.pixels_loop
+
+	add.l	#128,a1
+	add.l	#512*2,a2
+
+	dbf		d5,.lines_loop
+
+	sub.l	#128*8,a1
+	sub.l	#512*2*8,a2
+
+.skip_character:
+	addq.l	#1,a1
+	add.l	#8*2,a2
+
+	dbf		d6,.characters_loop
+
+	add.l	#128*8-32,a1
+	add.l	#512*2*8-256*2,a2
+
+	jra		.next_text_line
+
+.skip_text_line:
+	add.l	#128*8,a1
+	add.l	#512*2*8,a2
+
+.next_text_line:
+	move.l	32*4(a0),(a0)+
+
+	dbf		d7,.text_lines_loop	
+
+	; Flip screen request.
+
 	move	sr,-(sp)
 
 	move	#$2700,sr
@@ -1660,6 +1841,15 @@ draw_tc_sprites_end:
 	movem.l	(sp)+,d0-a6
 
 	rts
+
+	data
+
+	bss
+
+text_bitmaps:
+	ds.l	32*2
+
+	text
 
 ; ------------------------------------------------------------------------------
 

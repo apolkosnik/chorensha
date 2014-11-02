@@ -10,7 +10,7 @@
 
 	ifd __ATARI__
 
-	xref draw_tc_sprites,vbl_wait_counter
+	xref draw_tc_sprites,vbl_wait_counter,compile_sprite
 
 	xdef NEW_STACK,SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
@@ -4435,11 +4435,35 @@ L_00022368:
 	rts                                             ; $00022370 4E75                     ; 
 
 DRAW_CHARACTER:
+	ifd __ATARI__
+
+	lea		text_bitmaps,a0
+	move	10(sp),d0
+	lea		(a0,d0.w*4),a0
+
+	clr.l	d0
+	move	#31,d1
+	sub		6(sp),d1
+	bset	d1,d0
+	or.l	d0,(a0)
+	or.l	d0,32*4(a0)
+
+	cmp.b	#$20,12+3(sp)
+	jne		.not_space
+
+	not.l	d0
+	and.l	d0,32*4(a0)
+
+.not_space	
+
+	endif
+
 	suba.l  A1,A1                                   ; $00022372 93C9                     ; S($0002B7C0) 
 	moveq   #-127,D0                                ; $00022374 7081                     ; 
 	trap    #$F                                     ; $00022376 4E4F                     ; _B_SUPER 
 
 	move.l  D0,LONG_00022694                        ; $00022378 23C0 0002 2694           ; 
+
 	move.l  12(A7),D0                               ; $0002237E 202F 000C                ; 
 	move.w  D0,D1                                   ; $00022382 3200                     ; 
 	lsr.l   #$2,D0                                  ; $00022384 E488                     ; 
@@ -4464,6 +4488,7 @@ L_00022398:
 	swap    D0                                      ; $000223BA 4840                     ; 
 	lsr.l   #$6,D0                                  ; $000223BC EC88                     ; 
 	adda.l  D0,A1                                   ; $000223BE D3C0                     ; 
+
 	move.l  #$20000,D0                              ; $000223C0 203C 0002 0000           ; 
 
 	move.b  (A0),(A1)                               ; $000223C6 1290                     ; 
@@ -4619,6 +4644,20 @@ L_000225E0:
 	rts                                             ; $000225E0 4E75                     ; 
 
 CLEAR_TEXT_PLANE:
+	ifd __ATARI__
+
+	lea		text_bitmaps,a0
+
+	move	#32-1,d0
+
+.loop:
+	clr.l	32*4(a0)
+	clr.l	(a0)+
+
+	dbf		d0,.loop
+
+	endif
+
 	movem.l D3-D7/A3-A6,-(A7)                       ; $000225E2 48E7 1F1E                ; S($00027A9C) 
 
 	suba.l  A1,A1                                   ; $000225E6 93C9                     ; 
@@ -9697,6 +9736,16 @@ MENU_EXIT_TEXT:
 MENU_COPYRIGHT_TEXT:
 	dc.b    '@1995 FAMIBE NO YOSSHIN',0
 
+	ifd __ATARI__
+
+menu_port_text1:
+	dc.b	'ATARI FALCON 030 PORT',0
+
+menu_port_text2:
+	dc.b	'BY SASCHA SPRINGER',0
+
+	endif
+
 MENU_VERSION_TEXT:
 	dc.b    'version  1.01',0
 
@@ -9791,15 +9840,39 @@ L_00024DDC:
 	jsr     (A3)                                    ; $00024E26 4E93                     ; 
 
 	lea     36(A7),A7                               ; $00024E28 4FEF 0024                ; 
+
 	pea     MENU_EXIT_TEXT(pc)                          ; $00024E2C 487A FF00                ; 
 	pea     $17.w                                   ; $00024E30 4878 0017                ; 
 	pea     $D.w                                    ; $00024E34 4878 000D                ; 
 	jsr     (A3)                                    ; $00024E38 4E93                     ; 
 
+	ifd __ATARI__
+
+	pea     MENU_COPYRIGHT_TEXT(pc)
+	pea     $1a.w
+	pea     $5.w
+	jsr     (a3)
+
+	pea     menu_port_text1(pc)
+	pea     $1b.w
+	pea     $6.w
+	jsr     (a3)
+
+	pea     menu_port_text2(pc)
+	pea     $1c.w
+	pea     $7.w
+	jsr     (a3)
+
+	lea     4*3*2(sp),sp
+
+	else
+
 	pea     MENU_COPYRIGHT_TEXT(pc)                          ; $00024E3A 487A FEF7                ; 
 	pea     $1B.w                                   ; $00024E3E 4878 001B                ; 
 	pea     $5.w                                    ; $00024E42 4878 0005                ; 
 	jsr     (A3)                                    ; $00024E46 4E93                     ; 
+
+	endif
 
 	pea     MENU_VERSION_TEXT(pc)                          ; $00024E48 487A FF01                ; 
 	pea     $1D.w                                   ; $00024E4C 4878 001D                ; 
@@ -16263,6 +16336,18 @@ L_00028AE6:
 	add.l   SPRITE_DATA_ADDRESS,D0                        ; $00028B08 D0B9 0008 9688           ; 
 	move.l  D0,-(A7)                                ; $00028B0E 2F00                     ; 
 	jsr     READ_FILE                              ; $00028B10 4EB9 0005 A13A           ; 
+
+	ifd __ATARI__
+
+	movem.l	d0/a0,-(sp)
+
+	move.l	(a3),d0
+	move.l	SPRITE_DATA_ADDRESS,a0
+	jbsr	compile_sprite
+
+	movem.l	(sp)+,d0/a0
+
+	endif
 
 	move.l  D0,D4                                   ; $00028B16 2800                     ; 
 
