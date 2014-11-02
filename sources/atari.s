@@ -909,6 +909,8 @@ vbl_tc:
 draw_tc_sprites:
 	movem.l	d0-a6,-(sp)
 
+	rem
+
 	; Clear screen.
 
 	move.l	work_screen_address,a0
@@ -946,13 +948,23 @@ draw_tc_sprites:
 
 	dbf		d7,.clear_loop
 
-	rem
+	erem
+
+	; rem
 
 	; Draw background.
 
 	lea		background_image,a0
 	move.l	work_screen_address,a1
 	add.l	#512*2*16+16*2,a1
+
+	move	BACKGROUND_SCROLL_COUNTER,d0
+	move.l	#512-1,d1
+	and		#$1ff,d0
+	sub		d0,d1	
+	swap	d1
+	lsr.l	#7,d1
+	add.l	d1,a0
 
 	move	#240-1,d7
 
@@ -984,7 +996,7 @@ draw_tc_sprites:
 
 	dbf		d7,.copy_loop
 
-	erem
+	; erem
 
 	; Convert palettes.
 
@@ -2232,7 +2244,7 @@ welcome_text:
 	dc.b	'Famibe No Yosshin',10,13
 	dc.b	10,13
 
-	dc.b	'Atari Falcon 030 port v20141023t by',10,13
+	dc.b	'Atari Falcon 030 port v20141102t by',10,13
 	dc.b	'Sascha Springer',10,13
 	dc.b	10,13
 	
@@ -2252,12 +2264,13 @@ show_screen_address:
 display_screen_address:
 	dc.l	screen1
 
-	rem
+	; rem
 
 background_image:
 	incbin "surface.dat"
+	incbin "surface.dat",256*2*240
 
-	erem
+	; erem
 
 	bss
 
