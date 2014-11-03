@@ -3067,92 +3067,72 @@ L_0002187A:
 	rts                                             ; $0002188E 4E75                     ; 
 
 L_00021890:
-	dc.b    $00                                    ;  ; 0x00021890
-	dc.b    $22                                    ; " ; 0x00021891
-	dc.l    L_0002190E                              ; [Relocated]; 0x00021892
-	dc.b    $FF                                    ;  ; 0x00021896
-	dc.b    $FF                                    ;  ; 0x00021897
-	dc.b    $00                                    ;  ; 0x00021898
-	dc.b    $00                                    ;  ; 0x00021899
-	dc.b    $00                                    ;  ; 0x0002189A
-	dc.b    $00                                    ;  ; 0x0002189B
+	dc		34
+	dc.l    L_0002190E
+
+	dc		-1
+	dc.l	0
 
 L_0002189C:
-	dc.b    $00                                    ;  ; 0x0002189C
-	dc.b    $0C                                    ;  ; 0x0002189D
+	dc		12
 	dc.l    L_0002190E                              ; [Relocated]; 0x0002189E
-	dc.b    $FF                                    ;  ; 0x000218A2
-	dc.b    $FF                                    ;  ; 0x000218A3
-	dc.b    $00                                    ;  ; 0x000218A4
-	dc.b    $00                                    ;  ; 0x000218A5
-	dc.b    $00                                    ;  ; 0x000218A6
-	dc.b    $00                                    ;  ; 0x000218A7
+
+	dc		-1
+	dc.l	0
 
 L_000218A8:
-	dc.b    $00                                    ;  ; 0x000218A8
-	dc.b    $20                                    ;   ; 0x000218A9
-	dc.l    L_0002190E                              ; [Relocated]; 0x000218AA
-	dc.b    $00                                    ;  ; 0x000218AE
-	dc.b    $80                                    ;  ; 0x000218AF
-	dc.l    L_0002191A                              ; [Relocated]; 0x000218B0
-	dc.b    $00                                    ;  ; 0x000218B4
-	dc.b    $C0                                    ;  ; 0x000218B5
-	dc.l    L_00021966                              ; [Relocated]; 0x000218B6
-	dc.b    $01                                    ;  ; 0x000218BA
-	dc.b    $08                                    ;  ; 0x000218BB
-	dc.l    L_000219B2                              ; [Relocated]; 0x000218BC
-	dc.b    $01                                    ;  ; 0x000218C0
-	dc.b    $48                                    ; H ; 0x000218C1
-	dc.l    L_000219FE                              ; [Relocated]; 0x000218C2
-	dc.b    $01                                    ;  ; 0x000218C6
-	dc.b    $90                                    ;  ; 0x000218C7
-	dc.l    L_00021A4A                              ; [Relocated]; 0x000218C8
-	dc.b    $01                                    ;  ; 0x000218CC
-	dc.b    $D0                                    ;  ; 0x000218CD
-	dc.l    L_00021A96                              ; [Relocated]; 0x000218CE
-	dc.b    $FF                                    ;  ; 0x000218D2
-	dc.b    $FF                                    ;  ; 0x000218D3
-	dc.b    $00                                    ;  ; 0x000218D4
-	dc.b    $00                                    ;  ; 0x000218D5
-	dc.b    $00                                    ;  ; 0x000218D6
-	dc.b    $00                                    ;  ; 0x000218D7
+	dc		32
+	dc.l	L_0002190E
+
+	dc		128
+	dc.l    L_0002191A
+
+	dc		192
+	dc.l    L_00021966
+
+	dc		264
+	dc.l    L_000219B2
+
+	dc		328
+	dc.l    L_000219FE
+
+	dc		400
+	dc.l    L_00021A4A
+
+	dc		464
+	dc.l    L_00021A96
+
+	dc		-1
+	dc.l	0
 
 L_000218D8:
-	dc.b    $00                                    ;  ; 0x000218D8
-	dc.b    $0C                                    ;  ; 0x000218D9
-	dc.l    L_0002190E                              ; [Relocated]; 0x000218DA
-	dc.b    $00                                    ;  ; 0x000218DE
-	dc.b    $34                                    ; 4 ; 0x000218DF
-	dc.l    L_0002191A                              ; [Relocated]; 0x000218E0
-	dc.b    $00                                    ;  ; 0x000218E4
-	dc.b    $54                                    ; T ; 0x000218E5
-	dc.l    L_00021966                              ; [Relocated]; 0x000218E6
-	dc.b    $00                                    ;  ; 0x000218EA
-	dc.b    $78                                    ; x ; 0x000218EB
-	dc.l    L_000219B2                              ; [Relocated]; 0x000218EC
-	dc.b    $00                                    ;  ; 0x000218F0
-	dc.b    $98                                    ;  ; 0x000218F1
-	dc.l    L_000219FE                              ; [Relocated]; 0x000218F2
-	dc.b    $00                                    ;  ; 0x000218F6
-	dc.b    $BC                                    ;  ; 0x000218F7
-	dc.l    L_00021A4A                              ; [Relocated]; 0x000218F8
-	dc.b    $00                                    ;  ; 0x000218FC
-	dc.b    $DC                                    ;  ; 0x000218FD
-	dc.l    L_00021A96                              ; [Relocated]; 0x000218FE
-	dc.b    $FF                                    ;  ; 0x00021902
-	dc.b    $FF                                    ;  ; 0x00021903
-	dc.b    $00                                    ;  ; 0x00021904
-	dc.b    $00                                    ;  ; 0x00021905
-	dc.b    $00                                    ;  ; 0x00021906
-	dc.b    $00                                    ;  ; 0x00021907
+	dc		12
+	dc.l    L_0002190E
+
+	dc		52
+	dc.l    L_0002191A
+
+	dc		84
+	dc.l    L_00021966
+
+	dc		120
+	dc.l    L_000219B2
+
+	dc		152
+	dc.l    L_000219FE
+
+	dc		188
+	dc.l    L_00021A4A
+
+	dc		220
+	dc.l    L_00021A96
+
+	dc		-1
+	dc.l	0
 
 L_00021908:
-	dc.b    $FF                                    ;  ; 0x00021908
-	dc.b    $FF                                    ;  ; 0x00021909
-	dc.b    $00                                    ;  ; 0x0002190A
-	dc.b    $00                                    ;  ; 0x0002190B
-	dc.b    $00                                    ;  ; 0x0002190C
-	dc.b    $00                                    ;  ; 0x0002190D
+	dc		-1
+	dc.l	0
 
 L_0002190E:
 	bset    #$1,L_00EB0000+$808                     ; $0002190E 08F9 0001 00EB 0808      ; [SPRITE REGISTERS + $808]  
