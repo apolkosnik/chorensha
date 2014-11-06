@@ -1,0 +1,572 @@
+
+	xdef start_game
+	xdef vbl_handler
+	xdef line_f_handler
+	xdef trap_2_handler
+	xdef trap_4_handler
+	xdef trap_f_handler
+
+	xdef game_heap_address
+	xdef vbl_wait_counter
+	xdef iocs_joystick_data
+
+; ------------------------------------------------------------------------------
+	text
+; ------------------------------------------------------------------------------
+
+; a0	メモリ管理ポインタのアドレス "Address of a pointer to memory management"
+; a1	プログラムの終わり+1 のアドレス "+1 Address of the end of the program"
+; a2	コマンドラインのアドレス "Address of the command line"
+; a3	環境のアドレス "Address of the environment"
+; a4	プログラムの実行開始アドレス "Execution of the program start address"
+; sr	ユーザーモード "User-mode"
+; usp	親のスタック "Stack of the parent"
+; ssp	システムのスタック "Stack of the system"
+
+start_game:
+	move.l	game_heap_address,a0
+	move.l	a0,a1
+	move.l	a0,a2
+	move.l	a0,a3
+	lea		_start,a4
+
+	jmp		_start
+
+; ------------------------------------------------------------------------------
+
+vbl_handler:
+	move.b	display_screen_address+1,$ffff8201.w
+	move.b	display_screen_address+2,$ffff8203.w
+	move.b	display_screen_address+3,$ffff820d.w
+
+	addq	#1,vbl_wait_counter
+
+	move.l	L_00000118,-(sp)
+	rts
+
+; ------------------------------------------------------------------------------
+
+LINE_F_OFFSET=2 ; 0 = 68000, 2 = 68030
+
+line_f_handler:
+	movem.l	d1-d2/a0-a2,-(sp)
+
+	move.l	22(sp),a0
+	move	(a0),d1
+	addq.l	#2,22(sp)
+
+	cmp		#$fe00,d1 ; __LMUL
+	jne		.not__lmul
+
+	muls.l	(sp),d0
+
+	jra		.exit
+
+.not__lmul:
+	cmp		#$fe01,d1 ; __LDIV
+	jne		.not__ldiv
+
+	divs.l	(sp),d0
+
+	jra		.exit
+
+.not__ldiv:
+	cmp		#$fe0d,d1 ; __SRAND
+	jne		.not__srand
+
+	clr.l	d0
+
+	jra		.exit
+
+.not__srand:
+	cmp		#$ff06,d1 ; _INPOUT
+	jne		.not_inpout
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_inpout:
+	cmp		#$ff20,d1 ; _SUPER
+	jne		.not_super
+
+	move.l	26+LINE_F_OFFSET+0(sp),a0
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_super:
+	cmp		#$ff23,d1 ; _CONCTRL
+	jne		.not_conctrl
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_conctrl:
+	cmp		#$ff25,d1 ; _INTVCS
+	jne		.not_intvcs
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move	26+LINE_F_OFFSET+4(sp),a0
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_intvcs:
+	cmp		#$ff36,d1 ; _DSKFRE
+	jne		.not_dskfre
+
+	move.l	#10000000,d0
+
+	jra		.exit
+
+.not_dskfre:
+	cmp		#$ff37,d1 ; _NAMECK
+	jne		.not_nameck
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_nameck:
+	cmp		#$ff3d,d1 ; _OPEN
+	jne		.not_open
+
+	move.l	26+LINE_F_OFFSET+0(sp),a0
+	move	26+LINE_F_OFFSET+4(sp),d0
+
+	rem
+
+	movem.l	d0/a0,-(sp)
+
+	pea		(a0)
+	move	#9,-(sp)
+	trap	#1
+	addq	#6,sp
+
+	pea		.new_line
+	move	#9,-(sp)
+	trap	#1
+	addq	#6,sp
+
+	movem.l	(sp)+,d0/a0
+
+	erem
+
+	move	d0,-(sp)
+	pea		(a0)
+	move	#61,-(sp)
+	trap	#1
+	addq	#8,sp
+
+	jra		.exit
+
+.new_line:
+	dc.b	10,13,0,0
+
+.not_open:
+	cmp		#$ff3f,d1 ; _READ
+	jne		.not_read
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move.l	26+LINE_F_OFFSET+2(sp),a0
+	move.l	26+LINE_F_OFFSET+6(sp),d1
+	and.l	#$7fffffff,d1
+
+	pea		(a0)
+	move.l	d1,-(sp)
+	move	d0,-(sp)
+	move	#63,-(sp)
+	trap	#1
+	lea		12(sp),sp
+
+	jra		.exit
+
+.not_read:
+	cmp		#$ff3e,d1 ; _CLOSE
+	jne		.not_close
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+
+	move	d0,-(sp)
+	move	#62,-(sp)
+	trap	#1
+	addq	#4,sp
+
+	jra		.exit
+
+.not_close:
+	cmp		#$ff40,d1 ; _WRITE
+	jne		.not_write
+
+	illegal
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move.l	26+LINE_F_OFFSET+2(sp),a0
+	move.l	26+LINE_F_OFFSET+6(sp),d1
+
+	cmp		#1,d0
+	jne		.exit
+
+	clr		d0
+	move.b	(a0),d0
+
+	move	d0,-(sp)
+	move	#2,-(sp)
+	trap	#1
+	addq	#4,sp
+
+	clr.l	d0
+
+	jra		.exit	
+
+.not_write:
+	cmp		#$ff42,d1 ; _SEEK
+	jne		.not_seek
+
+	move	26+LINE_F_OFFSET+0(sp),d0
+	move.l	26+LINE_F_OFFSET+2(sp),a0
+	move	26+LINE_F_OFFSET+6(sp),d1
+
+	move	d1,-(sp)
+	move	d0,-(sp)
+	move.l	a0,-(sp)
+	move	#66,-(sp)
+	trap	#1
+	lea		10(sp),sp
+
+	jra		.exit	
+
+.not_seek:
+	cmp		#$ff44,d1 ; _IOCTRL
+	jne		.not_ioctrl
+
+	clr.l	d0
+
+	jra		.exit
+
+.not_ioctrl:
+	cmp		#$ff4a,d1 ; _SETBLOCK
+	jne		.not_setblock
+
+	move.l	26+LINE_F_OFFSET+4(sp),d0
+
+	cmp.l	#$ffffff,d0
+	jeq		.1
+
+	clr.l	d0
+
+	jra		.exit
+
+.1:
+	move.l	#$81200000,d0
+
+	jra		.exit
+
+.not_setblock:
+	illegal
+
+	clr.l	d0
+
+.exit:
+	movem.l	(sp)+,d1-d2/a0-a2
+
+	rte
+
+; ------------------------------------------------------------------------------
+
+trap_2_handler:
+	rte
+
+; ------------------------------------------------------------------------------
+
+trap_4_handler:
+	rte
+
+; ------------------------------------------------------------------------------
+
+trap_f_handler:
+	cmp.b	#$4,d0 ; _BITSNS
+	jne		.no_bitsns
+
+	clr.l	d0
+
+	rte
+
+.no_bitsns:
+	cmp.b	#$10,d0 ; _CRTMOD
+	jne		.no_crtmod
+
+	clr.l	d0
+
+	rte
+
+.no_crtmod:
+	cmp.b	#$14,d0 ; _TPALET2
+	jne		.no_tpalet2
+
+	movem.l	d1-d2/a0,-(sp)
+
+	lea		L_00E82000+$200,a0
+	and		#$f,d1
+
+	clr.l	d0
+
+	tst.l	d2
+	jmi		.tpalet2_get_color
+
+	move	d2,(a0,d1.w*2)
+
+	jra		.tpalet2_skip
+
+.tpalet2_get_color:
+	move	(a0,d1.w*2),d0
+
+.tpalet2_skip:
+	movem.l	(sp)+,d1-d2/a0
+
+	rte
+
+.no_tpalet2:
+	cmp.b	#$20,d0 ; _B_PUTC
+	jne		.no_b_putc
+
+	clr.l	d0
+
+	rte
+
+.no_b_putc:
+	cmp.b	#$22,d0 ; _B_COLOR
+	jne		.no_b_color
+
+	clr.l	d0
+
+	rte
+
+.no_b_color:
+	cmp.b	#$23,d0 ; _B_LOCATE
+	jne		.no_b_locate
+
+	clr.l	d0
+
+	rte
+
+.no_b_locate:
+	cmp.b	#$3b,d0 ; _JOYGET
+	jne		.no_joyget
+
+	move.l	iocs_joystick_data,d0
+
+	rte
+
+.no_joyget:
+	cmp.b	#$60,d0 ; _ADPCMOUT
+	jne		.no_adpcmout
+
+	movem.l	d0-d2/a0-a2,-(sp)
+
+;	WavePlay #0,#12571,(a1),d2
+;	movem.l	(sp)+,d0-d2/a0-a2
+;	rte
+
+;	move	#$200b,$ffff8932.w
+;	clr.b	$ffff8936.w
+
+	clr		$ffff8900.w
+
+	move.b	#$81,$ffff8921.w ; Mono & 12571 Hz.
+
+	move.l	a1,d0
+	move.b	d0,$ffff8907.w
+	lsr		#8,d0
+	move.b	d0,$ffff8905.w
+	swap	d0
+	move.b	d0,$ffff8903.w
+
+	move.l	a1,d0
+	add.l	d2,d0
+	move.b	d0,$ffff8913.w
+	lsr		#8,d0
+	move.b	d0,$ffff8911.w
+	swap	d0
+	move.b	d0,$ffff890f.w
+
+	move	#1,$ffff8900.w
+
+	movem.l	(sp)+,d0-d2/a0-a2
+
+	clr.l	d0
+
+	rte
+
+.no_adpcmout:
+	cmp.b	#$66,d0 ; _ADPCMSNS
+	jne		.no_adpcmsns
+
+	clr.l	d0
+
+	btst	#0,$ffff8901.w
+	jeq		.replay_not_running
+
+	moveq.l	#2,d0
+	
+.replay_not_running:
+	rte
+
+.no_adpcmsns:
+	cmp.b	#$67,d0 ; _ADPCMMOD
+	jne		.no_adpcmmod
+
+	clr.l	d0
+
+	rte
+
+.no_adpcmmod:
+	cmp.b	#$7d,d0 ; _SKEY_MOD
+	jne		.no_skey_mod
+
+	rte
+
+.no_skey_mod:
+	cmp.b	#$7f,d0 ; _ONTIME
+	jne		.no_ontime
+
+	move.l	#100*100,d0
+	clr.l	d1
+
+	rte
+
+.no_ontime:
+	cmp.b	#$81,d0 ; _B_SUPER
+	jne		.no_b_super
+
+	move.l	#-1,d0
+
+	rte
+
+.no_b_super:
+	cmp.b	#$87,d0 ; _B_WPOKE
+	jne		.no_b_wpoke
+
+	rte
+
+.no_b_wpoke:
+	cmp.b	#$90,d0 ; _G_CLR_ON
+	jne		.no_g_clr_on
+
+	rte
+
+.no_g_clr_on:
+	cmp.b	#$92,d0 ; (未公開)	プライオリティ設定
+	jne		.no_prio_set
+
+	rte
+
+.no_prio_set:
+	cmp.b	#$ae,d0 ; _OS_CURON
+	jne		.no_os_curon
+
+	rte
+
+.no_os_curon:
+	cmp.b	#$af,d0 ; _OS_CUROFF
+	jne		.no_os_curoff
+
+	rte
+
+.no_os_curoff:
+	cmp.b	#$b2,d0 ; _VPAGE
+	jne		.no_vpage
+
+	clr.l	d0
+
+	rte
+
+.no_vpage:
+	cmp.b	#$b3,d0 ; _HOME
+	jne		.no_home
+
+	clr.l	d0
+
+	rte
+
+.no_home:
+	cmp.b	#$c1,d0 ; _SP_ON
+	jne		.no_sp_on
+
+	rte
+
+.no_sp_on:
+	cmp.b	#$c2,d0 ; _SP_OFF
+	jne		.no_sp_off
+
+	rte
+
+.no_sp_off:
+	cmp.b	#$ca,d0 ; _BGCTRLST
+	jne		.no_bgctrlst
+
+	rte
+
+.no_bgctrlst:
+	cmp.b	#$ce,d0 ; _BGTEXTGT
+	jne		.no_bgtextgt
+
+	clr.l	d0
+
+	rte
+
+.no_bgtextgt:
+	cmp.b	#$cf,d0 ; _SPALET
+	jne		.no_spalet
+
+	movem.l	d1-d3/a0,-(sp)
+
+	lea		L_00E82000+$200,a0
+	lsl		#4,d2
+	add		d1,d2
+
+	clr.l	d0
+
+	tst.l	d3
+	jmi		.spalet_get_color
+
+	move	d3,(a0,d2.w*2)
+
+	jra		.spalet_skip
+
+.spalet_get_color:
+	move	(a0,d2.w*2),d0
+
+.spalet_skip:
+	movem.l	(sp)+,d1-d3/a0
+
+	rte
+
+.no_spalet:
+	illegal
+
+; ------------------------------------------------------------------------------
+	data
+; ------------------------------------------------------------------------------
+
+iocs_joystick_data:
+	dc.l	-1
+
+vbl_wait_counter:
+	dc		0
+
+; ------------------------------------------------------------------------------
+	bss
+; ------------------------------------------------------------------------------
+
+game_heap_address:
+	ds.l	1
+
+; ------------------------------------------------------------------------------
+	end
+; ------------------------------------------------------------------------------
+
