@@ -3,7 +3,8 @@
 	xdef compile_sprite
 
 	xdef text_bitmaps
-	xdef display_screen_address
+	xdef show_screen_address
+	xdef work_screen_address
 
 ; ------------------------------------------------------------------------------
 	text
@@ -141,7 +142,7 @@ draw_tc_sprites:
 
 	; Convert palettes.
 
-	jbsr	convert_palettes
+	jsr		convert_palettes
 
 	; Draw sprites.
 
@@ -978,16 +979,6 @@ draw_tc_sprites_end:
 	move.l	work_screen_address,d0
 	move.l	show_screen_address,work_screen_address
 	move.l	d0,show_screen_address
-	add.l	#512*2*16+16*2,d0
-	move.l	d0,display_screen_address
-
-	ifd __HATARI__
-
-	move.b	display_screen_address+1,$ffff8201.w
-	move.b	display_screen_address+2,$ffff8203.w
-	move.b	display_screen_address+3,$ffff820d.w
-
-	endif
 
 	move	(sp)+,sr
 
@@ -1014,27 +1005,14 @@ compile_sprite:
 	rts
 
 ; ------------------------------------------------------------------------------
-	data
-; ------------------------------------------------------------------------------
-
-show_screen_address:
-	dc.l	screen_buffer1
-
-work_screen_address:
-	dc.l	screen_buffer2
-
-display_screen_address:
-	dc.l	screen_buffer1+(16)*256*2*2+16*2
-
-; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
 
-screen_buffer1:
-	ds.b	(16+240+16)*256*2*2
+show_screen_address:
+	ds.l	1
 
-screen_buffer2:
-	ds.b	(16+240+16)*256*2*2
+work_screen_address:
+	ds.l	1
 
 ; ------------------------------------------------------------------------------
 	end

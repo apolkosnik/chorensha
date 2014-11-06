@@ -2807,7 +2807,7 @@ L_000215EA:
 L_00021602:
 	ifd __ATARI__
 
-	jbsr	draw_tc_sprites
+	jsr		draw_tc_sprites
 
 	endif
 
@@ -16312,7 +16312,7 @@ L_00028AE6:
 
 	move.l	(a3),d0
 	move.l	SPRITE_DATA_ADDRESS,a0
-	jbsr	compile_sprite
+	jsr		compile_sprite
 
 	movem.l	(sp)+,d0/a0
 

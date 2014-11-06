@@ -9,6 +9,7 @@
 	xdef game_heap_address
 	xdef vbl_wait_counter
 	xdef iocs_joystick_data
+	xdef saved_stack_address
 
 ; ------------------------------------------------------------------------------
 	text
@@ -24,6 +25,8 @@
 ; ssp	システムのスタック "Stack of the system"
 
 start_game:
+	move.l	sp,saved_stack_address
+
 	move.l	game_heap_address,a0
 	move.l	a0,a1
 	move.l	a0,a2
@@ -35,6 +38,8 @@ start_game:
 ; ------------------------------------------------------------------------------
 
 vbl_handler:
+	move.l	show_screen_address,display_screen_address
+	add.l	#512*2*16+16*2,display_screen_address
 	move.b	display_screen_address+1,$ffff8201.w
 	move.b	display_screen_address+2,$ffff8203.w
 	move.b	display_screen_address+3,$ffff820d.w
@@ -43,6 +48,9 @@ vbl_handler:
 
 	move.l	L_00000118,-(sp)
 	rts
+
+display_screen_address:
+	ds.l	1
 
 ; ------------------------------------------------------------------------------
 
@@ -562,6 +570,9 @@ vbl_wait_counter:
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
+
+saved_stack_address:
+	ds.l	1
 
 game_heap_address:
 	ds.l	1

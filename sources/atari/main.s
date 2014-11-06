@@ -1,6 +1,5 @@
 
 	xdef start
-	xdef restore
 
 ; ------------------------------------------------------------------------------
 	text
@@ -16,7 +15,9 @@ start:
 	lea		(a0,d0.l),a1
 	move.l	a1,game_heap_address
 
-	add.l	#$100000,d0 ; Heap area for the game.
+	add.l	#$100000,d0 ; Reserve heap memory for the game.
+
+	; Free unused memory.
 
 	move.l	d0,-(sp)
 	move.l	a0,-(sp)
@@ -24,6 +25,8 @@ start:
 	move	#74,-(sp)
 	trap	#1
 	lea		12(sp),sp
+
+	; Activate super mode.
 
 	pea		0
 	move	#32,-(sp)
@@ -34,6 +37,8 @@ start:
 
 	lea		my_stack,sp
 
+	; Print info text.
+
 	pea		welcome_text
 	move	#9,-(sp)
 	trap	#1
@@ -41,18 +46,59 @@ start:
 
 	jsr		detect_machine
 
+	; Allocate screen buffers (Fast-RAM preferred).
+
+	move	#3,-(sp)
+	move.l	#(16+240+16)*256*2*2*2,-(sp)
+	move	#68,-(sp)
+	trap	#1
+	addq.l	#8,sp
+
+	move.l	d0,a0
+	move.l	a0,a1
+	add.l	#(16+240+16)*256*2*2*2,a1
+
+.clear_loop:
+	clr.l	(a0)+	
+	clr.l	(a0)+	
+	clr.l	(a0)+	
+	clr.l	(a0)+	
+
+	cmp.l	a1,a0
+	jne		.clear_loop
+
+	move.l	d0,allocated_screen_buffer
+	move.l	d0,show_screen_address
+	add.l	#(16+240+16)*256*2*2,d0
+	move.l	d0,work_screen_address
+
 	pea		press_space_text
 	move	#9,-(sp)
 	trap	#1
 	addq.l	#6,sp
 
+	; Wait for user input.
+
 	move	#1,-(sp)
 	trap	#1
 	addq.l	#2,sp
 
+	; Initialize system and start game.
+
 	jsr		init
+
 	jsr		start_game
+
 	jsr		restore
+
+	; Free memory.
+
+	move.l	allocated_screen_buffer,-(sp)
+	move	#73,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+	; Activated user mode.
 
 	move.l	old_ssp,-(sp)
 	move	#32,-(sp)
@@ -229,9 +275,9 @@ init:
 	move.b	$ffff8203.w,old_screen+2
 	move.b	$ffff820d.w,old_screen+3
 
-	move.b	display_screen_address+1,$ffff8201.w
-	move.b	display_screen_address+2,$ffff8203.w
-	move.b	display_screen_address+3,$ffff820d.w
+	move.b	show_screen_address+1,$ffff8201.w
+	move.b	show_screen_address+2,$ffff8203.w
+	move.b	show_screen_address+3,$ffff820d.w
 
 	move.l	$ffff820e.w,d0
 	move.l	$ffff8264.w,d1
@@ -369,13 +415,7 @@ restore:
 
 	move	#$2300,sr
 
-	move.l	old_ssp,-(sp)
-	move	#32,-(sp)
-	trap	#1
-	addq	#6,sp
-
-	clr		-(sp)
-	trap	#1
+	rts
 
 ; ------------------------------------------------------------------------------
 	data
@@ -513,7 +553,13 @@ old_fa13:
 old_fa15:
 	ds.b	1
 
-	align 4
+	even
+
+allocated_screen_buffer:
+	ds.l	1
+
+allocated_display_buffer:
+	ds.l	1
 
 	ds.l	1024
 my_stack:

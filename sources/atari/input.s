@@ -29,7 +29,8 @@ ikbd_handler:
 	cmp.b	#$01+$80,d0 ; "ESC" released?
 	jne		.go_on
 
-	jmp		restore
+	move.l	saved_stack_address,sp
+	rts
 
 .go_on:
 	; Joystick emulation.
