@@ -1,5 +1,5 @@
 
-	xdef start_game
+	xdef start_emulator
 	xdef vbl_handler
 	xdef line_f_handler
 	xdef trap_2_handler
@@ -24,7 +24,7 @@
 ; usp	親のスタック "Stack of the parent"
 ; ssp	システムのスタック "Stack of the system"
 
-start_game:
+start_emulator:
 	move.l	sp,saved_stack_address
 
 	move.l	game_heap_address,a0
@@ -33,7 +33,7 @@ start_game:
 	move.l	a0,a3
 	lea		_start,a4
 
-	jmp		_start
+	jmp		(a4)
 
 ; ------------------------------------------------------------------------------
 

@@ -1,6 +1,9 @@
 
 	xdef start
 
+	xdef machine_type
+	xdef fast_ram_detected
+
 ; ------------------------------------------------------------------------------
 	text
 ; ------------------------------------------------------------------------------
@@ -44,33 +47,7 @@ start:
 	trap	#1
 	addq.l	#6,sp
 
-	jsr		detect_machine
-
-	; Allocate screen buffers (Fast-RAM preferred).
-
-	move	#3,-(sp)
-	move.l	#(16+240+16)*256*2*2*2,-(sp)
-	move	#68,-(sp)
-	trap	#1
-	addq.l	#8,sp
-
-	move.l	d0,a0
-	move.l	a0,a1
-	add.l	#(16+240+16)*256*2*2*2,a1
-
-.clear_loop:
-	clr.l	(a0)+	
-	clr.l	(a0)+	
-	clr.l	(a0)+	
-	clr.l	(a0)+	
-
-	cmp.l	a1,a0
-	jne		.clear_loop
-
-	move.l	d0,allocated_screen_buffer
-	move.l	d0,show_screen_address
-	add.l	#(16+240+16)*256*2*2,d0
-	move.l	d0,work_screen_address
+	jsr		initialize_machine
 
 	pea		press_space_text
 	move	#9,-(sp)
@@ -83,11 +60,11 @@ start:
 	trap	#1
 	addq.l	#2,sp
 
-	; Initialize system and start game.
+	; Initialize system and start emulator.
 
 	jsr		init
 
-	jsr		start_game
+	jsr		start_emulator
 
 	jsr		restore
 
@@ -98,7 +75,25 @@ start:
 	trap	#1
 	addq.l	#6,sp
 
-	; Activated user mode.
+	move.l	allocated_screen_buffer,d0
+	jeq		.skip_free_display_buffer
+
+	move.l	d0,-(sp)
+	move	#73,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+.skip_free_display_buffer:
+	move.l	allocated_samples_buffer,d0
+	jeq		.skip_free_samples_buffer
+
+	move.l	d0,-(sp)
+	move	#73,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+.skip_free_samples_buffer:
+	; Activate user mode.
 
 	move.l	old_ssp,-(sp)
 	move	#32,-(sp)
@@ -112,7 +107,7 @@ start:
 
 _p_cookies=$5a0
 
-detect_machine:
+initialize_machine:
 	move.l	_p_cookies,d0
 	jeq		.exit
 
@@ -216,6 +211,50 @@ detect_machine:
 	move	#9,-(sp)
 	trap	#1
 	addq.l	#6,sp
+
+	; Allocate screen buffers (Fast-RAM preferred).
+
+	move	#3,-(sp)
+	move.l	#(16+240+16)*256*2*2*2,-(sp)
+	move	#68,-(sp)
+	trap	#1
+	addq.l	#8,sp
+
+	move.l	d0,a0
+	move.l	a0,a1
+	add.l	#(16+240+16)*256*2*2*2,a1
+
+.clear_loop:
+	clr.l	(a0)+	
+	clr.l	(a0)+	
+	clr.l	(a0)+	
+	clr.l	(a0)+	
+
+	cmp.l	a1,a0
+	jne		.clear_loop
+
+	move.l	d0,allocated_screen_buffer
+	move.l	d0,show_screen_address
+	add.l	#(16+240+16)*256*2*2,d0
+	move.l	d0,work_screen_address
+
+	; Detect Fast-RAM by trying to allocate the display and sample buffers.
+
+	move	#1,-(sp)
+	move.l	#240*256*2,-(sp)
+	move	#68,-(sp)
+	trap	#1
+	addq.l	#8,sp
+
+	move.l	d0,allocated_display_buffer
+
+	move	#1,-(sp)
+	move.l	#512*1024,-(sp)
+	move	#68,-(sp)
+	trap	#1
+	addq.l	#8,sp
+
+	move.l	d0,allocated_samples_buffer
 
 .exit:
 	pea		line_end_text
@@ -475,6 +514,9 @@ machine_type_aranym_text:
 machine_cpu_text:
 	dc.b	'MC68000 CPU',0
 
+machine_fast_ram_text:
+	dc.b	'Fast-RAM',0
+
 	even
 
 machine_type:
@@ -559,6 +601,9 @@ allocated_screen_buffer:
 	ds.l	1
 
 allocated_display_buffer:
+	ds.l	1
+
+allocated_samples_buffer:
 	ds.l	1
 
 	ds.l	1024

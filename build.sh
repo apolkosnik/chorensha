@@ -22,8 +22,8 @@ diff binaries/sz2.dif binaries/x68000/sz2.dif
 ./vasmm68k_mot sources/atari/graphics.s -quiet -Faout -m68030 -o binaries/graphics.o
 ./vasmm68k_mot sources/atari/audio.s -quiet -Faout -m68030 -o binaries/audio.o
 
-./vlink binaries/main.o binaries/sz2_atari.o binaries/mem_map.o binaries/input.o binaries/emulator.o binaries/graphics.o binaries/audio.o -b ataritos -e start -o binaries/atari/sz2_dbg.tos
-./vlink binaries/main.o binaries/sz2_atari.o binaries/mem_map.o binaries/input.o binaries/emulator.o binaries/graphics.o binaries/audio.o -s -b ataritos -e start -o binaries/atari/sz2.tos
+./vlink binaries/main.o binaries/sz2_atari.o binaries/mem_map.o binaries/input.o binaries/emulator.o binaries/graphics.o binaries/audio.o -tos-flags 7 -bataritos -estart -o binaries/atari/sz2_dbg.tos
+./vlink binaries/main.o binaries/sz2_atari.o binaries/mem_map.o binaries/input.o binaries/emulator.o binaries/graphics.o binaries/audio.o -s -tos-flags 7 -bataritos -estart -o binaries/atari/sz2.tos
 
 #
 # Amiga
