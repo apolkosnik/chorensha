@@ -255,7 +255,19 @@ initialize_machine:
 	addq.l	#8,sp
 
 	move.l	d0,allocated_samples_buffer
+	jeq		.no_fast_ram
 
+	pea		separator_text
+	move	#9,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+	pea		machine_fast_ram_text
+	move	#9,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+.no_fast_ram:
 .exit:
 	pea		line_end_text
 	move	#9,-(sp)
