@@ -972,6 +972,49 @@ draw_tc_sprites_end:
 
 	; Flip screen request.
 
+    tst     machine_has_fast_ram
+    jeq     .flip_screen
+
+	move.l	work_screen_address,a0
+	add.l	#512*2*16+16*2,a0
+	move.l	allocated_display_buffer,a1
+
+	move	#240-1,d7
+
+.copy_loop:
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*2(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*3(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*4(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*5(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*6(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*7(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*8(a1)
+	movem.l	(a0)+,d0-d6/a2-a6
+	movem.l	d0-d6/a2-a6,12*4*9(a1)
+	movem.l	(a0)+,d0-d6/a2
+	movem.l	d0-d6/a2,12*4*10(a1)
+
+	add.l	#256*2,a0
+	add.l	#256*2,a1
+
+	dbf		d7,.copy_loop
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+.flip_screen:
 	move	sr,-(sp)
 
 	move	#$2700,sr

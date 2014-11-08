@@ -1,15 +1,6 @@
 #
 # X68000
 #
-./vasmm68k_mot sources/sz2.s -quiet -Felf -nosym -no-opt -m68000 -rangewarnings -o binaries/sz2_x68k.o
-./vasmm68k_mot sources/x68000/mem_map.s -quiet -Felf -nosym -no-opt -m68000 -rangewarnings -o binaries/mem_map.o
-human68k-gcc -nostartfiles binaries/sz2_x68k.o binaries/mem_map.o -o binaries/sz2.o 
-human68k-objcopy -O xfile binaries/sz2.o binaries/sz2.x 
-cp binaries/sz2.x binaries/x68000/CH68_101_B/SZ2.X 
-
-xxd binaries/sz2.x > binaries/sz2.hex
-diff binaries/sz2.hex binaries/x68000/sz2.hex > binaries/sz2.dif
-diff binaries/sz2.dif binaries/x68000/sz2.dif
 
 #
 # Atari

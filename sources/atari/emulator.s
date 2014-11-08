@@ -38,12 +38,16 @@ start_emulator:
 ; ------------------------------------------------------------------------------
 
 vbl_handler:
+    tst     machine_has_fast_ram
+    jne     .skip_set_address
+
 	move.l	show_screen_address,display_screen_address
 	add.l	#512*2*16+16*2,display_screen_address
 	move.b	display_screen_address+1,$ffff8201.w
 	move.b	display_screen_address+2,$ffff8203.w
 	move.b	display_screen_address+3,$ffff820d.w
 
+.skip_set_address:
 	addq	#1,vbl_wait_counter
 
 	move.l	L_00000118,-(sp)

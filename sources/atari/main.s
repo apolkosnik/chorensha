@@ -2,7 +2,9 @@
 	xdef start
 
 	xdef machine_type
-	xdef fast_ram_detected
+	xdef allocated_display_buffer
+	xdef allocated_samples_buffer
+    xdef machine_has_fast_ram
 
 ; ------------------------------------------------------------------------------
 	text
@@ -47,7 +49,7 @@ start:
 	trap	#1
 	addq.l	#6,sp
 
-	jsr		initialize_machine
+	jsr		check_machine
 
 	pea		press_space_text
 	move	#9,-(sp)
@@ -75,24 +77,16 @@ start:
 	trap	#1
 	addq.l	#6,sp
 
-	move.l	allocated_screen_buffer,d0
-	jeq		.skip_free_display_buffer
-
-	move.l	d0,-(sp)
+	move.l	allocated_display_buffer,-(sp)
 	move	#73,-(sp)
 	trap	#1
 	addq.l	#6,sp
 
-.skip_free_display_buffer:
-	move.l	allocated_samples_buffer,d0
-	jeq		.skip_free_samples_buffer
-
-	move.l	d0,-(sp)
+	move.l	allocated_samples_buffer,-(sp)
 	move	#73,-(sp)
 	trap	#1
 	addq.l	#6,sp
 
-.skip_free_samples_buffer:
 	; Activate user mode.
 
 	move.l	old_ssp,-(sp)
@@ -107,7 +101,7 @@ start:
 
 _p_cookies=$5a0
 
-initialize_machine:
+check_machine:
 	move.l	_p_cookies,d0
 	jeq		.exit
 
@@ -238,24 +232,58 @@ initialize_machine:
 	add.l	#(16+240+16)*256*2*2,d0
 	move.l	d0,work_screen_address
 
-	; Detect Fast-RAM by trying to allocate the display and sample buffers.
+	; Allocate the display buffer.
 
-	move	#1,-(sp)
-	move.l	#240*256*2,-(sp)
+	move	#0,-(sp)
+	move.l	#256*2*240,-(sp)
 	move	#68,-(sp)
 	trap	#1
 	addq.l	#8,sp
 
 	move.l	d0,allocated_display_buffer
 
-	move	#1,-(sp)
+    move.l  d0,a0
+    move.l  a0,a1
+    add.l   #256*2*240,a1
+
+    move    #$f800,d0
+
+.fill_loop:
+    move    d0,(a0)+
+    move    d0,(a0)+
+    move    d0,(a0)+
+    move    d0,(a0)+
+
+    cmp.l   a1,a0
+    jne     .fill_loop
+
+	; Allocate the samples buffer.
+
+	move	#0,-(sp)
 	move.l	#512*1024,-(sp)
 	move	#68,-(sp)
 	trap	#1
 	addq.l	#8,sp
 
 	move.l	d0,allocated_samples_buffer
+
+    ; Detect Fast-RAM.
+
+	move	#1,-(sp)
+	move.l	#1024,-(sp)
+	move	#68,-(sp)
+	trap	#1
+	addq.l	#8,sp
+
+    tst.l   d0
 	jeq		.no_fast_ram
+
+    move    #-1,machine_has_fast_ram
+
+	move.l	d0,-(sp)
+	move	#73,-(sp)
+	trap	#1
+	addq.l	#6,sp
 
 	pea		separator_text
 	move	#9,-(sp)
@@ -326,10 +354,21 @@ init:
 	move.b	$ffff8203.w,old_screen+2
 	move.b	$ffff820d.w,old_screen+3
 
+    tst     machine_has_fast_ram
+    jeq     .set_show_screen
+
+	move.b	allocated_display_buffer+1,$ffff8201.w
+	move.b	allocated_display_buffer+2,$ffff8203.w
+	move.b	allocated_display_buffer+3,$ffff820d.w
+
+    jra     .skip_set_show_screen
+
+.set_show_screen:
 	move.b	show_screen_address+1,$ffff8201.w
 	move.b	show_screen_address+2,$ffff8203.w
 	move.b	show_screen_address+3,$ffff820d.w
 
+.skip_set_show_screen:
 	move.l	$ffff820e.w,d0
 	move.l	$ffff8264.w,d1
 	movem.l	$ffff8282.w,d2-d5
@@ -392,9 +431,13 @@ init:
 	move	#$100,$ffff8210.w
 
 .skip_vga_mode:
+    tst     machine_has_fast_ram
+    jne     .skip_line_width
+
 ;	move	#(512-256)/2,$ffff820e.w
 	move	#(256*2-256),$ffff820e.w
 
+.skip_line_width:
 	clr.b	$fffffa07.w
 	clr.b	$fffffa09.w
 	clr.b	$fffffa13.w
@@ -478,7 +521,7 @@ welcome_text:
 	dc.b	10,13
 	dc.b	'Original X68000 version (c) 1995 by Famibe No Yosshin.',10,13
 	dc.b	10,13
-	dc.b	'Atari Falcon030 port v20141105t by Sascha Springer.',10,13
+	dc.b	'Atari Falcon030 port v20141107t by Sascha Springer.',10,13
 	dc.b	10,13
 	dc.b	0
 
@@ -617,6 +660,9 @@ allocated_display_buffer:
 
 allocated_samples_buffer:
 	ds.l	1
+
+machine_has_fast_ram:
+    ds      1
 
 	ds.l	1024
 my_stack:
