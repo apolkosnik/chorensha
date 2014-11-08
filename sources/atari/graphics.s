@@ -221,7 +221,6 @@ draw_sprites:
     lea     sprite_data_table,a1
     lea     sprite_graphics_buffer,a2
     move.l  sprite_data_count,d7
-    move.l  #512,d7
     lea     8(a1,d7.l*8),a1
     subq.l  #1,d7
     jmi     draw_sprites_end

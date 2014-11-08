@@ -26,13 +26,13 @@ ikbd_handler:
 	cmp.b	#$f6,d0 ; Key?
 	jhs		.check_joystick
 
-	cmp.b	#$01+$80,d0 ; "ESC" released?
-	jne		.go_on
+;	cmp.b	#$01+$80,d0 ; "ESC" released?
+;	jne		.go_on
 
-	move.l	saved_stack_address,sp
-	rts
+;	move.l	saved_stack_address,sp
+;	rts
 
-.go_on:
+;.go_on:
 	; Joystick emulation.
 
 	cmp.b	#$2a,d0 ; "Left SHIFT" pressed?

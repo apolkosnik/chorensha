@@ -519,7 +519,7 @@ welcome_text:
 	dc.b	10,13
 	dc.b	'Original X68000 version (c) 1995 by Famibe No Yosshin.',10,13
 	dc.b	10,13
-	dc.b	'Atari Falcon030 port v20141107t by Sascha Springer.',10,13
+	dc.b	'Atari Falcon030 port v20141108t by Sascha Springer.',10,13
 	dc.b	10,13
 	dc.b	0
 
