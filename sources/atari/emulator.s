@@ -39,8 +39,13 @@ start_emulator:
 
 vbl_handler:
     tst     machine_has_fast_ram
-    jne     .skip_set_address
+    jeq     .set_address
 
+    jsr     draw_sprites
+
+    jra     .skip_set_address
+
+.set_address:
 	move.l	show_screen_address,display_screen_address
 	add.l	#512*2*16+16*2,display_screen_address
 	move.b	display_screen_address+1,$ffff8201.w

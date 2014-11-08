@@ -1,5 +1,6 @@
 
-	xdef draw_tc_sprites
+	xdef prepare_sprites
+	xdef draw_sprites
 	xdef compile_sprite
 
 	xdef text_bitmaps
@@ -11,7 +12,7 @@
 ; ------------------------------------------------------------------------------
 
 convert_palettes:
-	movem.l	d0-d7/a0-a6,-(sp)
+	movem.l	d0-a6,-(sp)
 
 	lea		L_00E82000+$200,a0
 	lea		converted_sprite_palettes,a1
@@ -35,7 +36,7 @@ convert_palettes:
 
 	dbf		d7,.loop
 
-	movem.l	(sp)+,d0-d7/a0-a6
+	movem.l	(sp)+,d0-a6
 
 	rts
 
@@ -48,7 +49,66 @@ converted_sprite_palettes:
 
 ; ------------------------------------------------------------------------------
 
-draw_tc_sprites:
+prepare_sprites:
+	movem.l	d0-a6,-(sp)
+
+    move    sr,-(sp)
+
+    move    #$2700,sr
+
+    lea     SPRITE_DATA_TABLE,a0
+    lea     sprite_data_table,a1
+    move.l  CURRENT_SPRITE_DATA_ENTRY,d7
+    sub.l   a0,d7
+    lsr.l   #3,d7
+    move.l  d7,sprite_data_count
+    subq    #1,d7
+
+.copy_loop1:
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+
+    dbf     d7,.copy_loop1
+
+    lea     L_00EB8000,a0
+    lea     sprite_graphics_buffer,a1
+
+    move    #$8000/32-1,d7
+
+.copy_loop2:
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+    move.l  (a0)+,(a1)+
+
+    dbf     d7,.copy_loop2
+
+    move    (sp)+,sr
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+    bss
+
+sprite_data_count:
+    ds.l    1
+
+sprite_data_table:
+    ds.b    512*8
+
+sprite_graphics_buffer:
+    ds.b    $8000
+
+    text
+
+; ------------------------------------------------------------------------------
+
+draw_sprites:
 	movem.l	d0-a6,-(sp)
 
 	rem
@@ -147,21 +207,30 @@ draw_tc_sprites:
 	; Draw sprites.
 
 	move.l	work_screen_address,a0
-	move.l	CURRENT_SPRITE_DATA_ENTRY,a1
-	addq.l	#8,a1
-;	lea		SPRITE_DATA_TABLE+512*8+8,a1 ; Sprite infos table.
-	lea		L_00EB8000,a2 ; Sprite data table.
-;	lea		L_00E82000+$200,a3 ; Sprite palette table.
 	lea		converted_sprite_palettes,a3 ; Sprite palette table.
 
+    tst     machine_has_fast_ram
+    jeq     .draw_live_sprites
+
+    lea     sprite_data_table,a1
+    lea     sprite_graphics_buffer,a2
+    move.l  sprite_data_count,d7
+    lea     8(a1,d7.l*8),a1
+    subq    #1,d7
+    jmi     draw_sprites_end
+
+    jra     draw_sprites_loop
+
+.draw_live_sprites:
+	move.l	CURRENT_SPRITE_DATA_ENTRY,a1
+	lea		L_00EB8000,a2 ; Sprite VRAM.
+	addq.l	#8,a1
 	move.l	a1,d7
 	sub.l	#SPRITE_DATA_TABLE,d7
 	lsr		#3,d7
 	subq	#1,d7
 
-;	move	#512-1,d7
-
-draw_tc_sprites_loop:
+draw_sprites_loop:
 	sub		#16,a1
 
 	move	(a1)+,d0 ; X position.
@@ -186,16 +255,16 @@ draw_tc_sprites_loop:
 	move	d2,d3
 
 	and		#$e000,d3
-	jeq		draw_tc_sprites_normal
+	jeq		draw_sprites_normal
 
 	cmp		#$8000,d3
-	jeq		draw_tc_sprites_vertical_flipped
+	jeq		draw_sprites_vertical_flipped
 
 	cmp		#$4000,d3
-	jeq		draw_tc_sprites_horizontal_flipped
+	jeq		draw_sprites_horizontal_flipped
 
 ; --------------------------------------
-; draw_tc_sprites_vertical_and_horizontal_flipped:
+; draw_sprites_vertical_and_horizontal_flipped:
 ; --------------------------------------
 	add.l	#15*512*2,a4
 
@@ -362,12 +431,12 @@ draw_tc_sprites_loop:
 	dbf		d6,.loop1
 
 .skip_sprite:
-	dbf		d7,draw_tc_sprites_loop
+	dbf		d7,draw_sprites_loop
 
-	jra		draw_tc_sprites_end
+	jra		draw_sprites_end
 
 ; --------------------------------------
-draw_tc_sprites_normal:
+draw_sprites_normal:
 ; --------------------------------------
 	move	d2,d3
 	lsr		#3,d2
@@ -531,12 +600,12 @@ draw_tc_sprites_normal:
 
 	dbf		d6,.loop1
 
-	dbf		d7,draw_tc_sprites_loop
+	dbf		d7,draw_sprites_loop
 
-	jra		draw_tc_sprites_end
+	jra		draw_sprites_end
 
 ; --------------------------------------
-draw_tc_sprites_vertical_flipped:
+draw_sprites_vertical_flipped:
 ; --------------------------------------
 	add.l	#15*512*2,a4
 
@@ -702,12 +771,12 @@ draw_tc_sprites_vertical_flipped:
 
 	dbf		d6,.loop1
 
-	dbf		d7,draw_tc_sprites_loop
+	dbf		d7,draw_sprites_loop
 
-	jra		draw_tc_sprites_end
+	jra		draw_sprites_end
 
 ; --------------------------------------
-draw_tc_sprites_horizontal_flipped:
+draw_sprites_horizontal_flipped:
 ; --------------------------------------
 	move	d2,d3
 	lsr		#3,d2
@@ -871,9 +940,9 @@ draw_tc_sprites_horizontal_flipped:
 
 	dbf		d6,.loop1
 
-	dbf		d7,draw_tc_sprites_loop
+	dbf		d7,draw_sprites_loop
 
-draw_tc_sprites_end:
+draw_sprites_end:
 
 	; Draw texts.
 	

@@ -246,13 +246,11 @@ check_machine:
     move.l  a0,a1
     add.l   #256*2*240,a1
 
-    move    #$f800,d0
-
 .fill_loop:
-    move    d0,(a0)+
-    move    d0,(a0)+
-    move    d0,(a0)+
-    move    d0,(a0)+
+    clr.l   (a0)+
+    clr.l   (a0)+
+    clr.l   (a0)+
+    clr.l   (a0)+
 
     cmp.l   a1,a0
     jne     .fill_loop
