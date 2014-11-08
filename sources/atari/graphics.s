@@ -56,6 +56,8 @@ prepare_sprites:
 
     move    #$2700,sr
 
+    ; Copy sprite infos.
+
     lea     SPRITE_DATA_TABLE,a0
     lea     sprite_data_table,a1
     move.l  CURRENT_SPRITE_DATA_ENTRY,d7
@@ -63,12 +65,15 @@ prepare_sprites:
     lsr.l   #3,d7
     move.l  d7,sprite_data_count
     subq    #1,d7
+    jmi     .skip_all
 
 .copy_loop1:
     move.l  (a0)+,(a1)+
     move.l  (a0)+,(a1)+
 
     dbf     d7,.copy_loop1
+
+    ; Copy sprite graphics.
 
     lea     L_00EB8000,a0
     lea     sprite_graphics_buffer,a1
@@ -87,6 +92,7 @@ prepare_sprites:
 
     dbf     d7,.copy_loop2
 
+.skip_all:
     move    (sp)+,sr
 
 	movem.l	(sp)+,d0-a6
@@ -215,8 +221,9 @@ draw_sprites:
     lea     sprite_data_table,a1
     lea     sprite_graphics_buffer,a2
     move.l  sprite_data_count,d7
+    move.l  #512,d7
     lea     8(a1,d7.l*8),a1
-    subq    #1,d7
+    subq.l  #1,d7
     jmi     draw_sprites_end
 
     jra     draw_sprites_loop
