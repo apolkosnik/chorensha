@@ -9718,7 +9718,7 @@ MENU_COPYRIGHT_TEXT:
 	ifd __ATARI__
 
 menu_port_text1:
-	dc.b	'ATARI FALCON 030 PORT',0
+	dc.b	'atari falcon030 PORT',0
 
 menu_port_text2:
 	dc.b	'BY SASCHA SPRINGER',0
@@ -13140,6 +13140,15 @@ L_00026C04:
 	move.w  D0,D3                                   ; 00026C0A 3600
 	cmp.w   #$3,D3                                  ; 00026C0C B67C 0003
 	bne.w   L_00026B62                              ; 00026C10 6600 FF50
+
+    ifd __ATARI__
+
+    move    #$2700,sr
+
+    move.l  saved_stack_address,sp
+    rts
+
+    endif
 
 	jsr     L_00027A74                              ; 00026C14 4EB9 0002 7A74
 
