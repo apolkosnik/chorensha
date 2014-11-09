@@ -219,24 +219,16 @@ line_f_handler:
 	cmp		#$ff40,d1 ; _WRITE
 	jne		.not_write
 
-	illegal
-
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move.l	26+LINE_F_OFFSET+2(sp),a0
 	move.l	26+LINE_F_OFFSET+6(sp),d1
 
-	cmp		#1,d0
-	jne		.exit
-
-	clr		d0
-	move.b	(a0),d0
-
+	pea		(a0)
+	move.l	d1,-(sp)
 	move	d0,-(sp)
-	move	#2,-(sp)
+	move	#64,-(sp)
 	trap	#1
-	addq	#4,sp
-
-	clr.l	d0
+	lea		12(sp),sp
 
 	jra		.exit	
 
@@ -495,6 +487,14 @@ trap_f_handler:
 	rte
 
 .no_os_curoff:
+	cmp.b	#$b1,d0 ; _APAGE
+	jne		.no_apage
+
+	clr.l	d0
+
+	rte
+
+.no_apage:
 	cmp.b	#$b2,d0 ; _VPAGE
 	jne		.no_vpage
 
@@ -511,6 +511,22 @@ trap_f_handler:
 	rte
 
 .no_home:
+	cmp.b	#$b4,d0 ; _WINDOW
+	jne		.no_window
+
+	clr.l	d0
+
+	rte
+
+.no_window:
+	cmp.b	#$b5,d0 ; _WIPE
+	jne		.no_wipe
+
+	clr.l	d0
+
+	rte
+
+.no_wipe:
 	cmp.b	#$c1,d0 ; _SP_ON
 	jne		.no_sp_on
 

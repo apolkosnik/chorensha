@@ -7898,18 +7898,18 @@ L_00023C24:
 	jsr     L_0005A600                              ; 00023C5E 4EB9 0005 A600
 
 	pea     $0.w                                    ; 00023C64 4878 0000
-	lea     L_0005A6B2,A4                           ; 00023C68 49F9 0005 A6B2
+	lea     _APAGE,A4                           ; 00023C68 49F9 0005 A6B2
 	jsr     (A4)                                    ; 00023C6E 4E94
 
 	pea     $1FF.w                                  ; 00023C70 4878 01FF
 	pea     $1FF.w                                  ; 00023C74 4878 01FF
 	pea     $0.w                                    ; 00023C78 4878 0000
 	pea     $0.w                                    ; 00023C7C 4878 0000
-	lea     L_0005A6BC,A5                           ; 00023C80 4BF9 0005 A6BC
+	lea     _WINDOW,A5                           ; 00023C80 4BF9 0005 A6BC
 	jsr     (A5)                                    ; 00023C86 4E95
 
 	lea     36(A7),A7                               ; 00023C88 4FEF 0024
-	jsr     L_0005A6D0                              ; 00023C8C 4EB9 0005 A6D0
+	jsr     _WIPE                              ; 00023C8C 4EB9 0005 A6D0
 
 	pea     $1.w                                    ; 00023C92 4878 0001
 	jsr     (A4)                                    ; 00023C96 4E94
@@ -7920,7 +7920,7 @@ L_00023C24:
 	pea     $0.w                                    ; 00023CA4 4878 0000
 	jsr     (A5)                                    ; 00023CA8 4E95
 
-	jsr     L_0005A6D0                              ; 00023CAA 4EB9 0005 A6D0
+	jsr     _WIPE                              ; 00023CAA 4EB9 0005 A6D0
 
 	pea     $3.w                                    ; 00023CB0 4878 0003
 	jsr     (A3)                                    ; 00023CB4 4E93
@@ -90632,17 +90632,19 @@ L_0005A6A4:
 L_0005A6AA:
 	rol.w   #$8,D2                                  ; 0005A6AA E15A                     ; J($0005A6A2) 
 	move.l  D3,D0                                   ; 0005A6AC 2003
+
 	move.l  (A7)+,D3                                ; 0005A6AE 261F
+
 	rts                                             ; 0005A6B0 4E75
 
-L_0005A6B2:
+_APAGE:
 	move.l  4(A7),D1                                ; 0005A6B2 222F 0004
 	moveq   #-79,D0                                 ; 0005A6B6 70B1
 	trap    #$F                                     ; 0005A6B8 4E4F                     ; _APAGE 
 
 	rts                                             ; 0005A6BA 4E75
 
-L_0005A6BC:
+_WINDOW:
 	movem.l D3-D4,-(A7)                             ; 0005A6BC 48E7 1800
 
 	movem.l 12(A7),D1-D4                            ; 0005A6C0 4CEF 001E 000C
@@ -90650,9 +90652,10 @@ L_0005A6BC:
 	trap    #$F                                     ; 0005A6C8 4E4F                     ; _WINDOW 
 
 	movem.l (A7)+,D3-D4                             ; 0005A6CA 4CDF 0018
+
 	rts                                             ; 0005A6CE 4E75
 
-L_0005A6D0:
+_WIPE:
 	moveq   #-75,D0                                 ; 0005A6D0 70B5                     ; S($00023C8C) 
 	trap    #$F                                     ; 0005A6D2 4E4F                     ; _WIPE 
 
