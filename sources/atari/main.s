@@ -77,6 +77,7 @@ start:
 	trap	#1
 	addq.l	#6,sp
 
+	and.l	#$0fffffff,allocated_display_buffer
 	move.l	allocated_display_buffer,-(sp)
 	move	#73,-(sp)
 	trap	#1
@@ -145,6 +146,14 @@ check_machine:
 	jra		.next_cookie
 
 .skip_video:
+	cmp.l	#'SupV',d0
+	jne		.skip_supervidel
+
+	move.l	d1,machine_supervidel
+
+	jra		.next_cookie
+
+.skip_supervidel:
 	cmp.l	#'_SND',d0
 	jne		.skip_sound
 
@@ -209,11 +218,13 @@ check_machine:
 	; Allocate screen buffers (Fast-RAM preferred).
 
 	move	#3,-(sp)
-	move.l	#(16+240+16)*256*2*2*2,-(sp)
+	move.l	#(16+240+16)*256*2*2*2+16,-(sp)
 	move	#68,-(sp)
 	trap	#1
 	addq.l	#8,sp
 
+	add.l	#15,d0
+	and.l	#$fffffff0,d0
 	move.l	d0,a0
 	move.l	a0,a1
 	add.l	#(16+240+16)*256*2*2*2,a1
@@ -235,13 +246,14 @@ check_machine:
 	; Allocate the display buffer.
 
 	move	#0,-(sp)
-	move.l	#256*2*240,-(sp)
+	move.l	#256*2*240+16,-(sp)
 	move	#68,-(sp)
 	trap	#1
 	addq.l	#8,sp
 
+	add.l	#15,d0
+	and.l	#$fffffff0,d0
 	move.l	d0,allocated_display_buffer
-
     move.l  d0,a0
     move.l  a0,a1
     add.l   #256*2*240,a1
@@ -255,6 +267,13 @@ check_machine:
     cmp.l   a1,a0
     jne     .fill_loop
 
+	cmp.l	#-1,machine_supervidel
+	jeq		.skip_supervidel_redirection
+
+	or.l	#$a0000000,allocated_display_buffer
+
+.skip_supervidel_redirection:
+
 	; Allocate the samples buffer.
 
 	move	#0,-(sp)
@@ -264,6 +283,24 @@ check_machine:
 	addq.l	#8,sp
 
 	move.l	d0,allocated_samples_buffer
+
+	; Print detected SuperVidel.
+
+	move.l	machine_supervidel,d0
+	cmp.l	#-1,d0
+	jeq		.no_supervidel
+
+	pea		separator_text
+	move	#9,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+	pea		machine_supervidel_text
+	move	#9,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+.no_supervidel:
 
     ; Detect Fast-RAM.
 
@@ -519,7 +556,7 @@ welcome_text:
 	dc.b	10,13
 	dc.b	'Original X68000 version (c) 1995 by Famibe No Yosshin.',10,13
 	dc.b	10,13
-	dc.b	'Atari Falcon030 port v20141108t by Sascha Springer.',10,13
+	dc.b	'Atari Falcon030 port v20141111t by Sascha Springer.',10,13
 	dc.b	10,13
 	dc.b	0
 
@@ -570,6 +607,9 @@ machine_cpu_text:
 machine_fast_ram_text:
 	dc.b	'Fast-RAM',0
 
+machine_supervidel_text:
+	dc.b	'SuperVidel',0
+
 	even
 
 machine_type:
@@ -585,6 +625,9 @@ machine_video:
 	dc.l	-1
 
 machine_sound:
+	dc.l	-1
+
+machine_supervidel:
 	dc.l	-1
 
 machine_type_table:
