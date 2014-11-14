@@ -1,6 +1,8 @@
 
 	xdef ikbd_handler
 
+	xdef program_exit_request
+
 ; ------------------------------------------------------------------------------
 	text
 ; ------------------------------------------------------------------------------
@@ -26,13 +28,16 @@ ikbd_handler:
 	cmp.b	#$f6,d0 ; Key?
 	jhs		.check_joystick
 
-;	cmp.b	#$01+$80,d0 ; "ESC" released?
-;	jne		.go_on
+	cmp.b	#$01+$80,d0 ; "ESC" released?
+	jne		.no_exit_request
 
-;	move.l	saved_stack_address,sp
-;	rts
+	move	#-1,program_exit_request
 
-;.go_on:
+	move.l	(sp)+,d0
+
+	rte
+
+.no_exit_request:
 	; Joystick emulation.
 
 	cmp.b	#$2a,d0 ; "Left SHIFT" pressed?
@@ -247,6 +252,13 @@ ikbd_handler:
 
 .processing_routine:
 	dc.l	.process_key_code
+
+; ------------------------------------------------------------------------------
+	bss
+; ------------------------------------------------------------------------------
+
+program_exit_request:
+	ds		1
 
 ; ------------------------------------------------------------------------------
 	end
