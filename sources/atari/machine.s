@@ -149,13 +149,13 @@ initialize_machine:
 	move.l	$70.w,old_vbl_handler
 	move.l	$118.w,old_ikbd_handler
 
-	move.b	$ffff8201.w,old_display_address+1
-	move.b	$ffff8203.w,old_display_address+2
-	move.b	$ffff820d.w,old_display_address+3
+	move.b	$ffff8201.w,old_screen_address+1
+	move.b	$ffff8203.w,old_screen_address+2
+	move.b	$ffff820d.w,old_screen_address+3
 
-	move.b	display_graphics_address+1,$ffff8201.w
-	move.b	display_graphics_address+2,$ffff8203.w
-	move.b	display_graphics_address+3,$ffff820d.w
+	move.b	display_screen_address+1,$ffff8201.w
+	move.b	display_screen_address+2,$ffff8203.w
+	move.b	display_screen_address+3,$ffff820d.w
 
 	move.l	$ffff820e.w,d0
 	move.l	$ffff8264.w,d1
@@ -259,9 +259,9 @@ release_machine:
 	move.l	old_vbl_handler,$70.w
 	move.l	old_ikbd_handler,$118.w
 
-	move.b	old_display_address+1,$ffff8201.w
-	move.b	old_display_address+2,$ffff8203.w
-	move.b	old_display_address+3,$ffff820d.w
+	move.b	old_screen_address+1,$ffff8201.w
+	move.b	old_screen_address+2,$ffff8203.w
+	move.b	old_screen_address+3,$ffff820d.w
 
 	movem.l	old_videl,d0-a2
 	move.l	d0,$ffff820e.w
@@ -299,7 +299,7 @@ machine_supervidel:
 	bss
 ; ------------------------------------------------------------------------------
 
-old_display_address:
+old_screen_address:
 	ds.l	1
 old_palette:
 	ds.l	256
