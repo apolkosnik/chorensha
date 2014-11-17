@@ -165,6 +165,27 @@ initialize_graphics:
 
 	dbf		d7,.copy_loop2
 
+	; Build color translation table.
+
+	lea		color_translation_table,a0
+	clr.l	d0
+
+.color_translation_loop:
+	bfextu	d0{16+5:5},d1
+	bfextu	d0{16+0:5},d2
+	bfextu	d0{16+10:5},d3
+
+	clr		d4
+
+	bfins	d1,d4{16+0:5}
+	bfins	d2,d4{16+5:5}
+	bfins	d3,d4{16+11:5}
+
+	move	d4,(a0)+
+
+	addq	#1,d0
+	jne		.color_translation_loop
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -176,6 +197,31 @@ release_graphics:
 	move	#73,-(sp)
 	trap	#1
 	addq.l	#6,sp
+
+	rts
+
+; ------------------------------------------------------------------------------
+
+translate_palettes:
+	movem.l	d0-a6,-(sp)
+
+	lea		L_00E82000+$200,a0
+	lea		color_translation_table,a1
+	lea		translated_palettes,a2
+
+	clr.l	d0
+
+	move	#16*16-1,d7
+
+.loop:
+	move	(a0)+,d0
+	move	(a1,d0.l*2),d1
+	move	d1,(a2)+
+	move	d1,(a2)+
+
+	dbf		d7,.loop
+
+	movem.l	(sp)+,d0-a6
 
 	rts
 
@@ -291,6 +337,12 @@ text_bitmaps:
 
 background_image:
 	ds.b	256*2*512
+
+color_translation_table:
+	ds		$10000
+
+translated_palettes:
+	ds.l	16*16
 
 ; ------------------------------------------------------------------------------
 	end
