@@ -50,6 +50,7 @@ vbl_handler:
 	move.b	display_window_address+3,$ffff820d.w
 
 	jsr		update_background
+	jsr		translate_palettes
 	jsr		flip_screen
 
 	addq	#1,vbl_wait_counter

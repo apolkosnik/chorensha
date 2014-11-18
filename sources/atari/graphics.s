@@ -6,6 +6,7 @@
 	xdef draw_sprites
 	xdef update_background
 	xdef flip_screen
+	xdef translate_palettes
 
 	xdef display_screen_address
 	xdef work_screen_address
@@ -519,7 +520,83 @@ compile_sprite:
 
 	move	d0,sprite_color_count
 
+	; Create normal sprite.
+
 	move.l	(sp),a0
+	jsr		convert_sprite_to_drawing_code
+
+	; Create horizontally flipped sprite.
+
+	lea		sprite_matrix,a0
+
+	move	#16-1,d7
+
+.flip_loop1:
+	lea		16(a0),a1
+
+	rept 8
+
+	move.b	(a0),d0
+	move.b	-(a1),(a0)+
+	move.b	d0,(a1)
+
+	endr
+
+	addq.l	#8,a0
+
+	dbf		d7,.flip_loop1
+
+	move.l	(sp),a0
+	addq.l	#4,a0
+	jsr		convert_sprite_to_drawing_code
+
+	; Create horizontally and vertically flipped sprite.
+
+	lea		sprite_matrix,a0
+	lea		15*16(a0),a1
+
+	move	#8-1,d7
+
+.flip_loop2:
+	rept 4
+
+	move.l	(a0),d0
+	move.l	(a1),(a0)+
+	move.l	d0,(a1)+
+
+	endr
+
+	sub.l	#16*2,a1
+
+	dbf		d7,.flip_loop2
+
+	move.l	(sp),a0
+	add.l	#12,a0
+	jsr		convert_sprite_to_drawing_code
+
+	; Create vertically flipped sprite.
+
+	lea		sprite_matrix,a0
+
+	move	#16-1,d7
+
+.flip_loop3:
+	lea		16(a0),a1
+
+	rept 8
+
+	move.b	(a0),d0
+	move.b	-(a1),(a0)+
+	move.b	d0,(a1)
+
+	endr
+
+	addq.l	#8,a0
+
+	dbf		d7,.flip_loop3
+
+	move.l	(sp),a0
+	addq.l	#8,a0
 	jsr		convert_sprite_to_drawing_code
 
 	movem.l	(sp)+,d0-a6
@@ -529,6 +606,62 @@ compile_sprite:
 ; ------------------------------------------------------------------------------
 
 prepare_sprites:
+	movem.l	d0-a6,-(sp)
+
+	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
+	lea		L_00EB8000,a1 ; Sprite VRAM.
+
+	move.l	work_screen_address,a2
+	move	work_background_position,d0
+	swap	d0
+	clr		d0
+	lsr.l	#6,d0
+	add.l	d0,a2
+
+	lea		translated_palettes,a3
+	move.l	work_sprite_infos_address,a4
+
+	move.l	a0,d7
+	sub.l	#SPRITE_DATA_TABLE,d7
+	jeq		.skip_all
+
+	lsr		#3,d7
+	subq	#1,d7
+
+.sprites_loop:
+	subq.l	#8,a0
+	movem	(a0),d0-d3
+
+	lea		(a2,d0.w*2),a5
+	swap	d1
+	clr		d1
+	lsr.l	#6,d1
+	add.l	d1,a5
+	move.l	a5,(a4)+ ; Screen address.
+
+	move	d2,d3
+	lsr		#4,d3
+	and		#$f0,d3
+	lea		4(a3,d3.w*4),a5
+	move.l	a5,(a4)+ ; Palette address.
+
+	move	d2,d3
+	and.l	#$ff,d3
+	lsl.l	#2+3+2,d3
+	lea		(a1,d3.l),a5
+	rol		#2,d2
+	and		#$3,d2
+	lea		(a5,d2.w*4),a5
+	move.l	(a5),(a4)+ ; Sprite draw address.
+	move.l	16(a5),(a4)+ ; Sprite restore address.
+
+	dbf		d7,.sprites_loop
+
+.skip_all:
+	clr.l	(a4) ; End marker.
+
+	movem.l	(sp)+,d0-a6
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -564,9 +697,9 @@ flip_screen:
 	move	display_background_position,work_background_position
 	move	d0,display_background_position
 
-	move.l	work_sprite_positions_address,d0
-	move.l	display_sprite_positions_address,work_sprite_positions_address
-	move.l	d0,display_sprite_positions_address
+	move.l	work_sprite_infos_address,d0
+	move.l	display_sprite_infos_address,work_sprite_infos_address
+	move.l	d0,display_sprite_infos_address
 
 	move	display_background_position,d0
 	move.l	display_screen_address,d1
@@ -594,11 +727,11 @@ background_image_filename:
 	data
 ; ------------------------------------------------------------------------------
 
-display_sprite_positions_address:
-	dc.l	display_sprite_positions
+display_sprite_infos_address:
+	dc.l	sprite_infos1
 
-work_sprite_positions_address:
-	dc.l	work_sprite_positions
+work_sprite_infos_address:
+	dc.l	sprite_infos2
 
 free_compiled_objects_address:
 	dc.l	compiled_objects
@@ -625,11 +758,11 @@ display_background_position:
 work_background_position:
 	ds		1
 
-display_sprite_positions:
-	ds		512*2
+sprite_infos1:
+	ds.l	512*4 ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
 
-work_sprite_positions:
-	ds		512*2
+sprite_infos2:
+	ds.l	512*4 ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
 
 text_bitmaps:
 	ds.l	32*2

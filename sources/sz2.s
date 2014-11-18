@@ -2811,17 +2811,7 @@ L_000215EA:
 L_00021602:
 	ifd __ATARI__
 
-    tst     machine_has_fast_ram
-    jeq     .draw
-
-    jsr     prepare_sprites
-
-    jra     .skip
-
-.draw:
-	jsr		draw_sprites
-
-.skip:
+	jsr		prepare_sprites
 
 	endif
 
