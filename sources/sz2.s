@@ -16321,14 +16321,23 @@ L_00028AE6:
 
 	ifd __ATARI__
 
-	move.l	d0,-(sp)
+	movem.l	d0/d7,-(sp)
+
+	move	d0,d7
+	subq	#1,d7
 
 	move.l	(a3),d0
 	lsl.l	#$7,d0
 	add.l	SPRITE_DATA_ADDRESS,d0
+
+.loop:
 	jsr		compile_sprite
 
-	move.l	(sp)+,d0
+	add.l	#128,d0
+
+	dbf		d7,.loop
+
+	movem.l	(sp)+,d0/d7
 
 	endif
 

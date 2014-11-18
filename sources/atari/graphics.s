@@ -608,6 +608,9 @@ compile_sprite:
 prepare_sprites:
 	movem.l	d0-a6,-(sp)
 
+	move	sr,-(sp)
+	move	#$2700,sr
+
 	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
 	lea		L_00EB8000,a1 ; Sprite VRAM.
 
@@ -660,6 +663,8 @@ prepare_sprites:
 .skip_all:
 	clr.l	(a4) ; End marker.
 
+	move	(sp)+,sr
+
 	movem.l	(sp)+,d0-a6
 
 	rts
@@ -667,6 +672,30 @@ prepare_sprites:
 ; ------------------------------------------------------------------------------
 
 draw_sprites:
+	movem.l	d0-a6,-(sp)
+
+	move.l	work_sprite_infos_address,a0
+
+.loop:
+	move.l	(a0)+,d0
+	jeq		.end
+
+	move.l	d0,a6
+	move.l	(a0)+,a5
+	move.l	(a0)+,a1
+	addq.l	#4,a0
+
+	move.l	a0,-(sp)
+
+	jsr		(a1)
+
+	move.l	(sp)+,a0
+
+	jra		.loop
+
+.end:
+	movem.l	(sp)+,d0-a6
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -758,11 +787,11 @@ display_background_position:
 work_background_position:
 	ds		1
 
-sprite_infos1:
-	ds.l	512*4 ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+	ds.l	4*512
 
-sprite_infos2:
-	ds.l	512*4 ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+sprite_infos2: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+	ds.l	4*512
 
 text_bitmaps:
 	ds.l	32*2
@@ -777,7 +806,7 @@ translated_palettes:
 	ds.l	16*16
 
 compiled_objects:
-	ds		$100000
+	ds.b	$200000
 
 sprite_color_count:
 	ds		1

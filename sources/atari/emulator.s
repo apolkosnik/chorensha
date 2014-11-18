@@ -51,6 +51,7 @@ vbl_handler:
 
 	jsr		update_background
 	jsr		translate_palettes
+	jsr		draw_sprites
 	jsr		flip_screen
 
 	addq	#1,vbl_wait_counter
