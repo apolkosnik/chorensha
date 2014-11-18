@@ -16331,13 +16331,14 @@ L_00028AE6:
 
 	ifd __ATARI__
 
-	movem.l	d0/a0,-(sp)
+	move.l	d0,-(sp)
 
 	move.l	(a3),d0
-	move.l	SPRITE_DATA_ADDRESS,a0
+	lsl.l	#$7,d0
+	add.l	SPRITE_DATA_ADDRESS,d0
 	jsr		compile_sprite
 
-	movem.l	(sp)+,d0/a0
+	move.l	(sp)+,d0
 
 	endif
 

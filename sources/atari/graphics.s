@@ -211,13 +211,17 @@ translate_palettes:
 
 	clr.l	d0
 
-	move	#16*16-1,d7
+	move	#16*16/8-1,d7
 
 .loop:
+	rept 8
+
 	move	(a0)+,d0
 	move	(a1,d0.l*2),d1
 	move	d1,(a2)+
 	move	d1,(a2)+
+
+	endr
 
 	dbf		d7,.loop
 
@@ -226,8 +230,300 @@ translate_palettes:
 	rts
 
 ; ------------------------------------------------------------------------------
+;
+; a0.l = compiled sprites struct address.
+;
+
+; d0   #1
+; d1   #2
+; d2   #3
+; d3   #4
+; d4   #5
+; d5   #6
+; d6   #7
+; d7   #8 
+; a0   #9
+; a1   #10
+; a2   #11
+; a3   #12
+; a4   #13
+; a5   palette_address / #14
+; a6   screen_address
+; sp   stack_pointer
+; (sp) #15
+
+convert_sprite_to_drawing_code:
+	movem.l	d0-a6,-(sp)
+
+	lea		sprite_matrix,a1
+	move.l	free_compiled_objects_address,a2
+	move.l	a2,(a0)
+	lea		sprite_color_to_register_table,a0
+
+	; Colors.
+
+	lea		sprite_colors_count+2,a3 ; Start at index #1.
+	clr		d0 ; Color index.
+	clr		d1 ; Color register bitmap (for "movem.l", bit 0 = d0, ...).
+	clr		d2 ; Gap offset.
+
+	cmp		#15,sprite_color_count
+	jne		.skip_color_fix1
+
+	move	#$2f2d,(a2)+ ; "move.l x(a5),-(sp)".
+	move	#15*4,(a2)+ ; "x".
+
+.skip_color_fix1:
+	move	#16-1-1,d7
+
+.colors_loop:
+	tst		(a3)+
+	jeq		.process_gap
+
+	tst		d2
+	jeq		.count_colors
+
+	cmp		#8,d2
+	jle		.quick_add1
+
+	move	#$4bed,(a2)+ ; "lea x(a5),a5".
+	move	d2,(a2)+ ; "x".
+
+	jra		.count_colors
+
+.quick_add1:
+	and		#$7,d2
+	lsl		#8,d2
+	add		d2,d2
+	add		#$508d,d2 ; "addq.l #x,a5".
+	move	d2,(a2)+
+
+.count_colors:
+	clr		d2
+
+	move	2(a0,d0.w*2),d3
+	cmp		#15,d3
+	jeq		.skip_color_fix2
+
+	bset	d3,d1
+
+.skip_color_fix2:
+	jra		.next_color
+
+.process_gap:
+	tst		d1
+	jeq		.count_gaps
+
+	move	#$4cdd,(a2)+ ; "movem.l (a5)+,rx-ry".
+	move	d1,(a2)+ ; "rx-ry".
+
+.count_gaps:
+	clr		d1
+
+	addq	#4,d2
+
+.next_color:
+	addq	#1,d0
+
+	dbf		d7,.colors_loop
+
+	tst		d1
+	jeq		.no_final_colors
+
+	move	#$4cdd,(a2)+ ; "movem.l (a5)+,rx-ry".
+	move	d1,(a2)+ ; "rx-ry".
+
+.no_final_colors:
+	; Pixels.
+
+	clr		d0 ; Gap offset.
+	clr		d1
+
+	move	#16-1,d7
+
+.lines_loop2:
+	move	#16-1,d6
+
+.pixels_loop:
+	move.b	(a1)+,d1
+	jne		.process_pixel
+
+	addq	#2,d0
+
+	jra		.next_pixel
+
+.process_pixel:
+	tst		d0
+	jeq		.draw_pixel
+
+	cmp		#8,d0
+	jle		.quick_add2
+
+	move	#$4dee,(a2)+ ; "lea x(a6),a6".
+	move	d0,(a2)+ ; "x".
+
+	jra		.draw_pixel
+
+.quick_add2:
+	and		#$7,d0
+	lsl		#8,d0
+	add		d0,d0
+	add		#$508e,d0 ; "addq.l #x,a6".
+	move	d0,(a2)+
+
+.draw_pixel:
+	clr		d0
+
+	move	(a0,d1.w*2),d2 ; "x".
+	cmp		#15,d2
+	jne		.skip_color_fix3
+
+	move	#$3cd7,d2 ; "move.w (sp),(a6)+".
+	cmp		-2(a2),d2 ; Is the last opcode also "move.w (sp),(a6)+"?
+	jne		.set_draw_color_command
+
+	move	#$2cd7,d2 ; "move.l (sp),(a6)+".
+	subq.l	#2,a2
+
+	jra		.set_draw_color_command
+
+.skip_color_fix3:
+	add		#$3cc0,d2 ; "move.w rx,(a6)+".
+
+	cmp		-2(a2),d2 ; Is the last opcode also "move.w rx,(a6)+"?
+	jne		.set_draw_color_command
+
+	sub		#$1000,d2 ; Convert the current opcode to "move.l rx,(a6)+".
+	subq.l	#2,a2
+
+.set_draw_color_command:
+	move	d2,(a2)+
+
+.next_pixel:
+	dbf		d6,.pixels_loop
+
+	add		#(256*2-16)*2,d0
+
+	dbf		d7,.lines_loop2
+
+	cmp		#15,sprite_color_count
+	jne		.skip_color_fix4
+
+	move	#$588f,(a2)+ ; "addq.l #4,sp".
+
+.skip_color_fix4:
+	move	#$4e75,(a2)+ ; "rts".
+
+	move.l	a2,free_compiled_objects_address
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; d0.l = original sprite data address.
+;
 
 compile_sprite:
+	movem.l	d0-a6,-(sp)
+
+	; Create sprite matrix and count colors.
+
+	move.l	(sp),a0
+	lea		sprite_matrix,a1
+	lea		sprite_colors_count+16*2,a2
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+
+	move	#16-1,d7
+
+.lines_loop1:
+	move.l	(a0)+,d1
+	bfextu	d1{0:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{4:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{8:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{12:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{16:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{20:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{24:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{28:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+
+	move.l	16*4-4(a0),d1
+	bfextu	d1{0:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{4:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{8:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{12:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{16:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{20:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{24:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+	bfextu	d1{28:4},d2
+	addq	#1,(a2,d2.w*2)
+	move.b	d2,(a1)+
+
+	dbf		d7,.lines_loop1
+
+	lea		sprite_colors_count+2,a0
+	lea		sprite_color_to_register_table+2,a1
+	clr		d0
+
+	move	#16-1-1,d7
+
+.count_loop:
+	tst		(a0)+
+	jeq		.color_not_used
+
+	move	d0,(a1)
+	addq	#1,d0
+
+.color_not_used:
+	addq.l	#2,a1
+
+	dbf		d7,.count_loop
+
+	move	d0,sprite_color_count
+
+	move.l	(sp),a0
+	jsr		convert_sprite_to_drawing_code
+
+	movem.l	(sp)+,d0-a6
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -268,9 +564,9 @@ flip_screen:
 	move	display_background_position,work_background_position
 	move	d0,display_background_position
 
-	move.l	work_sprite_postitions_address,d0
-	move.l	display_sprite_postitions_address,work_sprite_postitions_address
-	move.l	d0,display_sprite_postitions_address
+	move.l	work_sprite_positions_address,d0
+	move.l	display_sprite_positions_address,work_sprite_positions_address
+	move.l	d0,display_sprite_positions_address
 
 	move	display_background_position,d0
 	move.l	display_screen_address,d1
@@ -298,11 +594,14 @@ background_image_filename:
 	data
 ; ------------------------------------------------------------------------------
 
-display_sprite_postitions_address:
-	dc.l	display_sprite_postitions
+display_sprite_positions_address:
+	dc.l	display_sprite_positions
 
-work_sprite_postitions_address:
-	dc.l	work_sprite_postitions
+work_sprite_positions_address:
+	dc.l	work_sprite_positions
+
+free_compiled_objects_address:
+	dc.l	compiled_objects
 
 ; ------------------------------------------------------------------------------
 	bss
@@ -326,10 +625,10 @@ display_background_position:
 work_background_position:
 	ds		1
 
-display_sprite_postitions:
+display_sprite_positions:
 	ds		512*2
 
-work_sprite_postitions:
+work_sprite_positions:
 	ds		512*2
 
 text_bitmaps:
@@ -343,6 +642,21 @@ color_translation_table:
 
 translated_palettes:
 	ds.l	16*16
+
+compiled_objects:
+	ds		$100000
+
+sprite_color_count:
+	ds		1
+
+sprite_colors_count:
+	ds		16
+
+sprite_color_to_register_table:
+	ds		16
+
+sprite_matrix:
+	ds.b	16*16
 
 ; ------------------------------------------------------------------------------
 	end
