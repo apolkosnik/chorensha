@@ -423,6 +423,39 @@ convert_sprite_to_drawing_code:
 
 ; ------------------------------------------------------------------------------
 ;
+; a0.l = compiled sprites struct address.
+;
+
+convert_sprite_to_restore_code:
+	movem.l	d0-a6,-(sp)
+
+
+	clr.l	d0
+
+	jra		.loop
+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+	move.l	(a5)+,(a6)+
+
+.loop:
+	move.l	(a0)+,d0
+	lea		(a5,d0.w),a5
+	lea		(a6,d0.w*2),a6
+	swap	d0
+	jmp		.loop(pc,d0.w)
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
 ; d0.l = original sprite data address.
 ;
 
@@ -806,7 +839,7 @@ translated_palettes:
 	ds.l	16*16
 
 compiled_objects:
-	ds.b	$200000
+	ds.b	$200000*2
 
 sprite_color_count:
 	ds		1
