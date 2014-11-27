@@ -429,7 +429,6 @@ convert_sprite_to_drawing_code:
 convert_sprite_to_restore_code:
 	movem.l	d0-a6,-(sp)
 
-
 	clr.l	d0
 
 	jra		.loop
@@ -449,6 +448,39 @@ convert_sprite_to_restore_code:
 	lea		(a6,d0.w*2),a6
 	swap	d0
 	jmp		.loop(pc,d0.w)
+
+alternative1:
+
+.next_line:
+	subq	#1,d7
+	jmi		.end
+
+	add.l	d1,a0
+	add.l	d2,a5
+	add.l	d3,a6
+
+	move.l	(a0)+,d0
+	jeq		.next_line
+
+.loop:
+	add.l	d0,d0
+	jcc		.no_clear
+
+	move	(a5)+,(a6)+
+
+	jra		.loop
+
+.no_clear:
+	jeq		.next_line
+
+	addq.l	#2,a5
+	addq.l	#2,a6
+
+	jra		.loop
+
+.end:
+
+	;
 
 	movem.l	(sp)+,d0-a6
 
@@ -709,24 +741,23 @@ draw_sprites:
 
 	move.l	work_sprite_infos_address,a0
 
-.loop:
-	move.l	(a0)+,d0
-	jeq		.end
+	jra		.start
 
+.loop:
 	move.l	d0,a6
 	move.l	(a0)+,a5
 	move.l	(a0)+,a1
-	addq.l	#4,a0
 
-	move.l	a0,-(sp)
+	pea		4(a0)
 
 	jsr		(a1)
 
 	move.l	(sp)+,a0
 
-	jra		.loop
+.start:
+	move.l	(a0)+,d0
+	jne		.loop
 
-.end:
 	movem.l	(sp)+,d0-a6
 
 	rts
@@ -818,6 +849,9 @@ display_background_position:
 	ds		1
 
 work_background_position:
+	ds		1
+
+draw_sprites_throttle:
 	ds		1
 
 sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
