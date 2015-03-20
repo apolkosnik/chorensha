@@ -17520,6 +17520,12 @@ L_00029530:
 	rts                                             ; 0002955E 4E75
 
 INITIALIZE_SPRITES_AND_GRAPHICS:
+	ifd __ATARI__
+	
+	rts
+
+	else
+	
 	link    A6,#-12                                 ; 00029560 4E56 FFF4                ; S($00026D1C) 
 
 	movem.l D3-D7/A3-A5,-(A7)                       ; 00029564 48E7 1F1C
@@ -18397,6 +18403,8 @@ L_00029CEC:
 
 	rts                                             ; 00029CF4 4E75
 
+	endif
+	
 L_00029CF6:
 	dc.b    'rt',0
 

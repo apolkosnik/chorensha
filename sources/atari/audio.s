@@ -2,7 +2,7 @@
 	xdef initialize_audio
 	xdef release_audio
 
-	xdef allocated_samples_buffer
+;	xdef allocated_samples_buffer
 	xdef next_free_sample_address
 
 ; ------------------------------------------------------------------------------
