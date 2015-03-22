@@ -66,7 +66,29 @@ initialize_graphics:
 	trap	#1
 	addq.l	#4,sp
 
-	; Set background graphics.
+	; Load background graphics (wrapped part).
+	
+	clr		-(sp)
+	pea		background_image_filename
+	move	#61,-(sp)
+	trap	#1
+	addq.l	#8,sp
+
+	move	d0,d7
+
+	pea		background_image+256*2*512
+	move.l	#256*2*256,-(sp)
+	move	d7,-(sp)
+	move	#63,-(sp)
+	trap	#1
+	lea		12(sp),sp
+
+	move	d7,-(sp)
+	move	#62,-(sp)
+	trap	#1
+	addq.l	#4,sp
+
+	; Copy background graphics.
 
 	lea		background_image,a0
 	move.l	display_screen_address,a1
@@ -74,7 +96,7 @@ initialize_graphics:
 	move.l	work_screen_address,a2
 	add.l	#SCREEN_DISPLAY_OFFSET,a2
 
-	move	#512-1,d7
+	move	#512+256-1,d7
 
 .copy_loop1:
 	movem.l	(a0)+,d0-d6/a3-a6
@@ -118,53 +140,6 @@ initialize_graphics:
 	add.l	#256*2*2,a2
 
 	dbf		d7,.copy_loop1
-
-	lea		background_image,a0
-
-	move	#256-1,d7
-
-.copy_loop2:
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,(a1)
-	movem.l	d0-d6/a3-a6,(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4(a1)
-	movem.l	d0-d6/a3-a6,11*4(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*2(a1)
-	movem.l	d0-d6/a3-a6,11*4*2(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*3(a1)
-	movem.l	d0-d6/a3-a6,11*4*3(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*4(a1)
-	movem.l	d0-d6/a3-a6,11*4*4(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*5(a1)
-	movem.l	d0-d6/a3-a6,11*4*5(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*6(a1)
-	movem.l	d0-d6/a3-a6,11*4*6(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*7(a1)
-	movem.l	d0-d6/a3-a6,11*4*7(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*8(a1)
-	movem.l	d0-d6/a3-a6,11*4*8(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*9(a1)
-	movem.l	d0-d6/a3-a6,11*4*9(a2)
-	movem.l	(a0)+,d0-d6/a3-a6
-	movem.l	d0-d6/a3-a6,11*4*10(a1)
-	movem.l	d0-d6/a3-a6,11*4*10(a2)
-	movem.l	(a0)+,d0-d6
-	movem.l	d0-d6,11*4*11(a1)
-	movem.l	d0-d6,11*4*11(a2)
-
-	add.l	#256*2*2,a1
-	add.l	#256*2*2,a2
-
-	dbf		d7,.copy_loop2
 
 	; Build color translation table.
 
@@ -864,7 +839,7 @@ text_bitmaps:
 	ds.l	32*2
 
 background_image:
-	ds.b	256*2*512
+	ds.b	256*2*(512+256)
 
 color_translation_table:
 	ds		$10000
