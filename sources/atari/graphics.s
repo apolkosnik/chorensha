@@ -399,17 +399,101 @@ convert_sprite_to_drawing_code:
 ; ------------------------------------------------------------------------------
 ;
 ; a0.l = compiled sprites struct address.
-; a1.l = screen_address
-; a2.l = background_address
 
 convert_sprite_to_restore_code:
 	movem.l	d0-a6,-(sp)
 
+	move.l	free_compiled_objects_address,a2
+	move.l	a2,(a0)
+	
+	lea		sprite_matrix,a1
+	
+	clr		d0 ; Pixel offset.
+	clr		d1 ; Jump offset.
+	
+	move	#16-1,d7
+
+.lines_loop:
+	move	#16-1,d6
+	
+.pixels_loop:
+	tst.b	(a1)+
+	jeq		.no_pixel
+	
+	tst		d1
+	jne		.skip_pixel_offset
+	
+	move	d0,(a2)+
+	clr		d0
+
+.skip_pixel_offset:
+	subq	#2,d1
+
+	jra		.next_pixel
+	
+.no_pixel:
+	tst		d1
+	jne		.skip_jump_offset
+	
+	move	d1,(a2)+
+	clr		d1
+
+.skip_jump_offset:
+	addq	#2,d0
+
+.next_pixel:
+	dbf		d6,pixels_loop
+	
+	tst		d1
+	jeq		.skip_jump_offset2
+	
+	move	d1,(a2)+
+	clr		d1
+
+.skip_jump_offset2:
+	add		#512*2,d0
+
+	dbf		d7,pixels_loop
+
+	move.l	a2,free_compiled_objects_address
+	
 	movem.l	(sp)+,d0-a6
 
 	rts
 
 	; Tests.
+Test:
+	jra		.jump
+	
+.restore_loop:
+	add		d0,a1
+	add		d0,a2
+	
+	move	(a0)+,d0
+	jmp		.jump(pc,d0.w)
+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+
+.jump:
+	move	(a0)+,d0
+	jpl		.restore_loop
+	
+	;
 	
 	move.l	#512*2,d1
 	
@@ -622,6 +706,8 @@ compile_sprite:
 	move.l	(sp),a0
 	addq.l	#4,a0
 	jsr		convert_sprite_to_drawing_code
+	add.l	#16,a0
+	jsr		convert_sprite_to_restore_code
 
 	; Create horizontally and vertically flipped sprite.
 
@@ -646,6 +732,8 @@ compile_sprite:
 	move.l	(sp),a0
 	add.l	#12,a0
 	jsr		convert_sprite_to_drawing_code
+	add.l	#16,a0
+	jsr		convert_sprite_to_restore_code
 
 	; Create vertically flipped sprite.
 
@@ -671,6 +759,8 @@ compile_sprite:
 	move.l	(sp),a0
 	addq.l	#8,a0
 	jsr		convert_sprite_to_drawing_code
+	add.l	#16,a0
+	jsr		convert_sprite_to_restore_code
 
 	movem.l	(sp)+,d0-a6
 
