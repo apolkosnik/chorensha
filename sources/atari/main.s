@@ -270,12 +270,6 @@ fpu_type_sfp004:
 fpu_type_mc68881_or_mc68882:
 	dc.b	'MC68881/2 FPU',0
 	
-fpu_type_mc68881:
-	dc.b	'MC68881 FPU',0
-	
-fpu_type_mc68882:
-	dc.b	'MC68882 FPU',0
-	
 fpu_type_mc68040_internal:
 	dc.b	'MC68040 internal FPU',0
 	
@@ -287,8 +281,7 @@ fpu_type_mc68060_internal:
 fpu_type_table:
 	dc.l	fpu_type_sfp004
 	dc.l	fpu_type_mc68881_or_mc68882
-	dc.l	fpu_type_mc68881
-	dc.l	fpu_type_mc68882
+	dc.l	fpu_type_mc68881_or_mc68882
 	dc.l	fpu_type_mc68040_internal
 	dc.l	fpu_type_mc68060_internal
 	
