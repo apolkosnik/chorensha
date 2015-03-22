@@ -142,7 +142,7 @@ print_info_text:
 
 	move.l	machine_fpu,d0
 	swap	d0
-	lea		fpu_type_table,a0
+	lea		fpu_type_table-4,a0 ; Note: -4!
 
 .fpu_loop:
 	lsr		#1,d0
