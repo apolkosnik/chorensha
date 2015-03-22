@@ -130,6 +130,31 @@ print_info_text:
 	trap	#1
 	addq.l	#6,sp
 
+	; Print detected FPU.
+
+	cmp.l	#-1,machine_fpu
+	jeq		.no_fpu
+
+	pea		separator_text
+	move	#9,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+	move.l	machine_fpu,d0
+	swap	d0
+	lea		fpu_type_table,a0
+
+.fpu_loop:
+	lsr		#1,d0
+	addq	#4,a0
+	jcc		.fpu_loop
+
+	move.l	(a0),-(sp)
+	move	#9,-(sp)
+	trap	#1
+	addq.l	#6,sp
+
+.no_fpu:
 	; Print detected SuperVidel.
 
 	cmp.l	#-1,machine_supervidel
@@ -239,8 +264,34 @@ machine_fast_ram_text:
 machine_supervidel_text:
 	dc.b	'SuperVidel',0
 
+fpu_type_sfp004:
+	dc.b	'SFP004 FPU card',0
+	
+fpu_type_mc68881_or_mc68882:
+	dc.b	'MC68881/2 FPU',0
+	
+fpu_type_mc68881:
+	dc.b	'MC68881 FPU',0
+	
+fpu_type_mc68882:
+	dc.b	'MC68882 FPU',0
+	
+fpu_type_mc68040_internal:
+	dc.b	'MC68040 internal FPU',0
+	
+fpu_type_mc68060_internal:
+	dc.b	'MC68060 internal FPU',0
+
 	even
 
+fpu_type_table:
+	dc.l	fpu_type_sfp004
+	dc.l	fpu_type_mc68881_or_mc68882
+	dc.l	fpu_type_mc68881
+	dc.l	fpu_type_mc68882
+	dc.l	fpu_type_mc68040_internal
+	dc.l	fpu_type_mc68060_internal
+	
 machine_type_table:
 	dc.l	$00000000,machine_type_atari_st_text
 	dc.l	$00010000,machine_type_atari_ste_text
