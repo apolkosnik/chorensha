@@ -399,11 +399,48 @@ convert_sprite_to_drawing_code:
 ; ------------------------------------------------------------------------------
 ;
 ; a0.l = compiled sprites struct address.
-;
+; a1.l = screen_address
+; a2.l = background_address
 
 convert_sprite_to_restore_code:
 	movem.l	d0-a6,-(sp)
 
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+	; Tests.
+	
+	move.l	#512*2,d1
+	
+	moveq	#16-1,d7
+
+.lines_loop:
+	clr		d2
+
+	move	(a0)+,d0
+	
+.pixels_loop:
+	add		d0,d0
+	jcc		.skip_pixel
+	
+	move	(a2,d2.w),(a1,d2.w)
+
+.skip_pixel:
+	addq	#2,d2
+
+	tst		d0
+	jne		.pixels_loop
+	
+	add.l	d1,a2
+	add.l	d1,a1
+
+	dbf		d7,.lines_loop
+
+	rts
+
+	; Alternatives.
+	
 	clr.l	d0
 
 	jra		.loop
@@ -456,10 +493,6 @@ alternative1:
 .end:
 
 	;
-
-	movem.l	(sp)+,d0-a6
-
-	rts
 
 ; ------------------------------------------------------------------------------
 ;
