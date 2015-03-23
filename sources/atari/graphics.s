@@ -144,7 +144,7 @@ initialize_graphics:
 
 	move.l	display_screen_address,a0
 	add.l	#SCREEN_DISPLAY_OFFSET,a0
-	lea		background_image,a1
+	lea		background_image+SCREEN_DISPLAY_OFFSET,a1
 
 	move	#512+256-1,d7
 
@@ -967,7 +967,7 @@ text_bitmaps:
 	ds.l	32*2
 
 background_image:
-	ds.b	512*2*(512+256)
+	ds.b	SCREEN_BUFFER_SIZE
 
 color_translation_table:
 	ds		$10000
