@@ -455,128 +455,13 @@ convert_sprite_to_restore_code:
 
 	dbf		d7,.pixels_loop
 
+	move	#-1,(a2)+
+	
 	move.l	a2,free_compiled_objects_address
 	
 	movem.l	(sp)+,d0-a6
 
 	rts
-
-	; Tests.
-Test:
-	jra		.jump
-	
-.restore_loop:
-	add		d0,a1
-	add		d0,a2
-	
-	move	(a0)+,d0
-	jmp		.jump(pc,d0.w)
-
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-
-.jump:
-	move	(a0)+,d0
-	jpl		.restore_loop
-	
-	;
-	
-	move.l	#512*2,d1
-	
-	moveq	#16-1,d7
-
-.lines_loop:
-	clr		d2
-
-	move	(a0)+,d0
-	
-.pixels_loop:
-	add		d0,d0
-	jcc		.skip_pixel
-	
-	move	(a2,d2.w),(a1,d2.w)
-
-.skip_pixel:
-	addq	#2,d2
-
-	tst		d0
-	jne		.pixels_loop
-	
-	add.l	d1,a2
-	add.l	d1,a1
-
-	dbf		d7,.lines_loop
-
-	rts
-
-	; Alternatives.
-	
-	clr.l	d0
-
-	jra		.loop
-
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-	move.l	(a5)+,(a6)+
-
-.loop:
-	move.l	(a0)+,d0
-	lea		(a5,d0.w),a5
-	lea		(a6,d0.w*2),a6
-	swap	d0
-	jmp		.loop(pc,d0.w)
-
-alternative1:
-
-.next_line:
-	subq	#1,d7
-	jmi		.end
-
-	add.l	d1,a0
-	add.l	d2,a5
-	add.l	d3,a6
-
-	move.l	(a0)+,d0
-	jeq		.next_line
-
-.loop:
-	add.l	d0,d0
-	jcc		.no_clear
-
-	move	(a5)+,(a6)+
-
-	jra		.loop
-
-.no_clear:
-	jeq		.next_line
-
-	addq.l	#2,a5
-	addq.l	#2,a6
-
-	jra		.loop
-
-.end:
-
-	;
 
 ; ------------------------------------------------------------------------------
 ;
@@ -837,11 +722,23 @@ prepare_sprites:
 restore_sprites:
 	movem.l	d0-a6,-(sp)
 
-	move.l	work_sprite_infos_address,a0
+	move.l	work_sprite_infos_address,a3
+	lea		background_image,a4
+	move.l	work_screen_address,d1
+	
+	jra		.start
+
+.loop:
+	addq.l	#8,a3
+	move.l	(a3)+,a0
+	
+	move.l	d0,a2
+	sub.l	d1,d0
+	lea		(a4,d0.l),a1
 
 	jra		.jump
 	
-.restore_loop:
+.sprite_loop:
 	add		d0,a1
 	add		d0,a2
 	
@@ -867,7 +764,11 @@ restore_sprites:
 
 .jump:
 	move	(a0)+,d0
-	jpl		.restore_loop
+	jpl		.sprite_loop
+	
+.start:
+	move.l	(a3)+,d0
+	jne		.loop
 	
 	movem.l	(sp)+,d0-a6
 
