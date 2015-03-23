@@ -135,6 +135,9 @@ print_info_text:
 	cmp.l	#-1,machine_fpu
 	jeq		.no_fpu
 
+	tst		machine_fpu
+	jeq		.no_fpu
+
 	pea		separator_text
 	move	#9,-(sp)
 	trap	#1
