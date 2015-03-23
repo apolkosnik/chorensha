@@ -3,6 +3,7 @@
 	xdef release_graphics
 	xdef compile_sprite
 	xdef prepare_sprites
+	xdef restore_sprites
 	xdef draw_sprites
 	xdef update_background
 	xdef flip_screen
@@ -400,7 +401,7 @@ convert_sprite_to_drawing_code:
 ;
 ; a0.l = compiled sprites struct address.
 
-convert_sprite_to_restore_code:
+convert_sprite_to_restore_data:
 	movem.l	d0-a6,-(sp)
 
 	move.l	free_compiled_objects_address,a2
@@ -433,7 +434,7 @@ convert_sprite_to_restore_code:
 	
 .no_pixel:
 	tst		d1
-	jne		.skip_jump_offset
+	jeq		.skip_jump_offset
 	
 	move	d1,(a2)+
 	clr		d1
@@ -451,9 +452,9 @@ convert_sprite_to_restore_code:
 	clr		d1
 
 .skip_jump_offset2:
-	add		#512*2,d0
+	add		#(512-16)*2,d0
 
-	dbf		d7,.pixels_loop
+	dbf		d7,.lines_loop
 
 	move	#-1,(a2)+
 	
@@ -566,6 +567,8 @@ compile_sprite:
 
 	move.l	(sp),a0
 	jsr		convert_sprite_to_drawing_code
+	add.l	#16,a0
+	jsr		convert_sprite_to_restore_data
 
 	; Create horizontally flipped sprite.
 
@@ -592,7 +595,7 @@ compile_sprite:
 	addq.l	#4,a0
 	jsr		convert_sprite_to_drawing_code
 	add.l	#16,a0
-	jsr		convert_sprite_to_restore_code
+	jsr		convert_sprite_to_restore_data
 
 	; Create horizontally and vertically flipped sprite.
 
@@ -618,7 +621,7 @@ compile_sprite:
 	add.l	#12,a0
 	jsr		convert_sprite_to_drawing_code
 	add.l	#16,a0
-	jsr		convert_sprite_to_restore_code
+	jsr		convert_sprite_to_restore_data
 
 	; Create vertically flipped sprite.
 
@@ -645,7 +648,7 @@ compile_sprite:
 	addq.l	#8,a0
 	jsr		convert_sprite_to_drawing_code
 	add.l	#16,a0
-	jsr		convert_sprite_to_restore_code
+	jsr		convert_sprite_to_restore_data
 
 	movem.l	(sp)+,d0-a6
 
@@ -913,7 +916,7 @@ translated_palettes:
 	ds.l	16*16
 
 compiled_objects:
-	ds.b	$200000*2
+	ds.b	$300000
 
 sprite_color_count:
 	ds		1
