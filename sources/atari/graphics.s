@@ -442,7 +442,7 @@ convert_sprite_to_restore_code:
 	addq	#2,d0
 
 .next_pixel:
-	dbf		d6,pixels_loop
+	dbf		d6,.pixels_loop
 	
 	tst		d1
 	jeq		.skip_jump_offset2
@@ -453,7 +453,7 @@ convert_sprite_to_restore_code:
 .skip_jump_offset2:
 	add		#512*2,d0
 
-	dbf		d7,pixels_loop
+	dbf		d7,.pixels_loop
 
 	move.l	a2,free_compiled_objects_address
 	
@@ -828,6 +828,47 @@ prepare_sprites:
 
 	move	(sp)+,sr
 
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+
+restore_sprites:
+	movem.l	d0-a6,-(sp)
+
+	move.l	work_sprite_infos_address,a0
+
+	jra		.jump
+	
+.restore_loop:
+	add		d0,a1
+	add		d0,a2
+	
+	move	(a0)+,d0
+	jmp		.jump(pc,d0.w)
+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+
+.jump:
+	move	(a0)+,d0
+	jpl		.restore_loop
+	
 	movem.l	(sp)+,d0-a6
 
 	rts
