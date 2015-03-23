@@ -673,7 +673,7 @@ prepare_sprites:
 	add.l	d0,a2
 
 	lea		translated_palettes,a3
-	move.l	work_sprite_infos_address,a4
+	move.l	work_sprite_infos_address_new,a4
 
 	move.l	a0,d7
 	sub.l	#SPRITE_DATA_TABLE,d7
@@ -725,7 +725,7 @@ prepare_sprites:
 restore_sprites:
 	movem.l	d0-a6,-(sp)
 
-	move.l	work_sprite_infos_address,a3
+	move.l	work_sprite_infos_address_old,a3
 	lea		background_image,a4
 	move.l	work_screen_address,d1
 	
@@ -782,7 +782,7 @@ restore_sprites:
 draw_sprites:
 	movem.l	d0-a6,-(sp)
 
-	move.l	work_sprite_infos_address,a0
+	move.l	work_sprite_infos_address_new,a0
 
 	jra		.start
 
@@ -800,6 +800,10 @@ draw_sprites:
 .start:
 	move.l	(a0)+,d0
 	jne		.loop
+
+	move.l	work_sprite_infos_address_old,d0
+	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
+	move.l	d0,work_sprite_infos_address_new
 
 	movem.l	(sp)+,d0-a6
 
@@ -833,9 +837,13 @@ flip_screen:
 	move	display_background_position,work_background_position
 	move	d0,display_background_position
 
-	move.l	work_sprite_infos_address,d0
-	move.l	display_sprite_infos_address,work_sprite_infos_address
-	move.l	d0,display_sprite_infos_address
+	move.l	work_sprite_infos_address_old,d0
+	move.l	display_sprite_infos_address_old,work_sprite_infos_address_old
+	move.l	d0,display_sprite_infos_address_old
+
+	move.l	work_sprite_infos_address_new,d0
+	move.l	display_sprite_infos_address_new,work_sprite_infos_address_new
+	move.l	d0,display_sprite_infos_address_new
 
 	move	display_background_position,d0
 	move.l	display_screen_address,d1
@@ -863,11 +871,17 @@ background_image_filename:
 	data
 ; ------------------------------------------------------------------------------
 
-display_sprite_infos_address:
+display_sprite_infos_address_new:
 	dc.l	sprite_infos1
 
-work_sprite_infos_address:
+display_sprite_infos_address_old:
 	dc.l	sprite_infos2
+
+work_sprite_infos_address_new:
+	dc.l	sprite_infos3
+
+work_sprite_infos_address_old:
+	dc.l	sprite_infos4
 
 free_compiled_objects_address:
 	dc.l	compiled_objects
@@ -901,6 +915,12 @@ sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_re
 	ds.l	4*512
 
 sprite_infos2: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+	ds.l	4*512
+
+sprite_infos3: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+	ds.l	4*512
+
+sprite_infos4: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
 	ds.l	4*512
 
 text_bitmaps:
