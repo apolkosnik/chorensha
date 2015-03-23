@@ -142,6 +142,43 @@ initialize_graphics:
 
 	dbf		d7,.copy_loop1
 
+	move.l	display_screen_address,a0
+	add.l	#SCREEN_DISPLAY_OFFSET,a0
+	lea		background_image,a1
+
+	move	#512+256-1,d7
+
+.copy_loop2:
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*2(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*3(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*4(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*5(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*6(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*7(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*8(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*9(a1)
+	movem.l	(a0)+,d0-d6/a3-a6
+	movem.l	d0-d6/a3-a6,11*4*10(a1)
+	movem.l	(a0)+,d0-d6
+	movem.l	d0-d6,11*4*11(a1)
+
+	add.l	#256*2,a0
+	add.l	#256*2*2,a1
+
+	dbf		d7,.copy_loop2
+
 	; Build color translation table.
 
 	lea		color_translation_table,a0
@@ -772,6 +809,9 @@ restore_sprites:
 .start:
 	move.l	(a3)+,d0
 	jne		.loop
+
+	move.l	work_sprite_infos_address_old,a0	
+	clr.l	(a0)
 	
 	movem.l	(sp)+,d0-a6
 
@@ -927,7 +967,7 @@ text_bitmaps:
 	ds.l	32*2
 
 background_image:
-	ds.b	256*2*(512+256)
+	ds.b	512*2*(512+256)
 
 color_translation_table:
 	ds		$10000
