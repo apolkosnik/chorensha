@@ -696,9 +696,6 @@ compile_sprite:
 prepare_sprites:
 	movem.l	d0-a6,-(sp)
 
-	move	sr,-(sp)
-	move	#$2700,sr
-
 	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
 	lea		L_00EB8000,a1 ; Sprite VRAM.
 
@@ -750,8 +747,6 @@ prepare_sprites:
 
 .skip_all:
 	clr.l	(a4) ; End marker.
-
-	move	(sp)+,sr
 
 	movem.l	(sp)+,d0-a6
 
