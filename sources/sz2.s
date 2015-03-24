@@ -2812,6 +2812,12 @@ L_00021602:
 	ifd __ATARI__
 
 	jsr		prepare_sprites
+	
+	jsr		update_background
+	jsr		translate_palettes
+	jsr		restore_sprites
+	jsr		draw_sprites
+	jsr		flip_screen
 
 	endif
 

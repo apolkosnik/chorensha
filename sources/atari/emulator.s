@@ -49,11 +49,13 @@ vbl_handler:
 	move.b	display_window_address+2,$ffff8203.w
 	move.b	display_window_address+3,$ffff820d.w
 
-	jsr		update_background
-	jsr		translate_palettes
-	jsr		restore_sprites
-	jsr		draw_sprites
-	jsr		flip_screen
+	; Moved to sz2.s!
+	
+;	jsr		update_background
+;	jsr		translate_palettes
+;	jsr		restore_sprites
+;	jsr		draw_sprites
+;	jsr		flip_screen
 
 	addq	#1,vbl_wait_counter
 
