@@ -881,7 +881,17 @@ flip_screen:
 	move.l	d0,display_sprite_infos_address_new
 
 	move	display_background_position,d0
+
+	ifd __HATARI__
+
+	move.l	work_screen_address,d1
+
+	else
+
 	move.l	display_screen_address,d1
+
+	endif
+
 	add.l	#SCREEN_DISPLAY_OFFSET,d1
 	swap	d0
 	clr		d0
