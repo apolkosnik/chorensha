@@ -56,7 +56,7 @@ _loop:
 ;	jsr		<send_rle_data
 	jsr		<draw_masks
 
-	jsr		<send_screen_buffer2
+	jsr		<send_screen_buffer
 
 	jmp		<_loop
 
@@ -589,20 +589,7 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 send_screen_buffer:
-	move	#screen_buffer1+(16+256+16)/8/3*16,r4
-
-	do		#(16+256+16)/8/3*200,_loop
-
-	jclr	#1,x:m_hsr,*
-	movep	y:(r4)+,x:m_htx
-_loop:
-
-	rts
-
-; -----------------------------------------------------------------------------
-
-send_screen_buffer2:
-	move	#screen_buffer1+(16+256+16)/8/3*16,r4
+	move	#screen_buffer1+(16+256+16)/8/3*(16+20),r4
 	move	#<sprite_convert_shifts,r5
 
 	move	#>$ff,x1

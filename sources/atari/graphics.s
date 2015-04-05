@@ -951,6 +951,7 @@ draw_masks:
 
 	move.l	work_sprite_infos_address_new,a0
 	move.l	physbase,a1
+	lea		8(a1),a1
 
 	tst.l	(a0)
 	jeq		.skip

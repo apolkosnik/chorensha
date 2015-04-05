@@ -117,7 +117,7 @@ initialize_machine:
 
 	dbra	d7,.copy_palette_loop
 
-	clr.l	$ffff9800.w
+;	clr.l	$ffff9800.w ; Fixme!
 
 	move	$ffff8900.w,old_8900
 	move	$ffff8920.w,old_8920
@@ -152,6 +152,8 @@ initialize_machine:
 	move.b	$ffff8201.w,old_screen_address+1
 	move.b	$ffff8203.w,old_screen_address+2
 	move.b	$ffff820d.w,old_screen_address+3
+
+	rem ; Fixme!
 
 	move.b	display_screen_address+1,$ffff8201.w
 	move.b	display_screen_address+2,$ffff8203.w
@@ -201,6 +203,8 @@ initialize_machine:
 
 .skip_vga_mode:
 	move	#(256*2-256),$ffff820e.w
+
+	erem
 
 	clr.b	$fffffa07.w
 	clr.b	$fffffa09.w

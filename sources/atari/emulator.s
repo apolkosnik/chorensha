@@ -45,9 +45,9 @@ vbl_handler:
 	rts
 
 .no_exit_request:
-	move.b	display_window_address+1,$ffff8201.w
-	move.b	display_window_address+2,$ffff8203.w
-	move.b	display_window_address+3,$ffff820d.w
+;	move.b	display_window_address+1,$ffff8201.w ; Fixme!
+;	move.b	display_window_address+2,$ffff8203.w
+;	move.b	display_window_address+3,$ffff820d.w
 
 	; Moved to sz2.s!
 	
