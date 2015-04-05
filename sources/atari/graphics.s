@@ -5,6 +5,7 @@
 	xdef prepare_sprites
 	xdef restore_sprites
 	xdef draw_sprites
+	xdef draw_masks
 	xdef update_background
 	xdef flip_screen
 	xdef translate_palettes
@@ -29,6 +30,14 @@ initialize_graphics:
 	jeq		*-6
 
 	move.l	#MAX_NUMBER_OF_SPRITES,$ffffa204.w
+
+	; Physbase.
+
+	move	#2,-(sp)
+	trap	#14
+	addq.l	#2,sp
+
+	move.l	d0,physbase
 
 	; Allocate screen buffers (16 bytes boundary, ST-RAM only).
 
@@ -937,6 +946,49 @@ draw_sprites:
 
 ; ------------------------------------------------------------------------------
 
+draw_masks:
+	movem.l	d0-a6,-(sp)
+
+	move.l	work_sprite_infos_address_new,a0
+	move.l	physbase,a1
+
+	tst.l	(a0)
+	jeq		.skip
+
+	btst	#0,$ffffa202.w
+	jeq		*-6
+
+	lea		$ffffa204+2.w,a0
+	move.l	#24,d0
+
+	move	#200-1,d7
+
+.lines_loop:
+	rept (16+256+16)/8/3/2
+
+	move	(a0),(a1)
+	move	(a0),8(a1)
+	move	(a0),16(a1)
+	add.l	d0,a1
+
+	endr
+
+	lea		(320-(16+256+16))/2(a1),a1
+
+	dbf		d7,.lines_loop
+
+.skip:
+
+	move.l	work_sprite_infos_address_old,d0
+	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
+	move.l	d0,work_sprite_infos_address_new
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+
 update_background:
 	movem.l	d0-d1,-(sp)
 
@@ -1025,6 +1077,9 @@ free_compiled_objects_address:
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
+
+physbase:
+	ds.l	1
 
 allocated_screen_address:
 	ds.l	1

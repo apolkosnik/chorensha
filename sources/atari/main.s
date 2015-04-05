@@ -61,6 +61,8 @@ start:
 	btst	#0,$ffffa202.w
 	jeq		*-6
 
+	tst.l	$ffffa204.w
+
 	; Print info text.
 
 	jsr		print_info_text
