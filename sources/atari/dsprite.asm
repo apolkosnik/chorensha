@@ -65,10 +65,18 @@ _loop:
 receive_sprite_masks:
 	move	#packed_sprite_masks1,r0
 
-	jclr	#0,x:m_hsr,*
-	movep	x:m_hrx,x0
+	move	#packed_sprite_masks2,r4
 
-	do		x0,_loop ; 1885 sprites.
+	move	#>PACKED_SPRITES1_LIMIT,x0
+
+	jclr	#0,x:m_hsr,*
+	movep	x:m_hrx,x1
+
+	tfr		x1,a
+	sub		x0,a
+	jcc		_extended_receive
+
+	do		x1,_loop
 
 	do		#11,_loop2
 
@@ -80,6 +88,31 @@ _loop2:
 _loop:
 	
 	rts
+
+_extended_receive:
+	do		#PACKED_SPRITES1_LIMIT,_loop3
+
+	do		#11,_loop4
+
+	jclr	#0,x:m_hsr,*
+	movep	x:m_hrx,x:(r0)+
+_loop4:
+
+	nop
+_loop3:
+
+	do		a1,_loop5
+
+	do		#11,_loop6
+
+	jclr	#0,x:m_hsr,*
+	movep	x:m_hrx,y:(r4)+
+_loop6:
+
+	nop
+_loop5:
+
+	rts	
 
 ; -----------------------------------------------------------------------------
 

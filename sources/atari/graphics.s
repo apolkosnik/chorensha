@@ -25,6 +25,9 @@ MAX_NUMBER_OF_SPRITES=1885
 initialize_graphics:
 	; Prepare to send all sprite masks to the DSP.
 
+	btst	#1,$ffffa202.w
+	jeq		*-6
+
 	move.l	#MAX_NUMBER_OF_SPRITES,$ffffa204.w
 
 	; Allocate screen buffers (16 bytes boundary, ST-RAM only).
@@ -785,11 +788,19 @@ prepare_sprites:
 	jeq		.skip_all
 
 	lsr		#3,d7
+
+	btst	#1,$ffffa202.w
+	jeq		*-6
+
+	move.l	d7,$ffffa204.w ; Send number of sprite infos to be sent to the DSP.
+
 	subq	#1,d7
 
 .sprites_loop:
 	subq.l	#8,a0
 	movem	(a0),d0-d3
+
+	move	d1,d5
 
 	lea		(a2,d0.w*2),a5
 	swap	d1
@@ -804,10 +815,19 @@ prepare_sprites:
 	lea		4(a3,d3.w*4),a5
 	move.l	a5,(a4)+ ; Palette address.
 
+	move	d2,d1
+
 	move	d2,d3
 	and.l	#$ff,d3
 	lsl.l	#2+3+2,d3
 	lea		(a1,d3.l),a5
+
+	and		#$c000,d1
+	or		32(a5),d1
+	move	d1,$ffffa204+2.w ; Flip info + sprite ID.
+	move	d0,$ffffa204+2.w ; X position.
+	move	d5,$ffffa204+2.w ; Y position.
+
 	rol		#2,d2
 	and		#$3,d2
 	lea		(a5,d2.w*4),a5
