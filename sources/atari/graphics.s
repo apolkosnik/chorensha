@@ -45,6 +45,9 @@ initialize_graphics:
 	add.l	#SCREEN_BUFFER_SIZE,d0
 	move.l	d0,work_screen_address
 
+	add.l	#SCREEN_DISPLAY_OFFSET,d0
+	move.l	d0,display_window_address
+
 	; Load background graphics.
 
 	clr		-(sp)

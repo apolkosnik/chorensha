@@ -41,6 +41,26 @@ start:
 
 	jsr		detect_machine
 
+	; Load DSP program.
+
+	move.l	#16000,-(sp)
+	move.l	#16000,-(sp)
+	move	#107,-(sp)
+	trap	#14
+	add		#10,sp
+
+	pea		dsp_program_buffer
+	move	#3,-(sp)
+	pea		dsp_program_file_name
+	move	#108,-(sp)
+	trap	#14
+	add		#12,sp
+
+	; DSP synchronization.
+
+	btst	#0,$ffffa202.w
+	jeq		*-6
+
 	; Print info text.
 
 	jsr		print_info_text
@@ -279,6 +299,9 @@ fpu_type_mc68040_internal:
 fpu_type_mc68060_internal:
 	dc.b	'MC68060 internal FPU',0
 
+dsp_program_file_name:
+	dc.b	'dsprite.lod',0
+
 	even
 
 fpu_type_table:
@@ -301,6 +324,9 @@ machine_type_table:
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
+
+dsp_program_buffer:
+	ds.l	10000
 
 old_stack_address:
 	ds.l	1
