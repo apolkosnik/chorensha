@@ -16,12 +16,17 @@
 
 SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
+MAX_NUMBER_OF_SPRITES=1885
 
 ; ------------------------------------------------------------------------------
 	text
 ; ------------------------------------------------------------------------------
 
 initialize_graphics:
+	; Prepare to send all sprite masks to the DSP.
+
+	move.l	#MAX_NUMBER_OF_SPRITES,$ffffa204.w
+
 	; Allocate screen buffers (16 bytes boundary, ST-RAM only).
 
 	move	#0,-(sp)
@@ -505,6 +510,59 @@ convert_sprite_to_restore_data:
 	rts
 
 ; ------------------------------------------------------------------------------
+
+build_and_send_sprite_mask_to_dsp:
+	movem.l	d0-a6,-(sp)
+
+	lea		sprite_matrix,a0
+	lea		sprite_mask_bitmap,a1
+
+	move	#16-1,d7
+
+.loop:
+	clr		d0
+
+	move	#16-1,d6
+
+.loop2:
+	tst.b	(a0)+
+	jeq		.no_pixel
+
+	bset	d6,d0
+
+.no_pixel:
+	dbf		d6,.loop2
+
+	move	d0,(a1)+
+
+	dbf		d7,.loop
+
+	; Send packed mask to DSP.
+
+	lea		$ffffa204.w,a0
+	lea		sprite_mask_bitmap,a1
+
+	rept 5
+
+	move.l	(a1)+,d0
+	move	d0,d1
+	lsr.l	#8,d0
+	move.l	d0,(a0)
+	swap	d1
+	move	(a1)+,d1
+	move.l	d1,(a0)
+
+	endr
+
+	move	(a1)+,d0
+	lsl.l	#8,d0
+	move.l	d0,(a0)
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
 ;
 ; d0.l = original sprite data address.
 ;
@@ -582,6 +640,12 @@ compile_sprite:
 	move.b	d2,(a1)+
 
 	dbf		d7,.lines_loop1
+
+	; Send sprite mask to DSP.
+
+	jsr		build_and_send_sprite_mask_to_dsp
+
+	; Palette color counting.
 
 	lea		sprite_colors_count+2,a0
 	lea		sprite_color_to_register_table+2,a1
@@ -689,6 +753,10 @@ compile_sprite:
 	jsr		convert_sprite_to_drawing_code
 	add.l	#16,a0
 	jsr		convert_sprite_to_restore_data
+
+	addq.l	#8,a0
+	move	sprite_count,(a0)
+	addq	#1,sprite_count
 
 	movem.l	(sp)+,d0-a6
 
@@ -997,6 +1065,12 @@ sprite_color_to_register_table:
 
 sprite_matrix:
 	ds.b	16*16
+
+sprite_mask_bitmap:
+	ds		16
+
+sprite_count:
+	ds		1
 
 ; ------------------------------------------------------------------------------
 	end
