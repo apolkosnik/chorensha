@@ -272,8 +272,7 @@ draw_inverted_masks:
 	push	a1
 
 	and		y0,a
-
-	cmp		x0,a a1,x0
+	sub		x0,a a1,x0
 
 	jcc		<_masks2
 
@@ -291,6 +290,7 @@ draw_inverted_masks:
 	jmp		<_skip
 
 _masks2:
+	move	a1,x0
 	mpy		x0,x1,a
 	move	a0,a
 	ror		a
@@ -481,8 +481,7 @@ draw_masks:
 	push	a1
 
 	and		y0,a
-
-	cmp		x0,a a1,x0
+	sub		x0,a a1,x0
 
 	jcc		<_masks2
 
@@ -500,12 +499,13 @@ draw_masks:
 	jmp		<_skip
 
 _masks2:
+	move	a1,x0
 	mpy		x0,x1,a
 	move	a0,a
 	ror		a
 
 	move	#<packed_sprite_masks2,r6
-	move	a0,n6
+	move	a1,n6
 	nop
 	move	(r6)+n6
 
