@@ -44,19 +44,13 @@ main:
 _loop:
 	jsr		<receive_sprite_infos
 
-;	move	#>$ffffff,x0
-;	jsr		<set_screen_buffer ; For debugging only!
-
 	jsr		<draw_inverted_masks
 	jsr		<create_rle_data
 
-;	move	#0,x0
-;	jsr		<set_screen_buffer ; For debugging only!
-
-;	jsr		<send_rle_data
+	jsr		<send_rle_data
 	jsr		<draw_masks
 
-	jsr		<send_screen_buffer
+;	jsr		<send_screen_buffer
 
 	jmp		<_loop
 
@@ -381,7 +375,7 @@ _loop:
 
 create_rle_data:
 	move	#screen_buffer1+(16+256+16)/8/3*16,r4
-	move	#rle_buffer2,r5
+	move	#rle_buffer1,r5
 
 	clr		b
 	move	b1,x0
@@ -445,14 +439,28 @@ _next_line:
 _loop:
 
 	clr		b
-	move	b1,y:(r5)+
-	move	b1,y:(r5)
+	move	b1,y:(r5)+ ; Offset.
+	move	b1,y:(r5)+ ; Number of pixels.
+
+	move	#rle_buffer1,x0
+	move	r5,a
+	sub		x0,a
+	move	a1,y:rle_length1
 
 	rts
 
 ; -----------------------------------------------------------------------------
 
 send_rle_data:
+	move	#rle_buffer1,r4
+
+	move	y:rle_length1,x0
+
+	do		x0,_loop
+
+	jclr	#1,x:m_hsr,*
+	movep	y:(r4)+,x:m_htx
+_loop:
 
 	rts
 
@@ -593,43 +601,6 @@ _loop:
 	rts
 
 ; -----------------------------------------------------------------------------
-
-send_screen_buffer:
-	move	#screen_buffer1+(16+256+16)/8/3*(16+20),r4
-	move	#<sprite_convert_shifts,r5
-
-	move	#>$ff,x1
-	move	y:(r4)+,y0
-	move	y:(r5)+,y1
-
-	do		#(16+256+16)/8/3/2*200,_loop
-
-	mpy		y0,y1,a
-	move	a0,x0
-	mpy		x0,y1,b y:(r4)+,x0
-
-	jclr	#1,x:m_hsr,*
-	movep	a1,x:m_htx
-	
-	move	y:(r5)-,y1
-	mpy		x0,y1,b b1,x0
-	and		x1,b
-	or		x0,b
-
-	jclr	#1,x:m_hsr,*
-	movep	b1,x:m_htx
-	
-	move	b0,x0
-	move	y:(r5)+,y1
-	mpy		x0,y1,a y:(r4)+,y0
-
-	jclr	#1,x:m_hsr,*
-	movep	a1,x:m_htx
-_loop:
-	
-	rts
-
-; -----------------------------------------------------------------------------
 	org	x:$0
 ; -----------------------------------------------------------------------------
 
@@ -730,10 +701,16 @@ sprite_convert_shifts:
 packed_sprite_masks2:
 	ds 		(MAX_PACKED_SPRITES-PACKED_SPRITES1_LIMIT)*11
 
+rle_length1:
+	ds		1
+
 rle_buffer1: ; Needs to be in front of the screen buffer!
 	ds		1300
 screen_buffer1:
 	ds		(16+256+16)*(16+256+16)/8/3
+
+rle_length2:
+	ds		1
 
 rle_buffer2: ; Needs to be in front of the screen buffer!
 	ds		1300
@@ -743,4 +720,40 @@ screen_buffer2:
 ; -----------------------------------------------------------------------------
 	end
 ; -----------------------------------------------------------------------------
+
+send_screen_buffer:
+	move	#screen_buffer1+(16+256+16)/8/3*(16+20),r4
+	move	#<sprite_convert_shifts,r5
+
+	move	#>$ff,x1
+	move	y:(r4)+,y0
+	move	y:(r5)+,y1
+
+	do		#(16+256+16)/8/3/2*200,_loop
+
+	mpy		y0,y1,a
+	move	a0,x0
+	mpy		x0,y1,b y:(r4)+,x0
+
+	jclr	#1,x:m_hsr,*
+	movep	a1,x:m_htx
+	
+	move	y:(r5)-,y1
+	mpy		x0,y1,b b1,x0
+	and		x1,b
+	or		x0,b
+
+	jclr	#1,x:m_hsr,*
+	movep	b1,x:m_htx
+	
+	move	b0,x0
+	move	y:(r5)+,y1
+	mpy		x0,y1,a y:(r4)+,y0
+
+	jclr	#1,x:m_hsr,*
+	movep	a1,x:m_htx
+_loop:
+	
+	rts
+
 

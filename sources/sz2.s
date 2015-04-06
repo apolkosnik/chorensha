@@ -2815,9 +2815,10 @@ L_00021602:
 	
 	jsr		update_background
 	jsr		translate_palettes
+	jsr		restore_sprites_dsp ; Fixme!
 ;	jsr		restore_sprites
-;	jsr		draw_sprites
-	jsr		draw_masks ; Fixme!
+	jsr		draw_sprites
+;	jsr		draw_sprites_dsp ; Fixme!
 	jsr		flip_screen
 
 	endif

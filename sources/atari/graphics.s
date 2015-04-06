@@ -4,8 +4,9 @@
 	xdef compile_sprite
 	xdef prepare_sprites
 	xdef restore_sprites
+	xdef restore_sprites_dsp
 	xdef draw_sprites
-	xdef draw_masks
+	xdef draw_sprites_dsp
 	xdef update_background
 	xdef flip_screen
 	xdef translate_palettes
@@ -914,6 +915,33 @@ restore_sprites:
 
 ; ------------------------------------------------------------------------------
 
+restore_sprites_dsp:
+	movem.l	d0-a6,-(sp)
+
+	move.l	work_sprite_infos_address_new,a0
+	tst.l	(a0)
+	jeq		.skip
+
+	btst	#0,$ffffa202.w
+	jeq		*-6
+
+	lea		$ffffa204.w,a0
+
+.loop:
+	move.l	(a0),d0
+	move	2(a0),d1
+	jne		.loop
+
+.skip:
+	move.l	work_sprite_infos_address_old,a0	
+	clr.l	(a0)
+	
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+
 draw_sprites:
 	movem.l	d0-a6,-(sp)
 
@@ -946,7 +974,7 @@ draw_sprites:
 
 ; ------------------------------------------------------------------------------
 
-draw_masks:
+draw_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
 	move.l	work_sprite_infos_address_new,a0
@@ -979,7 +1007,6 @@ draw_masks:
 	dbf		d7,.lines_loop
 
 .skip:
-
 	move.l	work_sprite_infos_address_old,d0
 	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
 	move.l	d0,work_sprite_infos_address_new
