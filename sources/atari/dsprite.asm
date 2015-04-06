@@ -395,7 +395,7 @@ create_rle_data:
 
 	do		#(16+256+16)/8/3,_loop2
 
-	tst		a x0,y:(r4)+
+	tst		a a0,y:(r4)+
 	jeq		<_skip_empty_data
 
 	do		#24,_loop3
