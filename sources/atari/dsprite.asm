@@ -391,9 +391,10 @@ create_rle_data:
 
 	do		#240,_loop
 
+	move	y:(r4),a
+
 	do		#(16+256+16)/8/3,_loop2
 
-	move	y:(r4),a
 	tst		a x0,y:(r4)+
 	jeq		<_skip_empty_data
 
@@ -419,6 +420,8 @@ _next_pixel:
 	add		x1,b
 _loop3:
 	
+	jmp		<_skip_non_empty_data
+
 _skip_empty_data:
 	bclr	#0,x0
 	jcc		<_next_word
@@ -427,6 +430,9 @@ _skip_empty_data:
 
 _next_word:
 	add		y0,b
+
+_skip_non_empty_data:
+	move	y:(r4),a
 _loop2:
 
 	bclr	#0,x0
