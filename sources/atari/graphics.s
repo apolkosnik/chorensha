@@ -798,15 +798,14 @@ prepare_sprites:
 	sub.l	#SPRITE_DATA_TABLE,d7
 	jeq		.skip_all
 
-	btst	#1,$ffffa202.w
+	btst	#3,$ffffa202.w
 	jeq		*-6
+
+	bset	#3,$ffffa200.w
 
 	lsr		#3,d7
 	move.l	d7,$ffffa204.w ; Send number of sprite infos to be sent to the DSP.
 	subq	#1,d7
-
-	btst	#1,$ffffa202.w
-	jeq		*-6
 
 .sprites_loop:
 	subq.l	#8,a0
@@ -923,9 +922,11 @@ restore_sprites_dsp:
 	tst.l	(a0)
 	jeq		.skip
 
-	btst	#0,$ffffa202.w
-	jeq		*-6
+	btst	#3,$ffffa202.w
+	jne		*-6
 
+	bclr	#3,$ffffa200.w
+	
 	lea		$ffffa204.w,a0
 	lea		$ffffa204+2.w,a1
 	lea		background_image+16*256*2*2,a2

@@ -30,6 +30,7 @@ peek	macro	register
 main:
 	movep	#1,x:m_pbc
 ;	movep	#0,x:m_bcr
+	bclr	#m_hf2,x:m_hcr
 
 	move	#$4000,r7
 
@@ -112,6 +113,9 @@ receive_sprite_infos:
 	move	#sprite_infos,r0
 
 	move	#>$ffff,x1
+
+	bset	#m_hf2,x:m_hcr ; DSP <-> CPU synchronization.
+	jclr	#m_hf0,x:m_hsr,*
 
 	jclr	#0,x:m_hsr,*
 	movep	x:m_hrx,x0
@@ -453,6 +457,9 @@ send_rle_data:
 	move	#rle_buffer,r4
 
 	move	y:rle_length,x0
+
+	bclr	#m_hf2,x:m_hcr ; DSP <-> CPU synchronization.
+	jset	#m_hf0,x:m_hsr,*
 
 	do		x0,_loop
 
