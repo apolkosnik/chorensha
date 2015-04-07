@@ -918,7 +918,7 @@ restore_sprites:
 restore_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
-	move.l	work_sprite_infos_address_new,a0
+	move.l	work_sprite_infos_address_old,a0
 	tst.l	(a0)
 	jeq		.skip
 
@@ -926,11 +926,30 @@ restore_sprites_dsp:
 	jeq		*-6
 
 	lea		$ffffa204.w,a0
+	lea		$ffffa204+2.w,a1
+	lea		background_image,a2
+	move.l	work_screen_address,a3
 
-.loop:
+	jra		.start
+
+	rept 16+256+16
+
+	move	(a2)+,(a3)+
+
+	endr
+
+.start:
 	move.l	(a0),d0
-	move	2(a0),d1
-	jne		.loop
+	lea		(a2,d0.l*2),a2
+	lea		(a3,d0.l*2),a3
+
+	move	(a1),d1
+	jeq		.skip
+
+	neg		d1
+
+	jmp		.start(pc,d1.w*2)
+
 
 .skip:
 	move.l	work_sprite_infos_address_old,a0	

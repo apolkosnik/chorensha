@@ -375,7 +375,7 @@ _loop:
 
 create_rle_data:
 	move	#screen_buffer1+(16+256+16)/8/3*16,r4
-	move	#rle_buffer1,r5
+	move	#rle_buffer,r5
 
 	clr		b
 	move	b1,x0
@@ -442,19 +442,19 @@ _loop:
 	move	b1,y:(r5)+ ; Offset.
 	move	b1,y:(r5)+ ; Number of pixels.
 
-	move	#rle_buffer1,x0
+	move	#rle_buffer,x0
 	move	r5,a
 	sub		x0,a
-	move	a1,y:rle_length1
+	move	a1,y:rle_length
 
 	rts
 
 ; -----------------------------------------------------------------------------
 
 send_rle_data:
-	move	#rle_buffer1,r4
+	move	#rle_buffer,r4
 
-	move	y:rle_length1,x0
+	move	y:rle_length,x0
 
 	do		x0,_loop
 
@@ -701,19 +701,14 @@ sprite_convert_shifts:
 packed_sprite_masks2:
 	ds 		(MAX_PACKED_SPRITES-PACKED_SPRITES1_LIMIT)*11
 
-rle_length1:
+rle_length:
 	ds		1
 
-rle_buffer1: ; Needs to be in front of the screen buffer!
-	ds		1300
 screen_buffer1:
 	ds		(16+256+16)*(16+256+16)/8/3
 
-rle_length2:
-	ds		1
-
-rle_buffer2: ; Needs to be in front of the screen buffer!
-	ds		1300
+rle_buffer: ; Needs to be in front of the screen buffer 1!
+	ds		1300*2
 screen_buffer2:
 	ds		(16+256+16)*(16+256+16)/8/3
 
