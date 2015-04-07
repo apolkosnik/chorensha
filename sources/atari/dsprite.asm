@@ -3,7 +3,7 @@
 	include	'ioequ.inc'
 
 MAX_PACKED_SPRITES equ 1900
-PACKED_SPRITES1_LIMIT equ 1300
+PACKED_SPRITES1_LIMIT equ 1300+21
 
 push	macro	register
         move    register,y:-(r7)
@@ -29,7 +29,7 @@ peek	macro	register
 
 main:
 	movep	#1,x:m_pbc
-	movep	#0,x:m_bcr
+;	movep	#0,x:m_bcr
 
 	move	#$4000,r7
 
@@ -43,10 +43,8 @@ main:
 
 _loop:
 	jsr		<receive_sprite_infos
-
 	jsr		<draw_inverted_masks
 	jsr		<create_rle_data
-
 	jsr		<send_rle_data
 	jsr		<draw_masks
 
@@ -704,13 +702,14 @@ packed_sprite_masks2:
 rle_length:
 	ds		1
 
+rle_buffer: ; Needs to be in front of the screen buffer 1!
+;	ds		1300*2
+	ds		6200+340
 screen_buffer1:
 	ds		(16+256+16)*(16+256+16)/8/3
 
-rle_buffer: ; Needs to be in front of the screen buffer 1!
-	ds		1300*2
-screen_buffer2:
-	ds		(16+256+16)*(16+256+16)/8/3
+;screen_buffer2:
+;	ds		(16+256+16)*(16+256+16)/8/3
 
 ; -----------------------------------------------------------------------------
 	end

@@ -792,19 +792,21 @@ prepare_sprites:
 
 	lea		translated_palettes,a3
 	move.l	work_sprite_infos_address_new,a4
+	lea		$ffffa204+2.w,a6
 
 	move.l	a0,d7
 	sub.l	#SPRITE_DATA_TABLE,d7
 	jeq		.skip_all
 
-	lsr		#3,d7
-
 	btst	#1,$ffffa202.w
 	jeq		*-6
 
+	lsr		#3,d7
 	move.l	d7,$ffffa204.w ; Send number of sprite infos to be sent to the DSP.
-
 	subq	#1,d7
+
+	btst	#1,$ffffa202.w
+	jeq		*-6
 
 .sprites_loop:
 	subq.l	#8,a0
@@ -825,18 +827,17 @@ prepare_sprites:
 	lea		4(a3,d3.w*4),a5
 	move.l	a5,(a4)+ ; Palette address.
 
-	move	d2,d1
-
-	move	d2,d3
-	and.l	#$ff,d3
+	move.l	#$ff,d3
+	and.l	d2,d3
 	lsl.l	#2+3+2,d3
 	lea		(a1,d3.l),a5
 
+	move	d2,d1
 	and		#$c000,d1
 	or		32(a5),d1
-	move	d1,$ffffa204+2.w ; Flip info + sprite ID.
-	move	d0,$ffffa204+2.w ; X position.
-	move	d5,$ffffa204+2.w ; Y position.
+	move	d1,(a6) ; Flip info + sprite ID -> DSP.
+	move	d0,(a6) ; X position -> DSP.
+	move	d5,(a6) ; Y position -> DSP.
 
 	rol		#2,d2
 	and		#$3,d2
@@ -918,7 +919,7 @@ restore_sprites:
 restore_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
-	move.l	work_sprite_infos_address_old,a0
+	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
 	jeq		.skip
 
@@ -952,7 +953,7 @@ restore_sprites_dsp:
 	jmp		.start(pc,d1.w)
 
 .skip:
-	move.l	work_sprite_infos_address_old,a0	
+	move.l	work_sprite_infos_address_new,a0	
 	clr.l	(a0)
 	
 	movem.l	(sp)+,d0-a6
@@ -983,9 +984,9 @@ draw_sprites:
 	move.l	(a0)+,d0
 	jne		.loop
 
-	move.l	work_sprite_infos_address_old,d0
-	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
-	move.l	d0,work_sprite_infos_address_new
+;	move.l	work_sprite_infos_address_old,d0 ; Fixme!
+;	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
+;	move.l	d0,work_sprite_infos_address_new
 
 	movem.l	(sp)+,d0-a6
 
@@ -1063,13 +1064,13 @@ flip_screen:
 	move	display_background_position,work_background_position
 	move	d0,display_background_position
 
-	move.l	work_sprite_infos_address_old,d0
-	move.l	display_sprite_infos_address_old,work_sprite_infos_address_old
-	move.l	d0,display_sprite_infos_address_old
+;	move.l	work_sprite_infos_address_old,d0 ; Fixme!
+;	move.l	display_sprite_infos_address_old,work_sprite_infos_address_old
+;	move.l	d0,display_sprite_infos_address_old
 
-	move.l	work_sprite_infos_address_new,d0
-	move.l	display_sprite_infos_address_new,work_sprite_infos_address_new
-	move.l	d0,display_sprite_infos_address_new
+;	move.l	work_sprite_infos_address_new,d0 ; Fixme!
+;	move.l	display_sprite_infos_address_new,work_sprite_infos_address_new
+;	move.l	d0,display_sprite_infos_address_new
 
 	move	display_background_position,d0
 
