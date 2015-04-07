@@ -927,8 +927,9 @@ restore_sprites_dsp:
 
 	lea		$ffffa204.w,a0
 	lea		$ffffa204+2.w,a1
-	lea		background_image,a2
+	lea		background_image+16*256*2*2,a2
 	move.l	work_screen_address,a3
+	add.l	#16*256*2*2,a3
 
 	jra		.start
 
@@ -940,16 +941,15 @@ restore_sprites_dsp:
 
 .start:
 	move.l	(a0),d0
-	lea		(a2,d0.l*2),a2
-	lea		(a3,d0.l*2),a3
+	add.l	d0,a2
+	add.l	d0,a3
 
 	move	(a1),d1
 	jeq		.skip
 
 	neg		d1
 
-	jmp		.start(pc,d1.w*2)
-
+	jmp		.start(pc,d1.w)
 
 .skip:
 	move.l	work_sprite_infos_address_old,a0	
@@ -1043,6 +1043,7 @@ update_background:
 	move	BACKGROUND_SCROLL_COUNTER,d1
 	and		#$1ff,d1
 	sub		d1,d0
+	clr		d0 ; Fixme!
 	move	d0,work_background_position
 
 	movem.l	(sp)+,d0-d1
@@ -1054,9 +1055,9 @@ update_background:
 flip_screen:
 	movem.l	d0-d1,-(sp)
 
-	move.l	work_screen_address,d0
-	move.l	display_screen_address,work_screen_address
-	move.l	d0,display_screen_address
+;	move.l	work_screen_address,d0 ; Fixme!
+;	move.l	display_screen_address,work_screen_address
+;	move.l	d0,display_screen_address
 
 	move	work_background_position,d0
 	move	display_background_position,work_background_position
@@ -1081,6 +1082,8 @@ flip_screen:
 	move.l	display_screen_address,d1
 
 	endif
+
+	move.l	work_screen_address,d1 ; Fixme!
 
 	add.l	#SCREEN_DISPLAY_OFFSET,d1
 	swap	d0

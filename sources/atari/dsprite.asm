@@ -379,9 +379,9 @@ create_rle_data:
 
 	clr		b
 	move	b1,x0
-	move	#>1,x1
-	move	#>24,y0
-	move	#>512-(16+256+16),y1
+	move	#>1*2,x1
+	move	#>24*2,y0
+	move	#>(512-(16+256+16))*2,y1
 
 	do		#240,_loop
 
