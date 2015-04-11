@@ -1,9 +1,13 @@
+; Some figures for Cho Ren Sha 68k:
+; 1885 sprite masks.
+; Up to about 4000 RLE values.
+
 	opt mu,nohdr
 
 	include	'ioequ.inc'
 
-MAX_PACKED_SPRITES equ 1900
-PACKED_SPRITES1_LIMIT equ 1300+21
+TOTAL_NUMBER_OF_PACKED_SPRITES equ 1900
+NUMBER_OF_PACKED_SPRITES1 equ 1300+21
 
 push	macro	register
         move    register,y:-(r7)
@@ -60,7 +64,7 @@ receive_sprite_masks:
 
 	move	#packed_sprite_masks2,r4
 
-	move	#>PACKED_SPRITES1_LIMIT,x0
+	move	#>NUMBER_OF_PACKED_SPRITES1,x0
 
 	jclr	#0,x:m_hsr,*
 	movep	x:m_hrx,x1
@@ -83,7 +87,7 @@ _loop:
 	rts
 
 _extended_receive:
-	do		#PACKED_SPRITES1_LIMIT,_loop3
+	do		#NUMBER_OF_PACKED_SPRITES1,_loop3
 
 	do		#11,_loop4
 
@@ -258,7 +262,7 @@ draw_inverted_masks:
 
 	; Prepare mask.
 
-	move	#>PACKED_SPRITES1_LIMIT,x0
+	move	#>NUMBER_OF_PACKED_SPRITES1,x0
 	move	#>11,x1
 	move	#>$3fff,y0
 
@@ -449,6 +453,16 @@ _loop:
 	sub		x0,a
 	move	a1,y:rle_length
 
+	; Calculate maximum rle length.
+
+	move	y:maximum_rle_length,x0
+	cmp		x0,a
+	jcs		_skip_max
+	
+	move	a1,y:maximum_rle_length
+	
+_skip_max:
+
 	rts
 
 ; -----------------------------------------------------------------------------
@@ -490,7 +504,7 @@ draw_masks:
 
 	; Prepare mask.
 
-	move	#>PACKED_SPRITES1_LIMIT,x0
+	move	#>NUMBER_OF_PACKED_SPRITES1,x0
 	move	#>11,x1
 	move	#>$3fff,y0
 
@@ -684,7 +698,7 @@ bit_reverse_table:
 	dc		$0F,$8F,$4F,$CF,$2F,$AF,$6F,$EF,$1F,$9F,$5F,$DF,$3F,$BF,$7F,$FF
 
 packed_sprite_masks1:
-	ds 		PACKED_SPRITES1_LIMIT*11
+	ds 		NUMBER_OF_PACKED_SPRITES1*11
 
 sprite_infos:
 	ds		512*3
@@ -704,14 +718,17 @@ sprite_convert_shifts:
 	dc		$000080
 
 packed_sprite_masks2:
-	ds 		(MAX_PACKED_SPRITES-PACKED_SPRITES1_LIMIT)*11
+	ds 		(TOTAL_NUMBER_OF_PACKED_SPRITES-NUMBER_OF_PACKED_SPRITES1)*11
 
 rle_length:
 	ds		1
 
+maximum_rle_length:
+	dc		0
+
 rle_buffer: ; Needs to be in front of the screen buffer 1!
 ;	ds		1300*2
-	ds		6200+340
+	ds		6200 ; +340
 screen_buffer1:
 	ds		(16+256+16)*(16+256+16)/8/3
 
