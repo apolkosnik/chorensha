@@ -33,10 +33,8 @@ peek	macro	register
 
 main:
 	movep	#1,x:m_pbc
-;	movep	#0,x:m_bcr
 	bclr	#m_hf2,x:m_hcr
-
-	move	#$4000,r7
+	move	#stack,r7
 
 	move	#0,x0
 	jsr		<set_screen_buffer
@@ -734,6 +732,9 @@ screen_buffer1:
 
 ;screen_buffer2:
 ;	ds		(16+256+16)*(16+256+16)/8/3
+
+	ds		10
+stack:
 
 ; -----------------------------------------------------------------------------
 	end
