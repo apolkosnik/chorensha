@@ -34,7 +34,7 @@ peek	macro	register
 main:
 	movep	#1,x:m_pbc
 	bclr	#m_hf2,x:m_hcr
-	move	#stack,r7
+	move	#<stack,r7
 
 	move	#0,x0
 	jsr		<set_screen_buffer
@@ -223,7 +223,7 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 horizontal_flip_sprite_mask:
-	move	#<bit_reverse_table,r0
+	move	#bit_reverse_table,r0
 
 	move	#<sprite_mask,r4
 	move	#<sprite_convert_shifts,r5
@@ -293,7 +293,7 @@ _masks2:
 	move	a0,a
 	ror		a
 
-	move	#<packed_sprite_masks2,r6
+	move	#packed_sprite_masks2,r6
 	move	a1,n6
 	nop
 	move	(r6)+n6
@@ -535,7 +535,7 @@ _masks2:
 	move	a0,a
 	ror		a
 
-	move	#<packed_sprite_masks2,r6
+	move	#packed_sprite_masks2,r6
 	move	a1,n6
 	nop
 	move	(r6)+n6
@@ -618,7 +618,7 @@ _loop:
 	rts
 
 ; -----------------------------------------------------------------------------
-	org	x:$0
+	org	x:$0 ; Internal X RAM.
 ; -----------------------------------------------------------------------------
 
 shift_values:
@@ -677,6 +677,13 @@ sprite_convert_masks:
 	dc		$ffff00
 	dc		$00ff00
 
+number_of_sprite_infos:
+	ds		1
+
+; -----------------------------------------------------------------------------
+	org	x:$4000 ; External X RAM.
+; -----------------------------------------------------------------------------
+
 bit_reverse_table:
 	dc		$00,$80,$40,$C0,$20,$A0,$60,$E0,$10,$90,$50,$D0,$30,$B0,$70,$F0
 	dc		$08,$88,$48,$C8,$28,$A8,$68,$E8,$18,$98,$58,$D8,$38,$B8,$78,$F8 
@@ -695,9 +702,6 @@ bit_reverse_table:
 	dc		$07,$87,$47,$C7,$27,$A7,$67,$E7,$17,$97,$57,$D7,$37,$B7,$77,$F7 
 	dc		$0F,$8F,$4F,$CF,$2F,$AF,$6F,$EF,$1F,$9F,$5F,$DF,$3F,$BF,$7F,$FF
 
-number_of_sprite_infos:
-	ds		1
-
 packed_sprite_masks1:
 	ds 		NUMBER_OF_PACKED_SPRITES1*11
 
@@ -705,7 +709,7 @@ sprite_infos:
 	ds		512*3
 
 ; -----------------------------------------------------------------------------
-	org	y:$0
+	org	y:$0 ; Internal Y RAM.
 ; -----------------------------------------------------------------------------
 
 sprite_mask:
@@ -715,14 +719,21 @@ sprite_convert_shifts:
 	dc		$008000
 	dc		$000080
 
-packed_sprite_masks2:
-	ds 		(TOTAL_NUMBER_OF_PACKED_SPRITES-NUMBER_OF_PACKED_SPRITES1)*11
-
 rle_length:
 	ds		1
 
 maximum_rle_length:
 	dc		0
+
+	ds		10
+stack:
+
+; -----------------------------------------------------------------------------
+	org	y:$4000 ; External Y RAM.
+; -----------------------------------------------------------------------------
+
+packed_sprite_masks2:
+	ds 		(TOTAL_NUMBER_OF_PACKED_SPRITES-NUMBER_OF_PACKED_SPRITES1)*11
 
 rle_buffer: ; Needs to be in front of the screen buffer 1!
 ;	ds		1300*2
@@ -732,9 +743,6 @@ screen_buffer1:
 
 ;screen_buffer2:
 ;	ds		(16+256+16)*(16+256+16)/8/3
-
-	ds		10
-stack:
 
 ; -----------------------------------------------------------------------------
 	end
