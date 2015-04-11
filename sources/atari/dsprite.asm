@@ -7,7 +7,7 @@
 	include	'ioequ.inc'
 
 TOTAL_NUMBER_OF_PACKED_SPRITES equ 1900
-NUMBER_OF_PACKED_SPRITES1 equ 1300+21
+NUMBER_OF_PACKED_SPRITES1 equ 1200-14
 
 push	macro	register
         move    register,y:-(r7)
@@ -112,7 +112,7 @@ _loop5:
 ; -----------------------------------------------------------------------------
 
 receive_sprite_infos:
-	move	#sprite_infos,r0
+	move	x:<sprite_infos_even,r0
 
 	move	#>$ffff,x1
 
@@ -140,7 +140,7 @@ receive_sprite_infos:
 	move	a1,x:(r0)+ ; Y position.
 _loop:
 
-	move	x0,x:number_of_sprite_infos
+	move	x0,x:<number_of_sprite_infos_even
 
 	rts
 
@@ -252,9 +252,9 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 draw_inverted_masks:
-	move	#sprite_infos,r0
+	move	x:<sprite_infos_even,r0
 
-	move	x:number_of_sprite_infos,x0
+	move	x:<number_of_sprite_infos_even,x0
 
 	do		x0,_loop
 
@@ -322,7 +322,7 @@ _skip:
 	move	#>(16+256+16)/8/3/2,y1
 	mac		y0,y1,b a1,n1
 	move	#<sprite_mask,r4
-	move	#screen_buffer1,r5
+	move	#screen_buffer,r5
 	move	b0,n5
 	move	#<shift_values,r1
 	move	n1,n2
@@ -353,7 +353,7 @@ _loop2:
 _no_shift:
 	move	x1,b0
 	move	#>(16+256+16)/8/3/2,y1
-	mac		y0,y1,b #screen_buffer1,r5
+	mac		y0,y1,b #screen_buffer,r5
 	move	b0,n5
 	move	#<sprite_mask,r4
 	move	(r5)+n5
@@ -378,7 +378,7 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 create_rle_data:
-	move	#screen_buffer1+(16+256+16)/8/3*16,r4
+	move	#screen_buffer+(16+256+16)/8/3*16,r4
 	move	#rle_buffer,r5
 
 	clr		b
@@ -469,6 +469,7 @@ send_rle_data:
 	move	#rle_buffer,r4
 
 	move	y:rle_length,x0
+	clr		a
 
 	bclr	#m_hf2,x:m_hcr ; DSP <-> CPU synchronization.
 	jset	#m_hf0,x:m_hsr,*
@@ -476,7 +477,8 @@ send_rle_data:
 	do		x0,_loop
 
 	jclr	#1,x:m_hsr,*
-	movep	y:(r4)+,x:m_htx
+	movep	y:(r4),x:m_htx
+	move	a0,y:(r4)+
 _loop:
 
 	rts
@@ -484,7 +486,7 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 set_screen_buffer:
-	move	#screen_buffer1+(16+256+16)/8/3*16,r4
+	move	#screen_buffer+(16+256+16)/8/3*16,r4
 
 	rep		#(16+256+16)/8/3*256
 	move	x0,y:(r4)+
@@ -494,9 +496,9 @@ set_screen_buffer:
 ; -----------------------------------------------------------------------------
 
 draw_masks:
-	move	#sprite_infos,r0
+	move	x:<sprite_infos_even,r0
 
-	move	x:number_of_sprite_infos,x0
+	move	x:<number_of_sprite_infos_even,x0
 
 	do		x0,_loop
 
@@ -564,7 +566,7 @@ _skip:
 	move	#>(16+256+16)/8/3/2,y1
 	mac		y0,y1,b a1,n1
 	move	#<sprite_mask,r4
-	move	#screen_buffer1,r5
+	move	#screen_buffer,r5
 	move	b0,n5
 	move	#<shift_values,r1
 	move	n1,n2
@@ -595,7 +597,7 @@ _loop2:
 _no_shift:
 	move	x1,b0
 	move	#>(16+256+16)/8/3/2,y1
-	mac		y0,y1,b #screen_buffer1,r5
+	mac		y0,y1,b #screen_buffer,r5
 	move	b0,n5
 	move	#<sprite_mask,r4
 	move	(r5)+n5
@@ -677,8 +679,17 @@ sprite_convert_masks:
 	dc		$ffff00
 	dc		$00ff00
 
-number_of_sprite_infos:
-	ds		1
+sprite_infos_even:
+	dc		sprite_infos1
+
+sprite_infos_odd:
+	dc		sprite_infos2
+
+number_of_sprite_infos_even:
+	dc		0
+
+number_of_sprite_infos_odd:
+	dc		0
 
 ; -----------------------------------------------------------------------------
 	org	x:$4000 ; External X RAM.
@@ -705,7 +716,10 @@ bit_reverse_table:
 packed_sprite_masks1:
 	ds 		NUMBER_OF_PACKED_SPRITES1*11
 
-sprite_infos:
+sprite_infos1:
+	ds		512*3
+
+sprite_infos2:
 	ds		512*3
 
 ; -----------------------------------------------------------------------------
@@ -735,14 +749,10 @@ stack:
 packed_sprite_masks2:
 	ds 		(TOTAL_NUMBER_OF_PACKED_SPRITES-NUMBER_OF_PACKED_SPRITES1)*11
 
-rle_buffer: ; Needs to be in front of the screen buffer 1!
-;	ds		1300*2
-	ds		6200 ; +340
-screen_buffer1:
+rle_buffer: ; Needs to be in front of the screen buffer!
+	ds		4000
+screen_buffer:
 	ds		(16+256+16)*(16+256+16)/8/3
-
-;screen_buffer2:
-;	ds		(16+256+16)*(16+256+16)/8/3
 
 ; -----------------------------------------------------------------------------
 	end
