@@ -695,14 +695,14 @@ bit_reverse_table:
 	dc		$07,$87,$47,$C7,$27,$A7,$67,$E7,$17,$97,$57,$D7,$37,$B7,$77,$F7 
 	dc		$0F,$8F,$4F,$CF,$2F,$AF,$6F,$EF,$1F,$9F,$5F,$DF,$3F,$BF,$7F,$FF
 
+number_of_sprite_infos:
+	ds		1
+
 packed_sprite_masks1:
 	ds 		NUMBER_OF_PACKED_SPRITES1*11
 
 sprite_infos:
 	ds		512*3
-
-number_of_sprite_infos:
-	ds		1
 
 ; -----------------------------------------------------------------------------
 	org	y:$0
