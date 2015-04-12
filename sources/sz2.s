@@ -2811,15 +2811,7 @@ L_000215EA:
 L_00021602:
 	ifd __ATARI__
 
-	jsr		prepare_sprites
-	
-	jsr		update_background
-	jsr		translate_palettes
-;	jsr		restore_sprites
-	jsr		draw_sprites
-;	jsr		draw_sprites_dsp ; Fixme!
-	jsr		restore_sprites_dsp ; Fixme!
-	jsr		flip_screen
+	jsr		sprite_engine
 
 	endif
 

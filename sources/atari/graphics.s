@@ -2,14 +2,8 @@
 	xdef initialize_graphics
 	xdef release_graphics
 	xdef compile_sprite
-	xdef prepare_sprites
-	xdef restore_sprites
-	xdef restore_sprites_dsp
-	xdef draw_sprites
-	xdef draw_sprites_dsp
-	xdef update_background
-	xdef flip_screen
-	xdef translate_palettes
+	xdef sprite_engine
+	xdef timer_b_handler
 
 	xdef display_screen_address
 	xdef work_screen_address
@@ -792,6 +786,7 @@ prepare_sprites:
 
 	lea		translated_palettes,a3
 	move.l	work_sprite_infos_address_new,a4
+	move.l	a4,work_sprite_infos_address_next ; Fixme!
 	lea		$ffffa204+2.w,a6
 
 	move.l	a0,d7
@@ -918,6 +913,8 @@ restore_sprites:
 restore_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
+	not.l	$ffff9800.w
+	
 	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
 	jeq		.skip
@@ -957,6 +954,8 @@ restore_sprites_dsp:
 	move.l	work_sprite_infos_address_new,a0	
 	clr.l	(a0)
 	
+	not.l	$ffff9800.w
+
 	movem.l	(sp)+,d0-a6
 
 	rts
@@ -966,7 +965,8 @@ restore_sprites_dsp:
 draw_sprites:
 	movem.l	d0-a6,-(sp)
 
-	move.l	work_sprite_infos_address_new,a0
+;	move.l	work_sprite_infos_address_new,a0
+	move.l	work_sprite_infos_address_next,a0
 
 	jra		.start
 
@@ -982,12 +982,25 @@ draw_sprites:
 	move.l	(sp)+,a0
 
 .start:
+;	tst		delay_sprite_drawing
+;	jne		.delay
+
 	move.l	(a0)+,d0
 	jne		.loop
+
+	clr		still_drawing_sprites
 
 ;	move.l	work_sprite_infos_address_old,d0 ; Fixme!
 ;	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
 ;	move.l	d0,work_sprite_infos_address_new
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+.delay:
+	move.l	a0,work_sprite_infos_address_next
+	move	#-1,still_drawing_sprites
 
 	movem.l	(sp)+,d0-a6
 
@@ -1099,6 +1112,48 @@ flip_screen:
 	rts
 
 ; ------------------------------------------------------------------------------
+
+	rem
+
+	jsr		prepare_sprites
+	jsr		update_background
+	jsr		translate_palettes
+;	jsr		restore_sprites
+	jsr		draw_sprites
+;	jsr		draw_sprites_dsp ; Fixme!
+	jsr		restore_sprites_dsp ; Fixme!
+	jsr		flip_screen
+
+	erem
+
+sprite_engine:
+	tst		still_drawing_sprites
+	jne		.skip
+	
+	jsr		prepare_sprites
+	jsr		update_background
+	jsr		translate_palettes
+	
+.skip:
+	jsr		draw_sprites
+
+	tst		still_drawing_sprites
+	jne		.skip2
+	
+	jsr		restore_sprites_dsp
+	jsr		flip_screen
+	
+.skip2:
+	rts
+
+; ------------------------------------------------------------------------------
+
+timer_b_handler:
+;	not.l	$ffff9800.w
+
+	rte
+
+; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
 
@@ -1126,6 +1181,9 @@ work_sprite_infos_address_old:
 free_compiled_objects_address:
 	dc.l	compiled_objects
 
+work_sprite_infos_address_next:
+	dc.l	sprite_infos3
+
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
@@ -1151,7 +1209,7 @@ display_background_position:
 work_background_position:
 	ds		1
 
-draw_sprites_throttle:
+still_drawing_sprites:
 	ds		1
 
 sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.

@@ -141,6 +141,8 @@ initialize_machine:
 	move.b	$fffffa09.w,old_fa09
 	move.b	$fffffa13.w,old_fa13
 	move.b	$fffffa15.w,old_fa15
+	move.b	$fffffa1b.w,old_fa1b
+	move.b	$fffffa21.w,old_fa15
 
 	move.l	$2c.w,old_line_f_handler
 	move.l	$88.w,old_trap_2_handler
@@ -148,6 +150,7 @@ initialize_machine:
 	move.l	$bc.w,old_trap_f_handler
 	move.l	$70.w,old_vbl_handler
 	move.l	$118.w,old_ikbd_handler
+	move.l	$120.w,old_timer_b_handler
 
 	move.b	$ffff8201.w,old_screen_address+1
 	move.b	$ffff8203.w,old_screen_address+2
@@ -213,11 +216,18 @@ initialize_machine:
 	move.l	#trap_f_handler,$bc.w
 	move.l	#vbl_handler,$70.w
 	move.l	#ikbd_handler,$118.w
+	move.l	#timer_b_handler,$120.w
 
 	bset	#6,$fffffa09.w
 	bset	#6,$fffffa15.w
 
 	bclr	#3,$fffffa17.w
+
+	clr.b	$fffffa1b.w
+	move.b	#180,$fffffa21.w
+	move.b	#8,$fffffa1b.w
+	bset	#0,$fffffa07
+	bset	#0,$fffffa13
 
 	rts
 
@@ -251,6 +261,8 @@ release_machine:
 	move.b	old_fa09,$fffffa09.w
 	move.b	old_fa13,$fffffa13.w
 	move.b	old_fa15,$fffffa15.w
+	move.b	old_fa1b,$fffffa1b.w
+	move.b	old_fa21,$fffffa21.w
 
 	move.l	old_line_f_handler,$2c.w
 	move.l	old_trap_2_handler,$88.w
@@ -258,6 +270,7 @@ release_machine:
 	move.l	old_trap_f_handler,$bc.w
 	move.l	old_vbl_handler,$70.w
 	move.l	old_ikbd_handler,$118.w
+	move.l	old_timer_b_handler,$120.w
 
 	move.b	old_screen_address+1,$ffff8201.w
 	move.b	old_screen_address+2,$ffff8203.w
@@ -318,6 +331,8 @@ old_vbl_handler:
 	ds.l	1
 old_ikbd_handler:
 	ds.l	1
+old_timer_b_handler:
+	ds.l	1
 
 old_8900:
 	ds.w	1
@@ -341,6 +356,10 @@ old_fa09:
 old_fa13:
 	ds.b	1
 old_fa15:
+	ds.b	1
+old_fa1b:
+	ds.b	1
+old_fa21:
 	ds.b	1
 
 	even
