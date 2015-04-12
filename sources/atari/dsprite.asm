@@ -468,17 +468,23 @@ _skip_max:
 send_rle_data:
 	move	#rle_buffer,r4
 
-	move	y:rle_length,x0
-	clr		a
+	move	y:rle_length,a
+	bclr	#0,sr
+	ror		a #<0,y0
 
 	bclr	#m_hf2,x:m_hcr ; DSP <-> CPU synchronization.
 	jset	#m_hf0,x:m_hsr,*
 
-	do		x0,_loop
+	do		a1,_loop
 
 	jclr	#1,x:m_hsr,*
 	movep	y:(r4),x:m_htx
-	move	a0,y:(r4)+
+	move	y0,y:(r4)+
+
+	jclr	#1,x:m_hsr,*
+	move	y:(r4),a
+	neg		a y0,y:(r4)+
+	movep	a1,x:m_htx
 _loop:
 
 	rts

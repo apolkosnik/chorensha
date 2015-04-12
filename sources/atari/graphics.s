@@ -13,6 +13,7 @@
 SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
 MAX_NUMBER_OF_SPRITES=1885
+MAX_LINES_PER_SPRITE_DRAWING=170 ; 180
 
 ; ------------------------------------------------------------------------------
 	text
@@ -944,8 +945,6 @@ restore_sprites_dsp:
 	move	(a1),d1
 	jeq		.skip
 
-	neg		d1
-
 	jmp		.start(pc,d1.w)
 
 .skip:
@@ -962,7 +961,7 @@ draw_sprites:
 	movem.l	d0-a6,-(sp)
 
 ;	clr.b	$fffffa1b.w
-	move.b	#180,$fffffa21.w
+	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
 	move.b	#8,$fffffa1b.w
 
 ;	move.l	work_sprite_infos_address_new,a0
@@ -1137,7 +1136,7 @@ sprite_engine:
 	jne		.skip
 	
 ;	clr.b	$fffffa1b.w
-	move.b	#180,$fffffa21.w
+	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
 	move.b	#8,$fffffa1b.w
 
 	jsr		prepare_sprites
