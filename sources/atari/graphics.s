@@ -913,8 +913,6 @@ restore_sprites:
 restore_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
-	not.l	$ffff9800.w
-	
 	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
 	jeq		.skip
@@ -954,8 +952,6 @@ restore_sprites_dsp:
 	move.l	work_sprite_infos_address_new,a0	
 	clr.l	(a0)
 	
-	not.l	$ffff9800.w
-
 	movem.l	(sp)+,d0-a6
 
 	rts
@@ -964,6 +960,10 @@ restore_sprites_dsp:
 
 draw_sprites:
 	movem.l	d0-a6,-(sp)
+
+;	clr.b	$fffffa1b.w
+	move.b	#180,$fffffa21.w
+	move.b	#8,$fffffa1b.w
 
 ;	move.l	work_sprite_infos_address_new,a0
 	move.l	work_sprite_infos_address_next,a0
@@ -982,8 +982,8 @@ draw_sprites:
 	move.l	(sp)+,a0
 
 .start:
-;	tst		delay_sprite_drawing
-;	jne		.delay
+	tst		delay_drawing_sprites
+	jne		.delay
 
 	move.l	(a0)+,d0
 	jne		.loop
@@ -994,6 +994,9 @@ draw_sprites:
 ;	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
 ;	move.l	d0,work_sprite_infos_address_new
 
+	clr.b	$fffffa1b.w
+	clr		delay_drawing_sprites
+
 	movem.l	(sp)+,d0-a6
 
 	rts
@@ -1001,6 +1004,9 @@ draw_sprites:
 .delay:
 	move.l	a0,work_sprite_infos_address_next
 	move	#-1,still_drawing_sprites
+
+	clr.b	$fffffa1b.w
+	clr		delay_drawing_sprites
 
 	movem.l	(sp)+,d0-a6
 
@@ -1130,6 +1136,10 @@ sprite_engine:
 	tst		still_drawing_sprites
 	jne		.skip
 	
+;	clr.b	$fffffa1b.w
+	move.b	#180,$fffffa21.w
+	move.b	#8,$fffffa1b.w
+
 	jsr		prepare_sprites
 	jsr		update_background
 	jsr		translate_palettes
@@ -1149,7 +1159,9 @@ sprite_engine:
 ; ------------------------------------------------------------------------------
 
 timer_b_handler:
-;	not.l	$ffff9800.w
+	move	#-1,delay_drawing_sprites
+
+	clr.b	$fffffa1b.w
 
 	rte
 
@@ -1207,6 +1219,9 @@ display_background_position:
 	ds		1
 
 work_background_position:
+	ds		1
+
+delay_drawing_sprites:
 	ds		1
 
 still_drawing_sprites:

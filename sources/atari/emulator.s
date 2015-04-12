@@ -45,11 +45,6 @@ vbl_handler:
 	rts
 
 .no_exit_request:
-	clr.l	$ffff9800.w
-	clr.b	$fffffa1b.w
-	move.b	#180,$fffffa21.w
-	move.b	#8,$fffffa1b.w
-
 	move.b	display_window_address+1,$ffff8201.w
 	move.b	display_window_address+2,$ffff8203.w
 	move.b	display_window_address+3,$ffff820d.w
