@@ -310,8 +310,6 @@ _skip:
 	move	b0,b
 	sub		b,a x:(r0)+,y0
 
-	jeq		<_no_shift
-
 	move	x1,b0
 	move	#>(16+256+16)/8/3/2,y1
 	mac		y0,y1,b a1,n1
@@ -332,7 +330,7 @@ _skip:
 
 	do		#16,_loop2
 
-	mpy		x0,y0,a x:(r2),x0
+	mpy		-x0,y0,a x:(r2),x0
 	and		x0,a y:(r5)+,x0
 	not		a a0,b
 	and		x0,a y:(r5)-,x0
@@ -342,28 +340,6 @@ _skip:
 	move	(r5)+n5
 _loop2:
 
-	jmp		<_skip_no_shift
-
-_no_shift:
-	move	x1,b0
-	move	#>(16+256+16)/8/3/2,y1
-	mac		y0,y1,b #screen_buffer,r5
-	move	b0,n5
-	move	#<sprite_mask,r4
-	move	(r5)+n5
-	move	#(16+256+16)/8/3,n5
-
-	; Draw inverted mask.
-
-	do		#16,_loop3
-
-	move	y:(r4)+,a1
-	not		a y:(r5),x0
-	and		x0,a 
-	move	a1,y:(r5)+n5
-_loop3:
-
-_skip_no_shift:
 	nop
 _loop:
 
@@ -544,8 +520,6 @@ _skip:
 	move	b0,b
 	sub		b,a x:(r0)+,y0
 
-	jeq		<_no_shift
-
 	move	x1,b0
 	move	#>(16+256+16)/8/3/2,y1
 	mac		y0,y1,b a1,n1
@@ -566,7 +540,7 @@ _skip:
 
 	do		#16,_loop2
 
-	mpy		x0,y0,a x:(r2),x0
+	mpy		-x0,y0,a x:(r2),x0
 	and		x0,a y:(r5)+,x0
 	move	a0,b
 	or		x0,a y:(r5)-,x0
@@ -576,28 +550,6 @@ _skip:
 	move	(r5)+n5
 _loop2:
 
-	jmp		<_skip_no_shift
-
-_no_shift:
-	move	x1,b0
-	move	#>(16+256+16)/8/3/2,y1
-	mac		y0,y1,b #screen_buffer,r5
-	move	b0,n5
-	move	#<sprite_mask,r4
-	move	(r5)+n5
-	move	#(16+256+16)/8/3,n5
-
-	; Draw mask.
-
-	do		#16,_loop3
-
-	move	y:(r4)+,a1
-	move	y:(r5),x0
-	or		x0,a 
-	move	a1,y:(r5)+n5
-_loop3:
-
-_skip_no_shift:
 	nop
 _loop:
 
@@ -608,30 +560,30 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 shift_values:
-	dc		$000000
-	dc		$400000
-	dc		$200000
-	dc		$100000
-	dc		$080000
-	dc		$040000
-	dc		$020000
-	dc		$010000
-	dc		$008000
-	dc		$004000
-	dc		$002000
-	dc		$001000
-	dc		$000800
-	dc		$000400
-	dc		$000200
-	dc		$000100
-	dc		$000080
-	dc		$000040
-	dc		$000020
-	dc		$000010
-	dc		$000008
-	dc		$000004
-	dc		$000002
-	dc		$000001
+	dc		-1.0/@POW(2.0,0.0)
+	dc		-1.0/@POW(2.0,1.0)
+	dc		-1.0/@POW(2.0,2.0)
+	dc		-1.0/@POW(2.0,3.0)
+	dc		-1.0/@POW(2.0,4.0)
+	dc		-1.0/@POW(2.0,5.0)
+	dc		-1.0/@POW(2.0,6.0)
+	dc		-1.0/@POW(2.0,7.0)
+	dc		-1.0/@POW(2.0,8.0)
+	dc		-1.0/@POW(2.0,9.0)
+	dc		-1.0/@POW(2.0,10.0)
+	dc		-1.0/@POW(2.0,11.0)
+	dc		-1.0/@POW(2.0,12.0)
+	dc		-1.0/@POW(2.0,13.0)
+	dc		-1.0/@POW(2.0,14.0)
+	dc		-1.0/@POW(2.0,15.0)
+	dc		-1.0/@POW(2.0,16.0)
+	dc		-1.0/@POW(2.0,17.0)
+	dc		-1.0/@POW(2.0,18.0)
+	dc		-1.0/@POW(2.0,19.0)
+	dc		-1.0/@POW(2.0,20.0)
+	dc		-1.0/@POW(2.0,21.0)
+	dc		-1.0/@POW(2.0,22.0)
+	dc		-1.0/@POW(2.0,23.0)
 
 shift_masks:
 	dc		$ffffff
