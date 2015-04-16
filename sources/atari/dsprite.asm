@@ -330,12 +330,12 @@ _skip:
 
 	do		#16,_loop2
 
-	mpy		-x0,y0,a x:(r2),x0
-	and		x0,a y:(r5)+,x0
-	not		a a0,b
-	and		x0,a y:(r5)-,x0
+	mpy		-x0,y0,a x:(r2),x0 y:(r5)+,y1
+	and		x0,a a0,b
+	not		a
+	and		y1,a y:(r5)-,y1
 	not		b a1,y:(r5)+
-	and		x0,b x:(r1),x0 y:(r4)+,y0
+	and		y1,b x:(r1),x0 y:(r4)+,y0
 	move	b1,y:(r5)+n5
 _loop2:
 
@@ -539,12 +539,11 @@ _skip:
 
 	do		#16,_loop2
 
-	mpy		-x0,y0,a x:(r2),x0
-	and		x0,a y:(r5)+,x0
-	move	a0,b
-	or		x0,a y:(r5)-,x0
+	mpy		-x0,y0,a x:(r2),x0 y:(r5)+,y1
+	and		x0,a a0,b
+	or		y1,a y:(r5)-,y1
 	move	a1,y:(r5)+
-	or		x0,b x:(r1),x0 y:(r4)+,y0
+	or		y1,b x:(r1),x0 y:(r4)+,y0
 	move	b1,y:(r5)+n5
 _loop2:
 
