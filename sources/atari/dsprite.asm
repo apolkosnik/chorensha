@@ -37,7 +37,7 @@ main:
 	move	#<stack,r7
 
 	move	#0,x0
-	jsr		<set_screen_buffer
+	jsr		<fill_screen_buffer
 
 	jclr	#1,x:m_hsr,*
 	movep	x0,x:m_htx ; DSP <-> CPU synchronization.
@@ -256,6 +256,8 @@ draw_inverted_masks:
 
 	move	x:<number_of_sprite_infos_even,x0
 
+	move	x:(r0)+,a
+
 	do		x0,_loop
 
 	; Prepare mask.
@@ -263,8 +265,6 @@ draw_inverted_masks:
 	move	#>NUMBER_OF_PACKED_SPRITES1,x0
 	move	#>11,x1
 	move	#>$3fff,y0
-
-	move	x:(r0)+,a
 
 	push	r0
 	push	a1
@@ -322,7 +322,7 @@ _skip:
 	move	(r5)+n5
 	move	(r1)+n1
 	move	(r2)+n2
-	move	#(16+256+16)/8/3,n5
+	move	#(16+256+16)/8/3-1,n5
 
 	; Draw inverted mask.
 
@@ -336,11 +336,10 @@ _skip:
 	and		x0,a y:(r5)-,x0
 	not		b a1,y:(r5)+
 	and		x0,b x:(r1),x0 y:(r4)+,y0
-	move	b1,y:(r5)-
-	move	(r5)+n5
+	move	b1,y:(r5)+n5
 _loop2:
 
-	nop
+	move	x:(r0)+,a
 _loop:
 
 	rts
@@ -451,7 +450,7 @@ _loop:
 
 ; -----------------------------------------------------------------------------
 
-set_screen_buffer:
+fill_screen_buffer:
 	move	#screen_buffer+(16+256+16)/8/3*16,r4
 
 	rep		#(16+256+16)/8/3*256
@@ -466,6 +465,8 @@ draw_masks:
 
 	move	x:<number_of_sprite_infos_even,x0
 
+	move	x:(r0)+,a
+
 	do		x0,_loop
 
 	; Prepare mask.
@@ -473,8 +474,6 @@ draw_masks:
 	move	#>NUMBER_OF_PACKED_SPRITES1,x0
 	move	#>11,x1
 	move	#>$3fff,y0
-
-	move	x:(r0)+,a
 
 	push	r0
 	push	a1
@@ -532,7 +531,7 @@ _skip:
 	move	(r5)+n5
 	move	(r1)+n1
 	move	(r2)+n2
-	move	#(16+256+16)/8/3,n5
+	move	#(16+256+16)/8/3-1,n5
 
 	; Draw mask.
 
@@ -546,11 +545,10 @@ _skip:
 	or		x0,a y:(r5)-,x0
 	move	a1,y:(r5)+
 	or		x0,b x:(r1),x0 y:(r4)+,y0
-	move	b1,y:(r5)-
-	move	(r5)+n5
+	move	b1,y:(r5)+n5
 _loop2:
 
-	nop
+	move	x:(r0)+,a
 _loop:
 
 	rts
