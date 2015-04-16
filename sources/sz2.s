@@ -693,6 +693,12 @@ XSP_OUT:
 L_000204D0:
 	movem.l D1-D7/A0-A6,-(A7)                       ; 000204D0 48E7 7FFE
 
+	ifd __ATARI__
+
+	jsr		reset_sprite_drawing_timer
+
+	endif
+	
 	move.l  A7,SAVED_STACK_ADDRESS                        ; 000204D4 23CF 0002 2206
 
 	suba.l  A1,A1                                   ; 000204DA 93C9

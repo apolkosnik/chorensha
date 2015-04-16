@@ -275,11 +275,8 @@ draw_inverted_masks:
 	jcc		<_masks2
 
 	mpy		x0,x1,a
-	move	a0,a
-	ror		a
-
-	move	#packed_sprite_masks1,r0
-	move	a1,n0
+	asr		a #packed_sprite_masks1,r0
+	move	a0,n0
 	nop
 	move	(r0)+n0
 
@@ -290,11 +287,8 @@ draw_inverted_masks:
 _masks2:
 	move	a1,x0
 	mpy		x0,x1,a
-	move	a0,a
-	ror		a
-
-	move	#packed_sprite_masks2,r6
-	move	a1,n6
+	asr		a #packed_sprite_masks2,r6
+	move	a0,n6
 	nop
 	move	(r6)+n6
 
@@ -451,16 +445,6 @@ _loop:
 	sub		x0,a
 	move	a1,y:rle_length
 
-	; Calculate maximum rle length.
-
-	move	y:maximum_rle_length,x0
-	cmp		x0,a
-	jcs		_skip_max
-	
-	move	a1,y:maximum_rle_length
-	
-_skip_max:
-
 	rts
 
 ; -----------------------------------------------------------------------------
@@ -525,11 +509,8 @@ draw_masks:
 	jcc		<_masks2
 
 	mpy		x0,x1,a
-	move	a0,a
-	ror		a
-
-	move	#packed_sprite_masks1,r0
-	move	a1,n0
+	asr		a #packed_sprite_masks1,r0
+	move	a0,n0
 	nop
 	move	(r0)+n0
 
@@ -540,11 +521,8 @@ draw_masks:
 _masks2:
 	move	a1,x0
 	mpy		x0,x1,a
-	move	a0,a
-	ror		a
-
-	move	#packed_sprite_masks2,r6
-	move	a1,n6
+	asr		a #packed_sprite_masks2,r6
+	move	a0,n6
 	nop
 	move	(r6)+n6
 
@@ -741,9 +719,6 @@ sprite_convert_shifts:
 
 rle_length:
 	ds		1
-
-maximum_rle_length:
-	dc		0
 
 	ds		10
 stack:

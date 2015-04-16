@@ -3,6 +3,7 @@
 	xdef release_graphics
 	xdef compile_sprite
 	xdef sprite_engine
+	xdef reset_sprite_drawing_timer
 	xdef timer_b_handler
 
 	xdef display_screen_address
@@ -1153,6 +1154,15 @@ sprite_engine:
 	jsr		flip_screen
 	
 .skip2:
+	rts
+
+; ------------------------------------------------------------------------------
+
+reset_sprite_drawing_timer:
+;	clr.b	$fffffa1b.w
+;	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
+;	move.b	#8,$fffffa1b.w
+
 	rts
 
 ; ------------------------------------------------------------------------------
