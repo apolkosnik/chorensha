@@ -142,7 +142,7 @@ initialize_machine:
 	move.b	$fffffa13.w,old_fa13
 	move.b	$fffffa15.w,old_fa15
 	move.b	$fffffa1b.w,old_fa1b
-	move.b	$fffffa21.w,old_fa15
+	move.b	$fffffa21.w,old_fa21
 
 	move.l	$2c.w,old_line_f_handler
 	move.l	$88.w,old_trap_2_handler
