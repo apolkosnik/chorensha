@@ -944,7 +944,6 @@ restore_sprites_dsp:
 	add.l	d0,a3
 
 	move	(a1),d1
-	jeq		.skip
 
 	jmp		.start(pc,d1.w)
 

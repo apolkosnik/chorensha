@@ -413,6 +413,7 @@ _loop:
 
 	clr		b
 	move	b1,y:(r5)+ ; Offset.
+	move	#>-12,b
 	move	b1,y:(r5)+ ; Number of pixels.
 
 	move	#rle_buffer,x0
