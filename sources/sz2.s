@@ -7648,7 +7648,7 @@ RESET_DEMO_REPLAY:
 
 	rts                                             ; 000239E4 4E75
 
-DEMO_REPLAY_OR_RECORD: ; Replay = 1, record = 0
+JOYSTICK_DIRECTIONS_REPLAY_OR_RECORD: ; Replay = 1, record = 0
 	tst.w   6(A7)                                   ; 000239E6 4A6F 0006                ; S($0002A942) 
 	bne.w   L_00023AA0                              ; 000239EA 6600 00B4
 
@@ -7664,7 +7664,7 @@ DEMO_REPLAY_OR_RECORD: ; Replay = 1, record = 0
 
 	move.w  D1,D0                                   ; 00023A04 3001
 	ext.l   D0                                      ; 00023A06 48C0
-	lea     DEMO_REPLAY_JOYSTICK_ENCODE_TABLE,A0                        ; 00023A08 41F9 0005 D37E
+	lea     JOYSTICK_DIRECTIONS_ENCODE_TABLE,A0                        ; 00023A08 41F9 0005 D37E
 	add.l   D0,D0                                   ; 00023A0E D080
 	move.w  0(A0,D0.l),D1                           ; 00023A10 3230 0800
 
@@ -7761,8 +7761,9 @@ L_00023ADE:
 
 	rts                                             ; 00023AF4 4E75
 
-L_00023AF6:
+JOYSTICK_BUTTONS_REPLAY_OR_RECORD:
 	move.l  D3,-(A7)                                ; 00023AF6 2F03                     ; S($0002AEB4) 
+
 	tst.w   10(A7)                                  ; 00023AF8 4A6F 000A
 	bne.s   L_00023B68                              ; 00023AFC 666A
 
@@ -13522,9 +13523,9 @@ L_00026FA0:
 
 	jsr     L_0002318E                              ; 00026FB4 4EB9 0002 318E
 
-	jsr     PLAYER_CONTROL                              ; 00026FBA 4EB9 0002 A90A
+	jsr     JOYSTICK_DIRECTIONS_HANDLER                              ; 00026FBA 4EB9 0002 A90A
 
-	jsr     L_0002AE96                              ; 00026FC0 4EB9 0002 AE96
+	jsr     JOYSTICK_BUTTONS_HANDLER                              ; 00026FC0 4EB9 0002 AE96
 
 	clr.w   WORD_0008DB2A                           ; 00026FC6 4279 0008 DB2A
 	jsr     L_0002721E                              ; 00026FCC 4EB9 0002 721E
@@ -19052,7 +19053,7 @@ L_0002A8A4:
 
 	rts                                             ; 0002A908 4E75
 
-PLAYER_CONTROL:
+JOYSTICK_DIRECTIONS_HANDLER:
 	link    A6,#-128                                ; 0002A90A 4E56 FF80                ; S($00026FBA) 
 
 	movem.l D3-D4/A3-A4,-(A7)                       ; 0002A90E 48E7 1818
@@ -19077,7 +19078,7 @@ L_0002A920:
 L_0002A93A:
 	movea.w DEMO_REPLAY_MODE_FLAG,A1                        ; 0002A93A 3279 0008 DB12
 	move.l  A1,-(A7)                                ; 0002A940 2F09
-	jsr     DEMO_REPLAY_OR_RECORD                              ; 0002A942 4EB9 0002 39E6
+	jsr     JOYSTICK_DIRECTIONS_REPLAY_OR_RECORD                              ; 0002A942 4EB9 0002 39E6
 
 	addq.w  #$4,A7                                  ; 0002A948 584F
 
@@ -19085,15 +19086,17 @@ L_0002A93A:
 	beq.w   L_0002A9F6                              ; 0002A94C 6700 00A8
 
 	ext.l   D0                                      ; 0002A950 48C0
-	lea     DEMO_REPLAY_JOYSTICK_DECODE_TABLE,A0                        ; 0002A952 41F9 0005 DC68
+	lea     JOYSTICK_DIRECTIONS_DECODE_TABLE,A0                        ; 0002A952 41F9 0005 DC68
 	add.l   D0,D0                                   ; 0002A958 D080
 	move.w  0(A0,D0.l),D0                           ; 0002A95A 3030 0800
 	ext.l   D0                                      ; 0002A95E 48C0
 	asl.l   #$2,D0                                  ; 0002A960 E580
+
 	lea     WORD_0008FCE4,A0                        ; 0002A962 41F9 0008 FCE4
 	adda.l  D0,A0                                   ; 0002A968 D1C0
 	move.w  (A0)+,D3                                ; 0002A96A 3618
 	move.w  (A0),D2                                 ; 0002A96C 3410
+
 	tst.w   WORD_000A8EFE                           ; 0002A96E 4A79 000A 8EFE
 	beq.s   L_0002A98E                              ; 0002A974 6718
 
@@ -19614,7 +19617,7 @@ L_0002AE60:
 
 	rts                                             ; 0002AE94 4E75
 
-L_0002AE96:
+JOYSTICK_BUTTONS_HANDLER:
 	link    A6,#-140                                ; 0002AE96 4E56 FF74                ; S($00026FC0) 
 
 	movem.l D3-D5/A3-A5,-(A7)                       ; 0002AE9A 48E7 1C1C
@@ -19622,12 +19625,15 @@ L_0002AE96:
 	lea     WORD_0005DC66,A4                        ; 0002AE9E 49F9 0005 DC66
 	lea     WORD_0005DC64,A3                        ; 0002AEA4 47F9 0005 DC64
 	move.w  (A3),(A4)                               ; 0002AEAA 3893
+
 	movea.w DEMO_REPLAY_MODE_FLAG,A2                        ; 0002AEAC 3479 0008 DB12
 	move.l  A2,-(A7)                                ; 0002AEB2 2F0A
-	jsr     L_00023AF6                              ; 0002AEB4 4EB9 0002 3AF6
+	jsr     JOYSTICK_BUTTONS_REPLAY_OR_RECORD                              ; 0002AEB4 4EB9 0002 3AF6
 
 	move.w  D0,(A3)                                 ; 0002AEBA 3680
+
 	addq.w  #$4,A7                                  ; 0002AEBC 584F
+
 	btst    #$0,D0                                  ; 0002AEBE 0800 0000
 	beq.s   L_0002AED2                              ; 0002AEC2 670E
 
@@ -19664,6 +19670,7 @@ L_0002AEF0:
 	jsr     L_00026472                              ; 0002AF14 4EB9 0002 6472
 
 	addq.w  #$4,A7                                  ; 0002AF1A 584F
+
 	cmpi.w  #$7,(A3)                                ; 0002AF1C 0C53 0007
 	bgt.s   L_0002AF88                              ; 0002AF20 6E66
 
@@ -98244,7 +98251,7 @@ CURRENT_DEMO_REPLAY_END_POINTER:
 CURRENT_DEMO_RECORD_END_POINTER:
 	dc.l    DEMO_REPLAY_DATA_END                              ; [Relocated]; 0005D37A
 
-DEMO_REPLAY_JOYSTICK_ENCODE_TABLE:
+JOYSTICK_DIRECTIONS_ENCODE_TABLE:
 	dc.w    $0000                                  ; ; 0005D37E
 	dc.w    $0003                                  ; ; 0005D380
 	dc.w    $0006                                  ; ; 0005D382
@@ -99744,7 +99751,7 @@ WORD_0005DC64:
 WORD_0005DC66:
 	dc.w    $0000                                  ; ; 0005DC66
 
-DEMO_REPLAY_JOYSTICK_DECODE_TABLE:
+JOYSTICK_DIRECTIONS_DECODE_TABLE:
 	dc.w    $0000                                  ; ; 0005DC68
 	dc.w    $00A0                                  ; ; 0005DC6A
 	dc.w    $0080                                  ; ; 0005DC6C
