@@ -7756,7 +7756,7 @@ L_00023AD8:
 
 L_00023ADE:
 	clr.w   WORD_00066C3A                           ; 00023ADE 4279 0006 6C3A           ; S($00026CC8) 
-	clr.w   WORD_00066C38                           ; 00023AE4 4279 0006 6C38
+	clr.w   DEMO_REPLAY_BUTTONS_BIT_INDEX                           ; 00023AE4 4279 0006 6C38
 	move.l  #DEMO_REPLAY_DATA_END,CURRENT_DEMO_REPLAY_END_POINTER            ; 00023AEA 23FC 0008 6C41 0005 D376
 
 	rts                                             ; 00023AF4 4E75
@@ -7771,7 +7771,9 @@ JOYSTICK_BUTTONS_REPLAY_OR_RECORD:
 	jsr     READ_JOYSTICK_BUTTONS                              ; 00023B02 4EB9 0005 A5D4
 
 	move.w  D0,D2                                   ; 00023B08 3400
+
 	addq.w  #$4,A7                                  ; 00023B0A 584F
+
 	tst.w   WORD_0008DB02                           ; 00023B0C 4A79 0008 DB02
 	beq.s   L_00023B28                              ; 00023B12 6714
 
@@ -7790,11 +7792,13 @@ L_00023B28:
 	move.b  (A0),D3                                 ; 00023B30 1610
 	asl.b   #$2,D3                                  ; 00023B32 E503
 	move.b  D3,(A0)                                 ; 00023B34 1083
+
 	movea.l (A1),A0                                 ; 00023B36 2051
 	move.b  D2,D0                                   ; 00023B38 1002
 	and.b   #%00000011,D0                           ; 00023B3A C03C 0003
 	or.b    D0,(A0)                                 ; 00023B3E 8110
-	lea     WORD_00066C38,A0                        ; 00023B40 41F9 0006 6C38
+
+	lea     DEMO_REPLAY_BUTTONS_BIT_INDEX,A0                        ; 00023B40 41F9 0006 6C38
 	addq.w  #$1,(A0)                                ; 00023B46 5250
 	move.w  (A0),D0                                 ; 00023B48 3010
 	and.w   #%0000000000000011,D0                   ; 00023B4A C07C 0003
@@ -7812,8 +7816,9 @@ L_00023B5C:
 	bra.s   L_00023BA0                              ; 00023B66 6038
 
 L_00023B68:
-	lea     WORD_00066C38,A0                        ; 00023B68 41F9 0006 6C38
+	lea     DEMO_REPLAY_BUTTONS_BIT_INDEX,A0                        ; 00023B68 41F9 0006 6C38
 	subq.w  #$1,(A0)                                ; 00023B6E 5350
+
 	lea     CURRENT_DEMO_REPLAY_END_POINTER,A1                        ; 00023B70 43F9 0005 D376
 	movea.l (A1),A2                                 ; 00023B76 2451
 	move.b  (A2),D0                                 ; 00023B78 1012
@@ -13535,6 +13540,7 @@ L_00026FA0:
 	jsr     XSP_OUT                              ; 00026FD8 4EB9 0002 04C2
 
 	move.w  D0,D3                                   ; 00026FDE 3600
+
 	addq.w  #$4,A7                                  ; 00026FE0 584F
 
 	cmpi.w  #$1,DEBUG_MODE                       ; 00026FE2 0C79 0001 0008 DAFE
@@ -101156,7 +101162,7 @@ OX_MASK:
 L_00066BB8:
 	ds.b    $80
 
-WORD_00066C38:
+DEMO_REPLAY_BUTTONS_BIT_INDEX:
 	ds.b    $2
 
 WORD_00066C3A:
