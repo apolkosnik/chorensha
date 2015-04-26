@@ -87,7 +87,7 @@ L_0002007C:
 	movea.l LONG_000221EC(pc),A1                    ; 0002007E 227A 216C
 	adda.w  D1,A1                                   ; 00020082 D2C1
 	movea.l CURRENT_SPRITE_DATA_ENTRY(pc),A0                    ; 00020084 207A 2140
-	move.l  #WORD_0005F522,D0                       ; 00020088 203C 0005 F522
+	move.l  #BUFF_END_ADR,D0                       ; 00020088 203C 0005 F522
 	sub.l   A0,D0                                   ; 0002008E 9088
 	asr.w   #$3,D0                                  ; 00020090 E640
 	cmp.w   (A1)+,D0                                ; 00020092 B059
@@ -1080,9 +1080,10 @@ L_000206F0:
 	move.w  SP_MODE(pc),D1                    ; 000206F0 323A 1AEC
 
 L_000206F4:
-	movea.l LONG_000221E2(pc),A1                    ; 000206F4 227A 1AEC                ; J($000206E4) J($000206EE) 
+	movea.l WRITE_STRUCT(pc),A1                    ; 000206F4 227A 1AEC                ; J($000206E4) J($000206EE) 
 	move.w  D1,(A1)                                 ; 000206F8 3281
 	move.w  D0,2(A1)                                ; 000206FA 3340 0002
+
 	clr.w   -2(A0)                                  ; 000206FE 4268 FFFE
 	adda.w  D0,A0                                   ; 00020702 D0C0
 
@@ -1093,7 +1094,7 @@ L_000206F4:
 	move.w  #$FFFF,-(A7)                            ; 00020714 3F3C FFFF
 	subq.w  #$4,A7                                  ; 00020718 594F
 
-	move.l  #WORD_0005F522,D0                       ; 0002071A 203C 0005 F522
+	move.l  #BUFF_END_ADR,D0                       ; 0002071A 203C 0005 F522
 	move.l  D0,D1                                   ; 00020720 2200
 	move.l  D0,D2                                   ; 00020722 2400
 	move.l  D0,D3                                   ; 00020724 2600
@@ -1126,10 +1127,13 @@ L_000206F4:
 L_00020778:
 	move.w  D3,-(A0)                                ; 00020778 3103
 	move.w  D5,-(A0)                                ; 0002077A 3105
+
 	move.w  D0,-(A7)                                ; 0002077C 3F00
 	move.l  A0,-(A7)                                ; 0002077E 2F08
+
 	addq.w  #$1,D7                                  ; 00020780 5247
 	subq.w  #$8,A0                                  ; 00020782 5148
+
 	move.w  (A0)+,D0                                ; 00020784 3018
 	move.w  (A0)+,D5                                ; 00020786 3A18
 	cmp.b   D2,D5                                   ; 00020788 BA02
@@ -1140,11 +1144,14 @@ L_0002078C:
 	beq.s   L_00020778                              ; 00020790 67E6
 
 	move.b  D6,0(A6,D1.w)                           ; 00020792 1D86 1000
+
 	move.w  D3,-(A0)                                ; 00020796 3103
 	move.b  D1,D5                                   ; 00020798 1A01
 	move.w  D5,-(A0)                                ; 0002079A 3105
+
 	addq.w  #$1,D7                                  ; 0002079C 5247
 	subq.w  #$8,A0                                  ; 0002079E 5148
+
 	move.w  (A0)+,D0                                ; 000207A0 3018
 	move.w  (A0)+,D5                                ; 000207A2 3A18
 	cmp.b   D2,D5                                   ; 000207A4 BA02
@@ -1160,6 +1167,7 @@ L_000207B0:
 	add.b   D4,D4                                   ; 000207B4 D804
 	add.b   D4,D4                                   ; 000207B6 D804
 	move.l  0(A1,D4.w),4100(A0)                     ; 000207B8 2171 4000 1004
+
 	moveq   #-1,D7                                  ; 000207BE 7EFF
 	move.b  D5,D3                                   ; 000207C0 1605
 	asr.w   #$4,D3                                  ; 000207C2 E843
@@ -1186,6 +1194,7 @@ L_000207D6:
 
 L_000207EC:
 	move.w  D0,-(A7)                                ; 000207EC 3F00
+
 	move.w  D5,D0                                   ; 000207EE 3005
 	add.w   D0,D0                                   ; 000207F0 D040
 	bvc.s   L_000207F8                              ; 000207F2 6804
@@ -1195,7 +1204,9 @@ L_000207EC:
 L_000207F8:
 	move.w  D3,-(A0)                                ; 000207F8 3103
 	move.w  D5,-(A0)                                ; 000207FA 3105
+
 	move.l  A0,-(A7)                                ; 000207FC 2F08
+
 	addq.w  #$1,D7                                  ; 000207FE 5247
 	lea     -12(A0),A0                              ; 00020800 41E8 FFF4
 	move.l  (A0),D0                                 ; 00020804 2010
@@ -1255,7 +1266,7 @@ L_00020850:
 	bne.s   L_00020816                              ; 00020870 66A4
 
 L_00020872:
-	movea.l LONG_000221E2(pc),A2                    ; 00020872 247A 196E                ; J($000207D2) 
+	movea.l WRITE_STRUCT(pc),A2                    ; 00020872 247A 196E                ; J($000207D2) 
 	lea     8(A2),A2                                ; 00020876 45EA 0008
 	lea     PCG_REV_ALT,A4                        ; 0002087A 49F9 0006 67B6
 	movea.l OX_CHK_POINTER(pc),A5                    ; 00020880 2A7A 197E
@@ -1453,16 +1464,20 @@ L_000209AE:
 	bne.s   L_000209A4                              ; 000209B2 66F0
 
 	move.w  D2,2(A0)                                ; 000209B4 3142 0002
+
 	movea.l (A7)+,A0                                ; 000209B8 205F
 	move.w  (A7)+,D0                                ; 000209BA 301F
+
 	bpl.s   L_000209AE                              ; 000209BC 6AF0
 
 L_000209BE:
 	move.l  #$FFFFFFFF,(A2)                         ; 000209BE 24BC FFFF FFFF           ; J($00020940) J($00020898) 
 	move.l  A5,OX_CHK_POINTER                        ; 000209C4 23CD 0002 2200
-	lea     WORD_0005F522,A0                        ; 000209CA 41F9 0005 F522
+	lea     BUFF_END_ADR,A0                        ; 000209CA 41F9 0005 F522
 	move.w  #$FFFF,4104(A0)                         ; 000209D0 317C FFFF 1008
+
 	move.l  A0,-(A7)                                ; 000209D6 2F08
+
 	lea     PR_TOP_TABLE,A1                        ; 000209D8 43F9 0006 0532
 	move.l  #$FFFFFFFF,256(A1)                      ; 000209DE 237C FFFF FFFF 0100
 	lea     64(A1),A1                               ; 000209E6 43E9 0040
@@ -1476,11 +1491,12 @@ L_000209EE:
 	beq.s   L_000209EA                              ; 000209F0 67F8
 
 	move.l  D0,-(A7)                                ; 000209F2 2F00
+
 	move.l  (A1)+,D0                                ; 000209F4 2019
 	bpl.s   L_000209EE                              ; 000209F6 6AF6
 
 L_000209F8:
-	movea.l LONG_000221E2(pc),A0                    ; 000209F8 207A 17E8
+	movea.l WRITE_STRUCT(pc),A0                    ; 000209F8 207A 17E8
 	move.w  (A0),D0                                 ; 000209FC 3010
 	cmpi.w  #$2,D0                                  ; 000209FE 0C40 0002
 	beq.s   L_00020A4C                              ; 00020A02 6748
@@ -1489,7 +1505,9 @@ L_000209F8:
 	beq.w   L_00020EA2                              ; 00020A08 6700 0498
 
 	movea.l 4(A0),A1                                ; 00020A0C 2268 0004
+
 	movea.l (A7)+,A0                                ; 00020A10 205F
+
 	move.w  4104(A0),D7                             ; 00020A12 3E28 1008
 	bmi.s   L_00020A3A                              ; 00020A16 6B22
 
@@ -1516,7 +1534,7 @@ L_00020A20:
 	bpl.s   L_00020A18                              ; 00020A38 6ADE
 
 L_00020A3A:
-	movea.l LONG_000221E2(pc),A0                    ; 00020A3A 207A 17A6
+	movea.l WRITE_STRUCT(pc),A0                    ; 00020A3A 207A 17A6
 	suba.l  4(A0),A1                                ; 00020A3E 93E8 0004
 	move.w  A1,D0                                   ; 00020A42 3009
 	move.w  D0,2(A0)                                ; 00020A44 3140 0002
@@ -1926,7 +1944,7 @@ L_00020E28:
 	move.w  D0,12482(A6)                            ; 00020E48 3D40 30C2
 	movea.l D6,A2                                   ; 00020E4C 2446
 	move.w  D0,12482(A2)                            ; 00020E4E 3540 30C2
-	movea.l LONG_000221E2(pc),A0                    ; 00020E52 207A 138E
+	movea.l WRITE_STRUCT(pc),A0                    ; 00020E52 207A 138E
 	movea.l 4(A0),A1                                ; 00020E56 2268 0004
 	move.l  #$208,D0                                ; 00020E5A 203C 0000 0208
 	suba.l  A1,A3                                   ; 00020E60 97C9
@@ -2695,7 +2713,7 @@ L_000214D2:
 	move.w  D0,12482(A6)                            ; 000214F2 3D40 30C2
 	movea.l D6,A2                                   ; 000214F6 2446
 	move.w  D0,12482(A2)                            ; 000214F8 3540 30C2
-	movea.l LONG_000221E2(pc),A0                    ; 000214FC 207A 0CE4
+	movea.l WRITE_STRUCT(pc),A0                    ; 000214FC 207A 0CE4
 	movea.l 4(A0),A1                                ; 00021500 2268 0004
 	move.l  #$208,D0                                ; 00021504 203C 0000 0208
 	suba.l  A1,A3                                   ; 0002150A 97C9
@@ -2804,7 +2822,7 @@ L_000215C0:
 	bsr.w   L_0002209C                              ; 000215D0 6100 0ACA
 
 L_000215D4:
-	movea.l LONG_000221E2(pc),A0                    ; 000215D4 207A 0C0C                ; J($00020A48) J($00020E9E) 
+	movea.l WRITE_STRUCT(pc),A0                    ; 000215D4 207A 0C0C                ; J($00020A48) J($00020E9E) 
 	lea     264(A0),A0                              ; 000215D8 41E8 0108
 	cmpa.l  #SPRITE_DATA_TABLE_OVERHEAD,A0                          ; 000215DC B1FC 0005 E51A
 	bne.s   L_000215EA                              ; 000215E2 6606
@@ -2815,7 +2833,7 @@ L_000215EA:
 	cmpa.l  LONG_000221E6(pc),A0                    ; 000215EA B1FA 0BFA
 	beq.s   L_000215EA                              ; 000215EE 67FA
 
-	move.l  A0,LONG_000221E2                        ; 000215F0 23C8 0002 21E2
+	move.l  A0,WRITE_STRUCT                        ; 000215F0 23C8 0002 21E2
 
 	move.l  SAVED_STACK_POINTER(pc),D0                    ; 000215F6 203A 0C12
 	bmi.s   L_00021602                              ; 000215FA 6B06
@@ -2871,7 +2889,7 @@ VBL_INTERRUPT_HANDLER:
 	lea     WORD_0005E202,A0                        ; 00021668 41F9 0005 E202
 
 L_0002166E:
-	cmpa.l  LONG_000221E2(pc),A0                    ; 0002166E B1FA 0B72
+	cmpa.l  WRITE_STRUCT(pc),A0                    ; 0002166E B1FA 0B72
 	beq.s   L_0002167A                              ; 00021672 6706
 
 	move.l  A0,LONG_000221E6                        ; 00021674 23C8 0002 21E6
@@ -4145,7 +4163,7 @@ SP_MODE:
 VBL_COUNTER:
 	dc.w    $0000                                  ; ; 000221E0
 
-LONG_000221E2:
+WRITE_STRUCT:
 	dc.l    WORD_0005E202                              ; [Relocated]; 000221E2
 
 LONG_000221E6:
@@ -101145,7 +101163,7 @@ SPRITE_DATA_TABLE:
 EXTENDED_SPRITE_DATA_TABLE:
 	ds.b    $400
 
-WORD_0005F522:
+BUFF_END_ADR:
 	ds.b    $1010
 
 PR_TOP_TABLE:
