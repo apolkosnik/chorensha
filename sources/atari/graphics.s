@@ -803,8 +803,18 @@ prepare_sprites:
 	move.l	d7,$ffffa204.w ; Send number of sprite infos to be sent to the DSP.
 	subq	#1,d7
 
-.loop:
+	move	d7,-(sp)
+	moveq	#$30,d6
+
+.loop1:
+	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
+	move	(sp),d7
+
+.loop2:
 	subq.l	#8,a0
+	cmp.b	7(a0),d6
+	jne		.skip
+	
 	movem	(a0),d0-d3
 
 	move	d1,d5
@@ -839,7 +849,14 @@ prepare_sprites:
 	move.l	(a5),(a4)+ ; Sprite draw address.
 	move.l	16(a5),(a4)+ ; Sprite restore address.
 
-	dbf		d7,.loop
+.skip:
+	dbf		d7,.loop2
+
+	addq	#1,d6
+	cmp		#$40,d6
+	jne		.loop1
+
+	move	(sp)+,d7
 
 .skip_all:
 	clr.l	(a4) ; End marker.
