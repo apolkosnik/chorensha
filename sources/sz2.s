@@ -694,7 +694,6 @@ XSP_OUT:
 L_000204D0:
 	ifd __ATARI__
 
-;	jsr		reset_sprite_drawing_timer
 	jsr		sprite_engine
 
 	clr.l	d0
@@ -2849,18 +2848,6 @@ L_000215EA:
 	trap    #$F                                     ; 00021600 4E4F                     ; _B_SUPER 
 
 L_00021602:
-	ifd __ATARI__
-
-	jsr		sprite_engine
-
-	endif
-
-	ifd __AMIGA__
-
-	illegal
-
-	endif
-
 	move.l  CURRENT_SPRITE_DATA_ENTRY(pc),D0                    ; 00021602 203A 0BC2
 	sub.l   #SPRITE_DATA_TABLE,D0                       ; 00021606 90BC 0005 E522
 	asr.l   #$3,D0                                  ; 0002160C E680

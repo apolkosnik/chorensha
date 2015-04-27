@@ -3,7 +3,6 @@
 	xdef release_graphics
 	xdef compile_sprite
 	xdef sprite_engine
-	xdef reset_sprite_drawing_timer
 	xdef timer_b_handler
 
 	xdef display_screen_address
