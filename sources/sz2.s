@@ -1,6 +1,7 @@
 
 	ifd __ATARI__
 
+	xdef SPRITE_DATA_ADDRESS
 	xdef SPRITE_DATA_TABLE
 	xdef CURRENT_SPRITE_DATA_ENTRY
 	xdef BACKGROUND_SCROLL_COUNTER
@@ -691,14 +692,19 @@ XSP_OUT:
 	rts                                             ; 000204CE 4E75
 
 L_000204D0:
-	movem.l D1-D7/A0-A6,-(A7)                       ; 000204D0 48E7 7FFE
-
 	ifd __ATARI__
 
-	jsr		reset_sprite_drawing_timer
+;	jsr		reset_sprite_drawing_timer
+	jsr		sprite_engine
 
+	clr.l	d0
+
+	rts
+	
 	endif
 	
+	movem.l D1-D7/A0-A6,-(A7)                       ; 000204D0 48E7 7FFE
+
 	move.l  A7,SAVED_STACK_ADDRESS                        ; 000204D4 23CF 0002 2206
 
 	suba.l  A1,A1                                   ; 000204DA 93C9

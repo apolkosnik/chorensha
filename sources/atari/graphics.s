@@ -852,6 +852,86 @@ prepare_sprites:
 
 ; ------------------------------------------------------------------------------
 
+prepare_sprites2:
+	movem.l	d0-a6,-(sp)
+
+	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
+	move.l	SPRITE_DATA_ADDRESS,a1
+
+	move.l	work_screen_address,a2
+	move	work_background_position,d0
+	swap	d0
+	clr		d0
+	lsr.l	#6,d0
+	add.l	d0,a2
+
+	lea		translated_palettes,a3
+	move.l	work_sprite_infos_address_new,a4
+	move.l	a4,work_sprite_infos_address_next ; Fixme!
+	lea		$ffffa204+2.w,a6
+
+	move.l	a0,d7
+	sub.l	#SPRITE_DATA_TABLE,d7
+	jeq		.skip_all
+
+	btst	#3,$ffffa202.w
+	jeq		*-6
+
+	bset	#3,$ffffa200.w
+
+	lsr		#3,d7
+	move.l	d7,$ffffa204.w ; Send number of sprite infos to be sent to the DSP.
+	subq	#1,d7
+
+.loop:
+	subq.l	#8,a0
+	movem	(a0),d0-d3
+
+	move	d1,d5
+
+	lea		(a2,d0.w*2),a5
+	swap	d1
+	clr		d1
+	lsr.l	#6,d1
+	add.l	d1,a5
+	move.l	a5,(a4)+ ; Screen address.
+
+	move	d3,d1
+	lsr		#4,d1
+	and		#$f0,d1
+	lea		4(a3,d1.w*4),a5
+	move.l	a5,(a4)+ ; Palette address.
+
+	ext.l	d2
+	lsl.l	#2+3+2,d2
+	lea		(a1,d2.l),a5 ; Sprite data.
+
+	move	d3,d1
+	and		#$c000,d1
+	or		32(a5),d1
+	move	d1,(a6) ; Flip info + sprite ID -> DSP.
+	move	d0,(a6) ; X position -> DSP.
+	move	d5,(a6) ; Y position -> DSP.
+
+	rol		#2,d3
+	and		#$3,d3
+	lea		(a5,d3.w*4),a5
+	move.l	(a5),(a4)+ ; Sprite draw address.
+	move.l	16(a5),(a4)+ ; Sprite restore address.
+
+	dbf		d7,.loop
+
+.skip_all:
+	clr.l	(a4) ; End marker.
+
+	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+
 restore_sprites:
 	movem.l	d0-a6,-(sp)
 
@@ -981,8 +1061,8 @@ draw_sprites:
 	move.l	(sp)+,a0
 
 .start:
-	tst		delay_drawing_sprites
-	jne		.delay
+;	tst		delay_drawing_sprites
+;	jne		.delay
 
 	move.l	(a0)+,d0
 	jne		.loop
@@ -1131,7 +1211,7 @@ flip_screen:
 
 	erem
 
-sprite_engine:
+sprite_engine2:
 	tst		still_drawing_sprites
 	jne		.skip
 	
@@ -1140,6 +1220,32 @@ sprite_engine:
 	move.b	#8,$fffffa1b.w
 
 	jsr		prepare_sprites
+	jsr		update_background
+	jsr		translate_palettes
+	
+.skip:
+	jsr		draw_sprites
+
+	tst		still_drawing_sprites
+	jne		.skip2
+	
+	jsr		restore_sprites_dsp
+	jsr		flip_screen
+	
+.skip2:
+	rts
+
+; ------------------------------------------------------------------------------
+
+sprite_engine:
+	tst		still_drawing_sprites
+	jne		.skip
+	
+;	clr.b	$fffffa1b.w
+	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
+	move.b	#8,$fffffa1b.w
+
+	jsr		prepare_sprites2
 	jsr		update_background
 	jsr		translate_palettes
 	
