@@ -775,7 +775,77 @@ compile_sprite:
 prepare_sprites:
 	movem.l	d0-a6,-(sp)
 
-	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
+	; Sort sprite data.
+
+	lea		SPRITE_DATA_TABLE,a0
+	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
+	sub.l	a0,d7
+	jeq		.skip_all
+
+	lsr		#3,d7
+	subq	#1,d7
+
+	lea		sort_buffers,a1
+	lea		sort_counts+16*2,a2
+
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	
+	addq.l	#6,a0
+	
+	clr		d0
+	
+.sort_loop:
+	moveq	#$f,d1
+	and		(a0),d1
+	
+	move	(a2,d1.w*2),d2
+	addq	#1,(a2,d1.w*2)
+	swap	d1
+	lsr.l	#7,d1
+	add		d2,d1
+	move	d0,(a1,d1.w*2)
+
+	addq	#1,d0
+	addq.l	#8,a0
+	
+	dbf		d7,.sort_loop
+
+	; Reorder sprite data.
+
+	lea		SPRITE_DATA_TABLE,a0
+	lea		sorted_sprite_data,a3
+	
+	move	#16-1,d7
+	
+.reorder_loop:
+	move	(a2)+,d6
+	jeq		.skip_reorder
+	
+	move.l	a1,a4
+	subq	#1,d6
+	
+.reorder_loop2:
+	move	(a4)+,d0
+	move.l	(a0,d0.w*8),(a3)+
+	move.l	4(a0,d0.w*8),(a3)+
+
+	dbf		d6,.reorder_loop2
+	
+.skip_reorder:
+	lea		512*2(a1),a1
+
+	dbf		d7,.reorder_loop
+	
+	; Process sprite data.
+
+	lea		sorted_sprite_data,a0
 	move.l	SPRITE_DATA_ADDRESS,a1
 
 	move.l	work_screen_address,a2
@@ -790,32 +860,21 @@ prepare_sprites:
 	move.l	a4,work_sprite_infos_address_next ; Fixme!
 	lea		$ffffa204+2.w,a6
 
-	move.l	a0,d7
+	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
 	sub.l	#SPRITE_DATA_TABLE,d7
-	jeq		.skip_all
+	lsr		#3,d7
 
 	btst	#3,$ffffa202.w
 	jeq		*-6
 
 	bset	#3,$ffffa200.w
 
-	lsr		#3,d7
 	move.l	d7,$ffffa204.w ; Send number of sprite infos to be sent to the DSP.
+
 	subq	#1,d7
 
-	move	d7,-(sp)
-	moveq	#$30,d6
-
-.loop1:
-	move.l	CURRENT_SPRITE_DATA_ENTRY,a0
-	move	(sp),d7
-
-.loop2:
-	subq.l	#8,a0
-	cmp.b	7(a0),d6
-	jne		.skip
-	
-	movem	(a0),d0-d3
+.loop:
+	movem	(a0)+,d0-d3
 
 	move	d1,d5
 
@@ -849,20 +908,13 @@ prepare_sprites:
 	move.l	(a5),(a4)+ ; Sprite draw address.
 	move.l	16(a5),(a4)+ ; Sprite restore address.
 
-.skip:
-	dbf		d7,.loop2
+	dbf		d7,.loop
 
-	addq	#1,d6
-	cmp		#$40,d6
-	jne		.loop1
-
-	move	(sp)+,d7
-
-.skip_all:
 	clr.l	(a4) ; End marker.
 
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
+.skip_all:
 	movem.l	(sp)+,d0-a6
 
 	rts
@@ -1253,16 +1305,16 @@ still_drawing_sprites:
 	ds		1
 
 sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
-	ds.l	4*512
+	ds.l	512*4
 
 sprite_infos2: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
-	ds.l	4*512
+	ds.l	512*4
 
 sprite_infos3: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
-	ds.l	4*512
+	ds.l	512*4
 
 sprite_infos4: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
-	ds.l	4*512
+	ds.l	512*4
 
 text_bitmaps:
 	ds.l	32*2
@@ -1296,6 +1348,15 @@ sprite_mask_bitmap:
 
 sprite_count:
 	ds		1
+
+sort_buffers:
+	ds		16*512
+	
+sort_counts:
+	ds		16
+
+sorted_sprite_data:
+	ds		512*8
 
 ; ------------------------------------------------------------------------------
 	end
