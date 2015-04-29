@@ -828,11 +828,11 @@ prepare_sprites:
 	move	(a2)+,d6
 	jeq		.skip_reorder
 	
-	move.l	a1,a4
+	lea     (a1,d6.w*2),a4
 	subq	#1,d6
 	
 .reorder_loop2:
-	move	(a4)+,d0
+	move	-(a4),d0
 	move.l	(a0,d0.w*8),(a3)+
 	move.l	4(a0,d0.w*8),(a3)+
 
