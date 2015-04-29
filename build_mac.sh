@@ -7,9 +7,9 @@ wine ./tools/human68k-ld.exe -q -o binaries/sz2.o binaries/sz2_x68k.o binaries/m
 wine ./tools/human68k-objcopy.exe -O xfile binaries/sz2.o binaries/sz2.x
 cp binaries/sz2.x binaries/x68000/CH68_101_B/SZ2.X
 
-#xxd binaries/sz2.x > binaries/sz2.hex
-#diff binaries/sz2.hex binaries/x68000/sz2.hex > binaries/sz2.dif
-#diff binaries/sz2.dif binaries/x68000/sz2.dif
+xxd binaries/sz2.x > binaries/sz2.hex
+diff binaries/sz2.hex binaries/x68000/sz2.hex > binaries/sz2.dif
+diff binaries/sz2.dif binaries/x68000/sz2.dif
 
 #
 # Atari
