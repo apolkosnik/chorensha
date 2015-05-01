@@ -2,6 +2,7 @@
 	xdef initialize_graphics
 	xdef release_graphics
 	xdef compile_sprite
+	xdef compile_characters
 	xdef sprite_engine
 	xdef timer_b_handler
 
@@ -772,6 +773,115 @@ compile_sprite:
 
 ; ------------------------------------------------------------------------------
 
+compile_characters:
+	movem.l	d0-a6,-(sp)
+
+	move.l	TEXT_GRAPHICS_ADDRESS,-(sp)
+	
+	move	#256-1,d7
+	
+.characters_loop:
+
+	; Clear sprite matrix.
+
+	lea		sprite_matrix+16*16,a1
+
+	move	#16-1,d6
+
+.clear_loop:
+	clr.l	-(a1)
+	clr.l	-(a1)
+	clr.l	-(a1)
+	clr.l	-(a1)
+
+	dbf		d6,.clear_loop
+
+	; Clear color count table.
+
+	lea		sprite_colors_count+16*2,a2
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+
+	move.l	(sp),a0
+
+	; Decode character graphics.
+
+	move	#8-1,d6
+
+.lines_loop:
+	move.b	(a0)+,d0
+	move.b	(a0)+,d1
+	move.b	(a0)+,d2
+	move.b	(a0)+,d3
+
+	move	#8-1,d5
+
+.pixels_loop:
+	clr		d4
+
+	add.b	d0,d0
+	addx	d4,d4
+	add.b	d1,d1
+	addx	d4,d4
+	add.b	d2,d2
+	addx	d4,d4
+	add.b	d3,d3
+	addx	d4,d4
+
+	move	d4,(a1)+
+
+	dbf		d5,.pixels_loop
+
+	addq.l	#8,a1
+
+	dbf		d6,.lines_loop
+
+	; Palette color counting.
+
+	lea		sprite_colors_count+2,a0
+	lea		sprite_color_to_register_table+2,a1
+	clr		d0
+
+	move	#16-1-1,d6
+
+.count_loop:
+	tst		(a0)+
+	jeq		.color_not_used
+
+	move	d0,(a1)
+	addq	#1,d0
+
+.color_not_used:
+	addq.l	#2,a1
+
+	dbf		d6,.count_loop
+
+	move	d0,sprite_color_count
+
+	; Create normal sprite.
+
+	move.l	(sp),a0
+	jsr		convert_sprite_to_drawing_code
+	addq.l	#4,a0
+	jsr		convert_sprite_to_restore_data
+
+	add.l	#4*8,(sp)
+	
+	dbf		d7,.characters_loop
+	
+	addq.l	#4,sp
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+
 prepare_sprites:
 	movem.l	d0-a6,-(sp)
 
@@ -1187,19 +1297,6 @@ flip_screen:
 
 ; ------------------------------------------------------------------------------
 
-	rem
-
-	jsr		prepare_sprites
-	jsr		update_background
-	jsr		translate_palettes
-;	jsr		restore_sprites
-	jsr		draw_sprites
-;	jsr		draw_sprites_dsp ; Fixme!
-	jsr		restore_sprites_dsp ; Fixme!
-	jsr		flip_screen
-
-	erem
-
 sprite_engine:
 	tst		still_drawing_sprites
 	jne		.skip
@@ -1219,6 +1316,7 @@ sprite_engine:
 	jne		.skip2
 	
 	jsr		restore_sprites_dsp
+	jsr		draw_text
 	jsr		flip_screen
 	
 .skip2:
@@ -1242,6 +1340,104 @@ timer_b_handler:
 
 	rte
 
+; ------------------------------------------------------------------------------
+
+draw_text:	
+	lea		text_bitmaps,a0
+	lea		L_00E00000,a1
+	move.l	work_screen_address,a2
+	add.l	#SCREEN_DISPLAY_OFFSET,a2
+	lea		translated_palettes,a3
+
+	move	#32-1,d7
+
+.text_lines_loop:
+	move.l	(a0),d0
+	jeq		.skip_text_line	
+
+	move	#32-1,d6
+
+.characters_loop:
+	add.l	d0,d0
+	jcc		.skip_character
+
+	move	#8-1,d5
+
+.lines_loop:
+	move.l	a1,a4
+	move.b	(a4),d1
+	swap	d1
+
+	add.l	#$20000,a4
+	move.b	(a4),d1
+	swap	d1
+
+	add.l	#$20000,a4
+	move.b	(a4),d2
+	swap	d2
+
+	add.l	#$20000,a4
+	move.b	(a4),d2
+	swap	d2
+
+	move.l	a2,a4
+
+	move	#8-1,d4
+
+.pixels_loop:
+	clr		d3
+
+	swap	d2
+	add.b	d2,d2
+	addx	d3,d3
+	swap	d2
+	add.b	d2,d2
+	addx	d3,d3
+	swap	d1
+	add.b	d1,d1
+	addx	d3,d3
+	swap	d1
+	add.b	d1,d1
+	addx	d3,d3
+	jeq		.skip_pixel
+
+	move	(a3,d3.w*4),(a4)
+
+.skip_pixel:
+	addq.l	#2,a4
+
+	dbf		d4,.pixels_loop
+
+	add.l	#128,a1
+	add.l	#256*2*2,a2
+
+	dbf		d5,.lines_loop
+
+	sub.l	#128*8,a1
+	sub.l	#256*2*2*8,a2
+
+.skip_character:
+	addq.l	#1,a1
+	add.l	#8*2,a2
+
+	dbf		d6,.characters_loop
+
+	add.l	#128*8-32,a1
+	add.l	#256*2*2*8-256*2,a2
+
+	jra		.next_text_line
+
+.skip_text_line:
+	add.l	#128*8,a1
+	add.l	#256*2*2*8,a2
+
+.next_text_line:
+	move.l	32*4(a0),(a0)+
+
+	dbf		d7,.text_lines_loop	
+
+	rts
+	
 ; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------

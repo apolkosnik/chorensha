@@ -5,6 +5,7 @@
 	xdef SPRITE_DATA_TABLE
 	xdef CURRENT_SPRITE_DATA_ENTRY
 	xdef BACKGROUND_SCROLL_COUNTER
+	xdef TEXT_GRAPHICS_ADDRESS
 
 	endif
 
@@ -4429,8 +4430,8 @@ LONG_00022360:
 LONG_00022364:
 	dc.l    $00000000                              ; ; 00022364
 
-L_00022368:
-	move.l  4(A7),LONG_00022698                     ; 00022368 23EF 0004 0002 2698      ; S($00025CD2) 
+SET_TEXT_GRAPHICS:
+	move.l  4(A7),TEXT_GRAPHICS_ADDRESS                     ; 00022368 23EF 0004 0002 2698      ; S($00025CD2) 
 
 	rts                                             ; 00022370 4E75
 
@@ -4438,12 +4439,12 @@ DRAW_CHARACTER:
 	ifd __ATARI__
 
 	lea		text_bitmaps,a0
-	move	10(sp),d0
+	move	8+2(sp),d0
 	lea		(a0,d0.w*4),a0
 
 	clr.l	d0
 	move	#31,d1
-	sub		6(sp),d1
+	sub		4+2(sp),d1
 	bset	d1,d0
 	or.l	d0,(a0)
 	or.l	d0,32*4(a0)
@@ -4454,7 +4455,7 @@ DRAW_CHARACTER:
 	not.l	d0
 	and.l	d0,32*4(a0)
 
-.not_space	
+.not_space:	
 
 	endif
 
@@ -4476,7 +4477,7 @@ DRAW_CHARACTER:
 	subi.w  #$1F,D1                                 ; 00022394 0441 001F
 
 L_00022398:
-	movea.l LONG_00022698(pc),A0                    ; 00022398 207A 02FE
+	movea.l TEXT_GRAPHICS_ADDRESS(pc),A0                    ; 00022398 207A 02FE
 	adda.l  D0,A0                                   ; 0002239C D1C0
 	adda.w  D1,A0                                   ; 0002239E D0C1
 	movea.l #L_00E00000+$0,A1                       ; 000223A0 227C 00E0 0000           ; [TEXT PLANE 1 + $0]  
@@ -4553,7 +4554,7 @@ L_00022494:
 	move.l  D0,LONG_00022694                        ; 0002249C 23C0 0002 2694
 	move.l  12(A7),D0                               ; 000224A2 202F 000C
 	lsl.l   #$7,D0                                  ; 000224A6 EF88
-	movea.l LONG_00022698(pc),A0                    ; 000224A8 207A 01EE
+	movea.l TEXT_GRAPHICS_ADDRESS(pc),A0                    ; 000224A8 207A 01EE
 	adda.l  D0,A0                                   ; 000224AC D1C0
 	movea.l #L_00E00000+$0,A1                       ; 000224AE 227C 00E0 0000           ; [TEXT PLANE 1 + $0]  
 	move.w  6(A7),D0                                ; 000224B4 302F 0006
@@ -4736,7 +4737,7 @@ TPALET2:
 LONG_00022694:
 	dc.l    $00000000                              ; ; 00022694
 
-LONG_00022698:
+TEXT_GRAPHICS_ADDRESS:
 	dc.l    $00000000                              ; ; 00022698
 
 WORD_0002269C:
@@ -11417,11 +11418,11 @@ L_00025CB3:
 
 	even
 
-L_00025CC8:
+LOAD_TEXT_GRAPHICS:
 	move.l  D3,-(A7)                                ; 00025CC8 2F03                     ; S($0002942A) 
 	move.l  #L_00086C4C,D3                          ; 00025CCA 263C 0008 6C4C
 	move.l  D3,-(A7)                                ; 00025CD0 2F03
-	jsr     L_00022368                              ; 00025CD2 4EB9 0002 2368
+	jsr     SET_TEXT_GRAPHICS                              ; 00025CD2 4EB9 0002 2368
 
 	pea     $0.w                                    ; 00025CD8 4878 0000
 	pea     $0.w                                    ; 00025CDC 4878 0000
@@ -11439,9 +11440,15 @@ L_00025CC8:
 	move.l  D3,-(A7)                                ; 00025D04 2F03
 	jsr     READ_FILE                              ; 00025D06 4EB9 0005 A13A
 
+	ifd __ATARI__
+	
+	jsr		compile_characters
+	
+	endif
+	
 	lea     36(A7),A7                               ; 00025D0C 4FEF 0024
 
-	jsr     L_0005A72A                              ; 00025D10 4EB9 0005 A72A
+	jsr     CLOSE_FILES                              ; 00025D10 4EB9 0005 A72A
 
 	move.l  (A7)+,D3                                ; 00025D16 261F
 
@@ -14880,7 +14887,7 @@ L_00027A74:
 	move.l  D3,-(A7)                                ; 00027AC4 2F03
 	jsr     L_0005B360                              ; 00027AC6 4EB9 0005 B360
 
-	jsr     L_0005A72A                              ; 00027ACC 4EB9 0005 A72A
+	jsr     CLOSE_FILES                              ; 00027ACC 4EB9 0005 A72A
 
 	pea     -1.w                                    ; 00027AD2 4878 FFFF
 	pea     $7D.w                                   ; 00027AD6 4878 007D
@@ -17056,7 +17063,7 @@ INITIALIZE_GAME:
 
 	lea     48(A7),A7                               ; 000290DE 4FEF 0030
 
-	jsr     L_0005A72A                              ; 000290E2 4EB9 0005 A72A
+	jsr     CLOSE_FILES                              ; 000290E2 4EB9 0005 A72A
 
 	pea     L_00028F87(pc)                          ; 000290E8 487A FE9D
 	jsr     LOAD_DEMO_REPLAY_FILE                              ; 000290EC 4EB9 0002 3764
@@ -17420,7 +17427,7 @@ skip_sincos:
 
 	bsr.s   L_0002943E                              ; 00029428 6114
 
-	jsr     L_00025CC8                              ; 0002942A 4EB9 0002 5CC8
+	jsr     LOAD_TEXT_GRAPHICS                              ; 0002942A 4EB9 0002 5CC8
 
 	bsr.w   L_000294FA                              ; 00029430 6100 00C8
 
@@ -90779,13 +90786,14 @@ READ_JOYSTICK_RAW:
 
 	rts                                             ; 0005A728 4E75
 
-L_0005A72A:
+CLOSE_FILES:
 	movem.l D5-D7/A6,-(A7)                          ; 0005A72A 48E7 0702                ; S($00027ACC) 
 
 	move.w  #$22,D7                                 ; 0005A72E 3E3C 0022
 	movea.l #LONG_000AAFA2,A6                       ; 0005A732 2C7C 000A AFA2
 	clr.l   D5                                      ; 0005A738 4285
 	clr.l   D6                                      ; 0005A73A 4286
+
 	subq.l  #$4,A7                                  ; 0005A73C 598F
 
 L_0005A73E:
@@ -90804,6 +90812,7 @@ L_0005A750:
 
 	move.l  D6,D0                                   ; 0005A75A 2006
 	or.l    D5,D0                                   ; 0005A75C 8085
+
 	addq.l  #$4,A7                                  ; 0005A75E 588F
 
 	movem.l (A7)+,D5-D7/A6                          ; 0005A760 4CDF 40E0
@@ -92594,7 +92603,7 @@ L_0005B446:
 
 	jsr     L_0005C6C6                              ; 0005B44C 4EB9 0005 C6C6
 
-	jsr     L_0005A72A                              ; 0005B452 4EB9 0005 A72A
+	jsr     CLOSE_FILES                              ; 0005B452 4EB9 0005 A72A
 
 	jmp     L_0005C6C2                              ; 0005B458 4EF9 0005 C6C2
 
