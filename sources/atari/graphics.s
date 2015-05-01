@@ -786,7 +786,7 @@ compile_characters:
 
 	lea		sprite_matrix+16*16,a1
 
-	move	#16-1,d6
+	moveq	#16-1,d6
 
 .clear_loop:
 	clr.l	-(a1)
@@ -812,7 +812,7 @@ compile_characters:
 
 	; Decode character graphics.
 
-	move	#8-1,d6
+	moveq	#8-1,d6
 
 .lines_loop:
 	move.b	(a0)+,d0
@@ -834,7 +834,8 @@ compile_characters:
 	add.b	d3,d3
 	addx	d4,d4
 
-	move	d4,(a1)+
+	addq	#1,(a2,d4.w*2)
+	move.b	d4,(a1)+
 
 	dbf		d5,.pixels_loop
 
@@ -848,7 +849,7 @@ compile_characters:
 	lea		sprite_color_to_register_table+2,a1
 	clr		d0
 
-	move	#16-1-1,d6
+	moveq	#16-1-1,d6
 
 .count_loop:
 	tst		(a0)+
