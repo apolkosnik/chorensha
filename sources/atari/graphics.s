@@ -10,6 +10,7 @@
 	xdef work_screen_address
 	xdef display_window_address
 	xdef text_bitmaps
+	xdef text_matrix
 
 SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
@@ -1343,7 +1344,7 @@ timer_b_handler:
 
 ; ------------------------------------------------------------------------------
 
-draw_text:	
+draw_text_slow:
 	lea		text_bitmaps,a0
 	lea		L_00E00000,a1
 	move.l	work_screen_address,a2
@@ -1440,6 +1441,60 @@ draw_text:
 	rts
 	
 ; ------------------------------------------------------------------------------
+
+draw_text:
+	lea		text_bitmaps,a0
+	lea		text_matrix,a1
+	move.l	TEXT_GRAPHICS_ADDRESS,a2
+	lea		translated_palettes,a5
+	move.l	work_screen_address,a6
+	add.l	#SCREEN_DISPLAY_OFFSET,a6
+
+	move	#32-1,d7
+
+.text_lines_loop:
+	move.l	(a0),d0
+	jeq		.skip_text_line	
+
+	move	#32-1,d6
+
+.characters_loop:
+	add.l	d0,d0
+	jcc		.skip_character
+
+	movem.l	d0/d6-d7/a0-a2/a5-a6,-(sp)
+
+	clr		d0
+	move.b	(a1),d0
+	lsl		#5,d0
+	move.l	(a2,d0.w),a0
+
+	jsr		(a0)
+	
+	movem.l	(sp)+,d0/d6-d7/a0-a2/a5-a6
+
+.skip_character:
+	addq.l	#1,a1
+	add.l	#8*2,a6
+
+	dbf		d6,.characters_loop
+
+	add.l	#256*2*2*8-256*2,a6
+
+	jra		.next_text_line
+
+.skip_text_line:
+	add.l	#32,a1
+	add.l	#256*2*2*8,a6
+
+.next_text_line:
+	move.l	32*4(a0),(a0)+
+
+	dbf		d7,.text_lines_loop	
+
+	rts
+	
+; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
 
@@ -1514,7 +1569,10 @@ sprite_infos4: ; screen_address, palette_address, sprite_draw_address, sprite_re
 	ds.l	512*4
 
 text_bitmaps:
-	ds.l	32*2
+	ds.l	2*32
+
+text_matrix:
+	ds.b	32*32
 
 background_image:
 	ds.b	SCREEN_BUFFER_SIZE
