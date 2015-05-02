@@ -830,7 +830,7 @@ compile_characters:
 	move.b	32*2+14(a2),(a1)+
 	move.b	32*3+14(a2),(a1)+
 
-	addq.l	#1,a2
+	add.l	#16,a2
 	
 	move.b	32*0+0(a2),(a1)+
 	move.b	32*1+0(a2),(a1)+
@@ -872,7 +872,7 @@ compile_characters:
 	move.b	32*2+14(a2),(a1)+
 	move.b	32*3+14(a2),(a1)+
 
-	add.l	#16-1,a2
+	sub.l	#16-1,a2
 	
 	move.b	32*0+0(a2),(a1)+
 	move.b	32*1+0(a2),(a1)+
@@ -914,7 +914,7 @@ compile_characters:
 	move.b	32*2+14(a2),(a1)+
 	move.b	32*3+14(a2),(a1)+
 
-	addq.l	#1,a2
+	add.l	#16,a2
 	
 	move.b	32*0+0(a2),(a1)+
 	move.b	32*1+0(a2),(a1)+
@@ -1039,10 +1039,10 @@ compile_characters:
 	moveq	#8-1,d6
 
 .lines_loop:
-	move.b	(a0)+,d0
-	move.b	(a0)+,d1
-	move.b	(a0)+,d2
 	move.b	(a0)+,d3
+	move.b	(a0)+,d2
+	move.b	(a0)+,d1
+	move.b	(a0)+,d0
 
 	move	#8-1,d5
 
@@ -1568,6 +1568,8 @@ timer_b_handler:
 ; ------------------------------------------------------------------------------
 
 draw_text_slow:
+	movem.l	d0-a6,-(sp)
+
 	lea		text_bitmaps,a0
 	lea		L_00E00000,a1
 	move.l	work_screen_address,a2
@@ -1660,6 +1662,8 @@ draw_text_slow:
 	move.l	32*4(a0),(a0)+
 
 	dbf		d7,.text_lines_loop	
+
+	movem.l	(sp)+,d0-a6
 
 	rts
 	
