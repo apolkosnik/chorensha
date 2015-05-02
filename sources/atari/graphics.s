@@ -777,6 +777,229 @@ compile_sprite:
 compile_characters:
 	movem.l	d0-a6,-(sp)
 
+	; Reorder character graphics.
+	
+	move.l	TEXT_GRAPHICS_ADDRESS,a0
+	
+	clr		d0
+	
+.reorder_loop:
+	lea		text_reorder_buffer,a1
+
+	move	d0,d1
+	lsl		#5,d1
+	lea		(a0,d1.w),a2
+
+	move.b	32*0+0(a2),(a1)+
+	move.b	32*1+0(a2),(a1)+
+	move.b	32*2+0(a2),(a1)+
+	move.b	32*3+0(a2),(a1)+
+
+	move.b	32*0+2(a2),(a1)+
+	move.b	32*1+2(a2),(a1)+
+	move.b	32*2+2(a2),(a1)+
+	move.b	32*3+2(a2),(a1)+
+
+	move.b	32*0+4(a2),(a1)+
+	move.b	32*1+4(a2),(a1)+
+	move.b	32*2+4(a2),(a1)+
+	move.b	32*3+4(a2),(a1)+
+	
+	move.b	32*0+6(a2),(a1)+
+	move.b	32*1+6(a2),(a1)+
+	move.b	32*2+6(a2),(a1)+
+	move.b	32*3+6(a2),(a1)+
+	
+	move.b	32*0+8(a2),(a1)+
+	move.b	32*1+8(a2),(a1)+
+	move.b	32*2+8(a2),(a1)+
+	move.b	32*3+8(a2),(a1)+
+
+	move.b	32*0+10(a2),(a1)+
+	move.b	32*1+10(a2),(a1)+
+	move.b	32*2+10(a2),(a1)+
+	move.b	32*3+10(a2),(a1)+
+
+	move.b	32*0+12(a2),(a1)+
+	move.b	32*1+12(a2),(a1)+
+	move.b	32*2+12(a2),(a1)+
+	move.b	32*3+12(a2),(a1)+
+	
+	move.b	32*0+14(a2),(a1)+
+	move.b	32*1+14(a2),(a1)+
+	move.b	32*2+14(a2),(a1)+
+	move.b	32*3+14(a2),(a1)+
+
+	addq.l	#1,a2
+	
+	move.b	32*0+0(a2),(a1)+
+	move.b	32*1+0(a2),(a1)+
+	move.b	32*2+0(a2),(a1)+
+	move.b	32*3+0(a2),(a1)+
+
+	move.b	32*0+2(a2),(a1)+
+	move.b	32*1+2(a2),(a1)+
+	move.b	32*2+2(a2),(a1)+
+	move.b	32*3+2(a2),(a1)+
+
+	move.b	32*0+4(a2),(a1)+
+	move.b	32*1+4(a2),(a1)+
+	move.b	32*2+4(a2),(a1)+
+	move.b	32*3+4(a2),(a1)+
+	
+	move.b	32*0+6(a2),(a1)+
+	move.b	32*1+6(a2),(a1)+
+	move.b	32*2+6(a2),(a1)+
+	move.b	32*3+6(a2),(a1)+
+	
+	move.b	32*0+8(a2),(a1)+
+	move.b	32*1+8(a2),(a1)+
+	move.b	32*2+8(a2),(a1)+
+	move.b	32*3+8(a2),(a1)+
+
+	move.b	32*0+10(a2),(a1)+
+	move.b	32*1+10(a2),(a1)+
+	move.b	32*2+10(a2),(a1)+
+	move.b	32*3+10(a2),(a1)+
+
+	move.b	32*0+12(a2),(a1)+
+	move.b	32*1+12(a2),(a1)+
+	move.b	32*2+12(a2),(a1)+
+	move.b	32*3+12(a2),(a1)+
+	
+	move.b	32*0+14(a2),(a1)+
+	move.b	32*1+14(a2),(a1)+
+	move.b	32*2+14(a2),(a1)+
+	move.b	32*3+14(a2),(a1)+
+
+	add.l	#16-1,a2
+	
+	move.b	32*0+0(a2),(a1)+
+	move.b	32*1+0(a2),(a1)+
+	move.b	32*2+0(a2),(a1)+
+	move.b	32*3+0(a2),(a1)+
+
+	move.b	32*0+2(a2),(a1)+
+	move.b	32*1+2(a2),(a1)+
+	move.b	32*2+2(a2),(a1)+
+	move.b	32*3+2(a2),(a1)+
+
+	move.b	32*0+4(a2),(a1)+
+	move.b	32*1+4(a2),(a1)+
+	move.b	32*2+4(a2),(a1)+
+	move.b	32*3+4(a2),(a1)+
+	
+	move.b	32*0+6(a2),(a1)+
+	move.b	32*1+6(a2),(a1)+
+	move.b	32*2+6(a2),(a1)+
+	move.b	32*3+6(a2),(a1)+
+	
+	move.b	32*0+8(a2),(a1)+
+	move.b	32*1+8(a2),(a1)+
+	move.b	32*2+8(a2),(a1)+
+	move.b	32*3+8(a2),(a1)+
+
+	move.b	32*0+10(a2),(a1)+
+	move.b	32*1+10(a2),(a1)+
+	move.b	32*2+10(a2),(a1)+
+	move.b	32*3+10(a2),(a1)+
+
+	move.b	32*0+12(a2),(a1)+
+	move.b	32*1+12(a2),(a1)+
+	move.b	32*2+12(a2),(a1)+
+	move.b	32*3+12(a2),(a1)+
+	
+	move.b	32*0+14(a2),(a1)+
+	move.b	32*1+14(a2),(a1)+
+	move.b	32*2+14(a2),(a1)+
+	move.b	32*3+14(a2),(a1)+
+
+	addq.l	#1,a2
+	
+	move.b	32*0+0(a2),(a1)+
+	move.b	32*1+0(a2),(a1)+
+	move.b	32*2+0(a2),(a1)+
+	move.b	32*3+0(a2),(a1)+
+
+	move.b	32*0+2(a2),(a1)+
+	move.b	32*1+2(a2),(a1)+
+	move.b	32*2+2(a2),(a1)+
+	move.b	32*3+2(a2),(a1)+
+
+	move.b	32*0+4(a2),(a1)+
+	move.b	32*1+4(a2),(a1)+
+	move.b	32*2+4(a2),(a1)+
+	move.b	32*3+4(a2),(a1)+
+	
+	move.b	32*0+6(a2),(a1)+
+	move.b	32*1+6(a2),(a1)+
+	move.b	32*2+6(a2),(a1)+
+	move.b	32*3+6(a2),(a1)+
+	
+	move.b	32*0+8(a2),(a1)+
+	move.b	32*1+8(a2),(a1)+
+	move.b	32*2+8(a2),(a1)+
+	move.b	32*3+8(a2),(a1)+
+
+	move.b	32*0+10(a2),(a1)+
+	move.b	32*1+10(a2),(a1)+
+	move.b	32*2+10(a2),(a1)+
+	move.b	32*3+10(a2),(a1)+
+
+	move.b	32*0+12(a2),(a1)+
+	move.b	32*1+12(a2),(a1)+
+	move.b	32*2+12(a2),(a1)+
+	move.b	32*3+12(a2),(a1)+
+	
+	move.b	32*0+14(a2),(a1)+
+	move.b	32*1+14(a2),(a1)+
+	move.b	32*2+14(a2),(a1)+
+	move.b	32*3+14(a2),(a1)+
+
+	sub.l	#16+1,a2
+	lea		text_reorder_buffer,a1
+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	move.l	(a1)+,(a2)+
+	
+	addq.b	#4,d0
+	jne		.reorder_loop
+	
+	; Compile characters.
+
 	move.l	TEXT_GRAPHICS_ADDRESS,-(sp)
 	
 	move	#256-1,d7
@@ -1443,6 +1666,8 @@ draw_text_slow:
 ; ------------------------------------------------------------------------------
 
 draw_text:
+	movem.l	d0-a6,-(sp)
+
 	lea		text_bitmaps,a0
 	lea		text_matrix,a1
 	move.l	TEXT_GRAPHICS_ADDRESS,a2
@@ -1491,6 +1716,8 @@ draw_text:
 	move.l	32*4(a0),(a0)+
 
 	dbf		d7,.text_lines_loop	
+
+	movem.l	(sp)+,d0-a6
 
 	rts
 	
@@ -1573,6 +1800,9 @@ text_bitmaps:
 
 text_matrix:
 	ds.b	32*32
+
+text_reorder_buffer:
+	ds.b	32*4
 
 background_image:
 	ds.b	SCREEN_BUFFER_SIZE
