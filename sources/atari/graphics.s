@@ -1544,6 +1544,7 @@ sprite_engine:
 	
 	jsr		restore_sprites_dsp
 	jsr		draw_text
+;	jsr		draw_text_slow
 	jsr		flip_screen
 	
 .skip2:
@@ -1677,7 +1678,7 @@ draw_text:
 	lea		text_bitmaps,a0
 	lea		text_matrix,a1
 	move.l	TEXT_GRAPHICS_ADDRESS,a2
-	lea		translated_palettes,a5
+	lea		translated_palettes+4,a5
 	move.l	work_screen_address,a6
 	add.l	#SCREEN_DISPLAY_OFFSET,a6
 
