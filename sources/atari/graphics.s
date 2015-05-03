@@ -16,6 +16,7 @@ SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
 MAX_NUMBER_OF_SPRITES=1885
 MAX_LINES_PER_SPRITE_DRAWING=170 ; 180
+MAX_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
 
 ; ------------------------------------------------------------------------------
 	text
@@ -956,8 +957,8 @@ compile_characters:
 	move.b	32*2+14(a2),(a1)+
 	move.b	32*3+14(a2),(a1)+
 
-	sub.l	#16+1,a2
 	lea		text_reorder_buffer,a1
+	sub.l	#16+1,a2
 
 	move.l	(a1)+,(a2)+
 	move.l	(a1)+,(a2)+
@@ -995,14 +996,15 @@ compile_characters:
 	move.l	(a1)+,(a2)+
 	move.l	(a1)+,(a2)+
 	
-	addq.b	#4,d0
+	addq	#4,d0
+	cmp		#MAX_NUMBER_OF_CHARACTERS,d0
 	jne		.reorder_loop
 	
 	; Compile characters.
 
 	move.l	TEXT_GRAPHICS_ADDRESS,-(sp)
 	
-	move	#256-1,d7
+	move	#MAX_NUMBER_OF_CHARACTERS-1,d7
 	
 .characters_loop:
 

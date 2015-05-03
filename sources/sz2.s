@@ -4485,6 +4485,7 @@ L_00022398:
 	movea.l TEXT_GRAPHICS_ADDRESS(pc),A0                    ; 00022398 207A 02FE
 	adda.l  D0,A0                                   ; 0002239C D1C0
 	adda.w  D1,A0                                   ; 0002239E D0C1
+
 	movea.l #L_00E00000+$0,A1                       ; 000223A0 227C 00E0 0000           ; [TEXT PLANE 1 + $0]  
 	move.w  6(A7),D0                                ; 000223A6 302F 0006
 	andi.w  #%0000000001111111,D0                   ; 000223AA 0240 007F
