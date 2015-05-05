@@ -4,7 +4,6 @@
 	xdef compile_sprite
 	xdef compile_characters
 	xdef sprite_engine
-	xdef timer_b_handler
 
 	xdef display_screen_address
 	xdef work_screen_address
@@ -15,7 +14,6 @@
 SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
 MAX_NUMBER_OF_SPRITES=1885
-MAX_LINES_PER_SPRITE_DRAWING=170 ; 180
 MAX_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
 
 ; ------------------------------------------------------------------------------
@@ -1366,10 +1364,6 @@ restore_sprites_dsp:
 draw_sprites:
 	movem.l	d0-a6,-(sp)
 
-;	clr.b	$fffffa1b.w
-	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
-	move.b	#8,$fffffa1b.w
-
 ;	move.l	work_sprite_infos_address_new,a0
 	move.l	work_sprite_infos_address_next,a0
 
@@ -1387,31 +1381,12 @@ draw_sprites:
 	move.l	(sp)+,a0
 
 .start:
-;	tst		delay_drawing_sprites
-;	jne		.delay
-
 	move.l	(a0)+,d0
 	jne		.loop
-
-	clr		still_drawing_sprites
 
 ;	move.l	work_sprite_infos_address_old,d0 ; Fixme!
 ;	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
 ;	move.l	d0,work_sprite_infos_address_new
-
-	clr.b	$fffffa1b.w
-	clr		delay_drawing_sprites
-
-	movem.l	(sp)+,d0-a6
-
-	rts
-
-.delay:
-	move.l	a0,work_sprite_infos_address_next
-	move	#-1,still_drawing_sprites
-
-	clr.b	$fffffa1b.w
-	clr		delay_drawing_sprites
 
 	movem.l	(sp)+,d0-a6
 
@@ -1525,48 +1500,19 @@ flip_screen:
 ; ------------------------------------------------------------------------------
 
 sprite_engine:
-	tst		still_drawing_sprites
-	jne		.skip
+	not.l	$ffff9800.w
 	
-;	clr.b	$fffffa1b.w
-	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
-	move.b	#8,$fffffa1b.w
-
 	jsr		prepare_sprites
 	jsr		update_background
 	jsr		translate_palettes
 	
-.skip:
 	jsr		draw_sprites
 
-	tst		still_drawing_sprites
-	jne		.skip2
-	
 	jsr		restore_sprites_dsp
 	jsr		draw_text
-;	jsr		draw_text_slow
 	jsr		flip_screen
 	
-.skip2:
 	rts
-
-; ------------------------------------------------------------------------------
-
-reset_sprite_drawing_timer:
-;	clr.b	$fffffa1b.w
-;	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
-;	move.b	#8,$fffffa1b.w
-
-	rts
-
-; ------------------------------------------------------------------------------
-
-timer_b_handler:
-	move	#-1,delay_drawing_sprites
-
-	clr.b	$fffffa1b.w
-
-	rte
 
 ; ------------------------------------------------------------------------------
 
@@ -1782,12 +1728,6 @@ display_background_position:
 	ds		1
 
 work_background_position:
-	ds		1
-
-delay_drawing_sprites:
-	ds		1
-
-still_drawing_sprites:
 	ds		1
 
 sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
