@@ -435,6 +435,9 @@ send_rle_data:
 	bclr	#m_hf2,x:m_hcr ; DSP <-> CPU synchronization.
 	jset	#m_hf0,x:m_hsr,*
 
+	jclr	#1,x:m_hsr,*
+	movep	a1,x:m_htx
+
 	do		a1,_loop
 
 	jclr	#1,x:m_hsr,*

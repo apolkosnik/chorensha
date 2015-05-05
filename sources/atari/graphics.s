@@ -242,10 +242,10 @@ translate_palettes:
 
 	clr.l	d0
 
-	move	#16*16/8-1,d7
+	move	#16*16/16-1,d7
 
 .loop:
-	rept 8
+	rept 16
 
 	move	(a0)+,d0
 	move	(a1,d0.l*2),d1
@@ -1333,6 +1333,8 @@ restore_sprites_dsp:
 	lea		background_image+16*256*2*2,a2
 	move.l	work_screen_address,a3
 	add.l	#16*256*2*2,a3
+
+	move.l	(a0),d0 ; RLE count.
 
 	jra		.start
 
