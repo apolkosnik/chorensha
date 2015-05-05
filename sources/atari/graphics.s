@@ -1500,14 +1500,10 @@ flip_screen:
 ; ------------------------------------------------------------------------------
 
 sprite_engine:
-	not.l	$ffff9800.w
-	
 	jsr		prepare_sprites
 	jsr		update_background
 	jsr		translate_palettes
-	
 	jsr		draw_sprites
-
 	jsr		restore_sprites_dsp
 	jsr		draw_text
 	jsr		flip_screen

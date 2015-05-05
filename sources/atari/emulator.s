@@ -61,8 +61,6 @@ vbl_handler:
 	
 	clr		delay_sprite_drawing
 
-	clr.l	$ffff9800.w
-
 	move.l	L_00000118,-(sp)
 	rts
 
