@@ -1438,6 +1438,7 @@ sprite_engine:
 	jsr		process_sprite_infos
 	jsr		update_background
 	jsr		translate_palettes
+	jsr		clear_text
 	jsr		draw_sprites
 	jsr		clear_sprites_dsp
 	jsr		draw_text
@@ -1542,6 +1543,16 @@ draw_text_slow:
 	move.l	32*4(a0),(a0)+
 
 	dbf		d7,.text_lines_loop	
+
+	movem.l	(sp)+,d0-a6
+
+	rts
+	
+; ------------------------------------------------------------------------------
+
+clear_text:
+	movem.l	d0-a6,-(sp)
+
 
 	movem.l	(sp)+,d0-a6
 
