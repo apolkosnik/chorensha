@@ -11,7 +11,6 @@
 	xdef vbl_wait_counter
 	xdef iocs_joystick_data
 	xdef saved_stack_address
-	xdef delay_sprite_drawing
 
 MAX_LINES_PER_SPRITE_DRAWING=170 ; 180
 
@@ -56,21 +55,25 @@ vbl_handler:
 	addq	#1,vbl_wait_counter
 
 	clr.b	$fffffa1b.w
-	move.b	#MAX_LINES_PER_SPRITE_DRAWING,$fffffa21.w
+	move.b	#255,$fffffa21.w
 	move.b	#8,$fffffa1b.w
-	
-	clr		delay_sprite_drawing
 
+	jsr		sprite_engine
+
+;	clr.l	$ffff9800.w
+	
+;.loop:
+;	cmp.b	#255-10,$fffffa21.w
+;	bcc		.loop
+	
+;	not.l	$ffff9800.w
+	
 	move.l	L_00000118,-(sp)
 	rts
 
 ; ------------------------------------------------------------------------------
 
 timer_b_handler:
-	move	#-1,delay_sprite_drawing
-
-	clr.b	$fffffa1b.w
-
 	rte
 
 ; ------------------------------------------------------------------------------
@@ -613,9 +616,6 @@ saved_stack_address:
 
 game_heap_address:
 	ds.l	1
-
-delay_sprite_drawing:
-	ds		1
 
 ; ------------------------------------------------------------------------------
 	end

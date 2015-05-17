@@ -3,6 +3,7 @@
 	xdef release_graphics
 	xdef compile_sprite
 	xdef compile_characters
+	xdef prepare_sprite_infos
 	xdef sprite_engine
 
 	xdef display_screen_address
@@ -13,8 +14,9 @@
 
 SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
-MAX_NUMBER_OF_SPRITES=1885
-MAX_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
+TOTAL_NUMBER_OF_SPRITES=1885
+TOTAL_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
+SPRITE_THROTTLE_DISPLAY_LINES=240*3/4
 
 ; ------------------------------------------------------------------------------
 	text
@@ -26,7 +28,7 @@ initialize_graphics:
 	btst	#1,$ffffa202.w
 	jeq		*-6
 
-	move.l	#MAX_NUMBER_OF_SPRITES,$ffffa204.w
+	move.l	#TOTAL_NUMBER_OF_SPRITES,$ffffa204.w
 
 	; Physbase.
 
@@ -995,14 +997,14 @@ compile_characters:
 	move.l	(a1)+,(a2)+
 	
 	addq	#4,d0
-	cmp		#MAX_NUMBER_OF_CHARACTERS,d0
+	cmp		#TOTAL_NUMBER_OF_CHARACTERS,d0
 	jne		.reorder_loop
 	
 	; Compile characters.
 
 	move.l	TEXT_GRAPHICS_ADDRESS,-(sp)
 	
-	move	#MAX_NUMBER_OF_CHARACTERS-1,d7
+	move	#TOTAL_NUMBER_OF_CHARACTERS-1,d7
 	
 .characters_loop:
 
@@ -1107,80 +1109,15 @@ compile_characters:
 
 ; ------------------------------------------------------------------------------
 
-prepare_sprites:
+process_sprite_infos:
 	movem.l	d0-a6,-(sp)
 
-	; Sort sprite data.
+	move.l	display_sprite_infos_address,a0
 
-	lea		SPRITE_DATA_TABLE,a0
-	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
-	sub.l	a0,d7
+	clr.l	d7
+	move	(a0)+,d7
 	jeq		.skip_all
 
-	lsr		#3,d7
-	subq	#1,d7
-
-	lea		sort_buffers,a1
-	lea		sort_counts+16*2,a2
-
-	clr.l	-(a2)
-	clr.l	-(a2)
-	clr.l	-(a2)
-	clr.l	-(a2)
-	clr.l	-(a2)
-	clr.l	-(a2)
-	clr.l	-(a2)
-	clr.l	-(a2)
-	
-	addq.l	#6,a0
-	
-	clr		d0
-	
-.sort_loop:
-	moveq	#$f,d1
-	and		(a0),d1
-	
-	move	(a2,d1.w*2),d2
-	addq	#1,(a2,d1.w*2)
-	swap	d1
-	lsr.l	#7,d1
-	add		d2,d1
-	move	d0,(a1,d1.w*2)
-
-	addq	#1,d0
-	addq.l	#8,a0
-	
-	dbf		d7,.sort_loop
-
-	; Reorder sprite data.
-
-	lea		SPRITE_DATA_TABLE,a0
-	lea		sorted_sprite_data,a3
-	
-	move	#16-1,d7
-	
-.reorder_loop:
-	move	(a2)+,d6
-	jeq		.skip_reorder
-	
-	lea     (a1,d6.w*2),a4
-	subq	#1,d6
-	
-.reorder_loop2:
-	move	-(a4),d0
-	move.l	(a0,d0.w*8),(a3)+
-	move.l	4(a0,d0.w*8),(a3)+
-
-	dbf		d6,.reorder_loop2
-	
-.skip_reorder:
-	lea		512*2(a1),a1
-
-	dbf		d7,.reorder_loop
-	
-	; Process sprite data.
-
-	lea		sorted_sprite_data,a0
 	move.l	SPRITE_DATA_ADDRESS,a1
 
 	move.l	work_screen_address,a2
@@ -1194,10 +1131,6 @@ prepare_sprites:
 	move.l	work_sprite_infos_address_new,a4
 	move.l	a4,work_sprite_infos_address_next ; Fixme!
 	lea		$ffffa204+2.w,a6
-
-	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
-	sub.l	#SPRITE_DATA_TABLE,d7
-	lsr		#3,d7
 
 	btst	#3,$ffffa202.w
 	jeq		*-6
@@ -1256,7 +1189,7 @@ prepare_sprites:
 
 ; ------------------------------------------------------------------------------
 
-restore_sprites:
+clear_sprites:
 	movem.l	d0-a6,-(sp)
 
 	move.l	work_sprite_infos_address_old,a3
@@ -1316,7 +1249,7 @@ restore_sprites:
 
 ; ------------------------------------------------------------------------------
 
-restore_sprites_dsp:
+clear_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
 	move.l	work_sprite_infos_address_new,a0	
@@ -1502,11 +1435,11 @@ flip_screen:
 ; ------------------------------------------------------------------------------
 
 sprite_engine:
-	jsr		prepare_sprites
+	jsr		process_sprite_infos
 	jsr		update_background
 	jsr		translate_palettes
 	jsr		draw_sprites
-	jsr		restore_sprites_dsp
+	jsr		clear_sprites_dsp
 	jsr		draw_text
 	jsr		flip_screen
 	
@@ -1673,6 +1606,95 @@ draw_text:
 	rts
 	
 ; ------------------------------------------------------------------------------
+
+prepare_sprite_infos:
+	movem.l	d0-a6,-(sp)
+
+	; Sort sprites.
+
+	move.l	work_sprite_infos_address,a3
+	clr		(a3)
+
+	lea		SPRITE_DATA_TABLE,a0
+	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
+	sub.l	a0,d7
+	jeq		.skip_all
+
+	lsr		#3,d7
+	move	d7,(a3)+
+	subq	#1,d7
+
+	lea		sort_buffers,a1
+	lea		sort_counts+16*2,a2
+
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	
+	addq.l	#6,a0
+	
+	clr		d0
+	
+.sort_loop:
+	moveq	#$f,d1
+	and		(a0),d1
+	
+	move	(a2,d1.w*2),d2
+	addq	#1,(a2,d1.w*2)
+	swap	d1
+	lsr.l	#7,d1
+	add		d2,d1
+	move	d0,(a1,d1.w*2)
+
+	addq	#1,d0
+	addq.l	#8,a0
+	
+	dbf		d7,.sort_loop
+
+	; Reorder sprite data.
+
+	lea		SPRITE_DATA_TABLE,a0
+	
+	move	#16-1,d7
+	
+.reorder_loop:
+	move	(a2)+,d6
+	jeq		.skip_reorder
+	
+	lea     (a1,d6.w*2),a4
+	subq	#1,d6
+	
+.reorder_loop2:
+	move	-(a4),d0
+	move.l	(a0,d0.w*8),(a3)+
+	move.l	4(a0,d0.w*8),(a3)+
+
+	dbf		d6,.reorder_loop2
+	
+.skip_reorder:
+	lea		512*2(a1),a1
+
+	dbf		d7,.reorder_loop
+	
+.skip_all:
+	move.l	work_sprite_infos_address,d0
+	move.l	display_sprite_infos_address,work_sprite_infos_address
+	move.l	d0,display_sprite_infos_address
+	
+	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
+
+	movem.l	(sp)+,d0-a6
+
+	clr.l	d0
+
+	rts
+	
+; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
 
@@ -1680,10 +1702,6 @@ background_image_filename:
 	dc.b	'ETC_DAT\BACKGND.DAT',0
 
 	even
-
-; ------------------------------------------------------------------------------
-	data
-; ------------------------------------------------------------------------------
 
 display_sprite_infos_address_new:
 	dc.l	sprite_infos1
@@ -1702,6 +1720,12 @@ free_compiled_objects_address:
 
 work_sprite_infos_address_next:
 	dc.l	sprite_infos3
+
+display_sprite_infos_address:
+	dc.l	emulated_sprite_infos1
+
+work_sprite_infos_address:
+	dc.l	emulated_sprite_infos2
 
 ; ------------------------------------------------------------------------------
 	bss
@@ -1728,20 +1752,26 @@ display_background_position:
 work_background_position:
 	ds		1
 
-sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
 	ds.l	512*4
 
-sprite_infos2: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+sprite_infos2: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
 	ds.l	512*4
 
-sprite_infos3: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+sprite_infos3: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
 	ds.l	512*4
 
-sprite_infos4: ; screen_address, palette_address, sprite_draw_address, sprite_restore_address.
+sprite_infos4: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
 	ds.l	512*4
+
+emulated_sprite_infos1:
+	ds		1+512*4
+
+emulated_sprite_infos2:
+	ds		1+512*4
 
 text_bitmaps:
-	ds.l	2*32
+	ds.l	2*32 ; Text clear bitmap infos followed by text draw bitmap infos.
 
 text_matrix:
 	ds.b	32*32

@@ -695,12 +695,8 @@ XSP_OUT:
 L_000204D0:
 	ifd __ATARI__
 
-	jsr		sprite_engine
+	jmp		prepare_sprite_infos
 
-	clr.l	d0
-
-	rts
-	
 	endif
 	
 	movem.l D1-D7/A0-A6,-(A7)                       ; 000204D0 48E7 7FFE
