@@ -58,10 +58,10 @@ vbl_handler:
 	move.b	#255,$fffffa21.w
 	move.b	#8,$fffffa1b.w
 
+	clr.l	$ffff9800.w
+	
 	jsr		sprite_engine
 
-;	clr.l	$ffff9800.w
-	
 ;.loop:
 ;	cmp.b	#255-10,$fffffa21.w
 ;	bcc		.loop

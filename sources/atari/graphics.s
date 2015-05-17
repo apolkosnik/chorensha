@@ -16,7 +16,7 @@ SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
 TOTAL_NUMBER_OF_SPRITES=1885
 TOTAL_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
-SPRITE_THROTTLE_DISPLAY_LINES=240*3/4
+SPRITE_THROTTLE_DISPLAY_LINES=240*2/3
 
 ; ------------------------------------------------------------------------------
 	text
@@ -260,7 +260,7 @@ translate_palettes:
 
 	movem.l	(sp)+,d0-a6
 
-	rts
+	jmp		clear_text
 
 ; ------------------------------------------------------------------------------
 ;
@@ -1129,7 +1129,6 @@ process_sprite_infos:
 
 	lea		translated_palettes,a3
 	move.l	work_sprite_infos_address_new,a4
-	move.l	a4,work_sprite_infos_address_next ; Fixme!
 	lea		$ffffa204+2.w,a6
 
 	btst	#3,$ffffa202.w
@@ -1185,7 +1184,7 @@ process_sprite_infos:
 .skip_all:
 	movem.l	(sp)+,d0-a6
 
-	rts
+	jmp		update_background
 
 ; ------------------------------------------------------------------------------
 
@@ -1252,6 +1251,8 @@ clear_sprites:
 clear_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
+;	move.l	#$88000000,$ffff9800.w
+
 	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
 	jeq		.skip
@@ -1267,7 +1268,36 @@ clear_sprites_dsp:
 	move.l	work_screen_address,a3
 	add.l	#16*256*2*2,a3
 
+;	move.l	#$ff000000,$ffff9800.w
+
 	move.l	(a0),d0 ; RLE count.
+
+	move	#255,d2
+	sub.b	$fffffa21.w,d2
+	move	d0,d1
+	lsr		#4,d1
+	add		d1,d2
+	cmp		#SPRITE_THROTTLE_DISPLAY_LINES,d2
+	jcs		.start
+	
+	move.l	#.clear_sprites_dsp2,next_display_routine
+	
+	movem.l	(sp)+,d0-a6
+	
+;	move.l	#$ffffffff,$ffff9800.w
+
+	rts
+
+.clear_sprites_dsp2:
+	movem.l	d0-a6,-(sp)
+
+	lea		$ffffa204.w,a0
+	lea		$ffffa204+2.w,a1
+	lea		background_image+16*256*2*2,a2
+	move.l	work_screen_address,a3
+	add.l	#16*256*2*2,a3
+
+;	move.l	#$ff000000,$ffff9800.w
 
 	jra		.start
 
@@ -1292,15 +1322,14 @@ clear_sprites_dsp:
 	
 	movem.l	(sp)+,d0-a6
 
-	rts
+	jmp		draw_text
 
 ; ------------------------------------------------------------------------------
 
 draw_sprites:
 	movem.l	d0-a6,-(sp)
 
-;	move.l	work_sprite_infos_address_new,a0
-	move.l	work_sprite_infos_address_next,a0
+	move.l	next_sprite_infos_address,a0
 
 	jra		.start
 
@@ -1315,6 +1344,18 @@ draw_sprites:
 
 	move.l	(sp)+,a0
 
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.start
+	
+	move.l	a0,next_sprite_infos_address
+	move.l	#draw_sprites,next_display_routine
+	
+	movem.l	(sp)+,d0-a6
+	
+;	move.l	#$ffffffff,$ffff9800.w
+
+	rts
+
 .start:
 	move.l	(a0)+,d0
 	jne		.loop
@@ -1325,50 +1366,9 @@ draw_sprites:
 
 	movem.l	(sp)+,d0-a6
 
-	rts
+	move.l	#sprite_infos3,next_sprite_infos_address
 
-; ------------------------------------------------------------------------------
-
-draw_sprites_dsp:
-	movem.l	d0-a6,-(sp)
-
-	move.l	work_sprite_infos_address_new,a0
-	move.l	physbase,a1
-	lea		8(a1),a1
-
-	tst.l	(a0)
-	jeq		.skip
-
-	btst	#0,$ffffa202.w
-	jeq		*-6
-
-	lea		$ffffa204+2.w,a0
-	move.l	#24,d0
-
-	move	#200-1,d7
-
-.lines_loop:
-	rept (16+256+16)/8/3/2
-
-	move	(a0),(a1)
-	move	(a0),8(a1)
-	move	(a0),16(a1)
-	add.l	d0,a1
-
-	endr
-
-	lea		(320-(16+256+16))/2(a1),a1
-
-	dbf		d7,.lines_loop
-
-.skip:
-	move.l	work_sprite_infos_address_old,d0
-	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
-	move.l	d0,work_sprite_infos_address_new
-
-	movem.l	(sp)+,d0-a6
-
-	rts
+	jmp		clear_sprites_dsp
 
 ; ------------------------------------------------------------------------------
 
@@ -1384,7 +1384,7 @@ update_background:
 
 	movem.l	(sp)+,d0-d1
 
-	rts
+	jmp		translate_palettes
 
 ; ------------------------------------------------------------------------------
 
@@ -1430,20 +1430,25 @@ flip_screen:
 
 	movem.l	(sp)+,d0-d1
 
+	move.l	#process_sprite_infos,next_display_routine
+
+;	move.l	#$ffffffff,$ffff9800.w
+	
 	rts
 
 ; ------------------------------------------------------------------------------
 
 sprite_engine:
-	jsr		process_sprite_infos
-	jsr		update_background
-	jsr		translate_palettes
-	jsr		clear_text
-	jsr		draw_sprites
-	jsr		clear_sprites_dsp
-	jsr		draw_text
-	jsr		flip_screen
-	
+;	jsr		process_sprite_infos
+;	jsr		update_background
+;	jsr		translate_palettes
+;	jsr		clear_text
+;	jsr		draw_sprites
+;	jsr		clear_sprites_dsp
+;	jsr		draw_text
+;	jsr		flip_screen
+
+	move.l	next_display_routine,-(sp)
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -1556,23 +1561,37 @@ clear_text:
 
 	movem.l	(sp)+,d0-a6
 
-	rts
+	jmp		draw_sprites
 	
 ; ------------------------------------------------------------------------------
 
 draw_text:
 	movem.l	d0-a6,-(sp)
 
-	lea		text_bitmaps,a0
+	move.l	next_text_bitmap_address,a0
 	lea		text_matrix,a1
 	move.l	TEXT_GRAPHICS_ADDRESS,a2
 	lea		translated_palettes+4,a5
 	move.l	work_screen_address,a6
 	add.l	#SCREEN_DISPLAY_OFFSET,a6
 
-	move	#32-1,d7
+	move	next_text_bitmap_count,d7
 
 .text_lines_loop:
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.go_on
+	
+	move.l	a0,next_text_bitmap_address
+	move	d7,next_text_bitmap_count
+	move.l	#draw_text,next_display_routine
+	
+	movem.l	(sp)+,d0-a6
+	
+;	move.l	#$ffffffff,$ffff9800.w
+
+	rts
+
+.go_on:	
 	move.l	(a0),d0
 	jeq		.skip_text_line	
 
@@ -1614,7 +1633,10 @@ draw_text:
 
 	movem.l	(sp)+,d0-a6
 
-	rts
+	move.l	#text_bitmaps,next_text_bitmap_address
+	move	#32-1,next_text_bitmap_count
+
+	jmp		flip_screen
 	
 ; ------------------------------------------------------------------------------
 
@@ -1714,6 +1736,9 @@ background_image_filename:
 
 	even
 
+next_display_routine:
+	dc.l	process_sprite_infos
+	
 display_sprite_infos_address_new:
 	dc.l	sprite_infos1
 
@@ -1729,7 +1754,7 @@ work_sprite_infos_address_old:
 free_compiled_objects_address:
 	dc.l	compiled_objects
 
-work_sprite_infos_address_next:
+next_sprite_infos_address:
 	dc.l	sprite_infos3
 
 display_sprite_infos_address:
@@ -1738,6 +1763,12 @@ display_sprite_infos_address:
 work_sprite_infos_address:
 	dc.l	emulated_sprite_infos2
 
+next_text_bitmap_address:
+	dc.l	text_bitmaps
+	
+next_text_bitmap_count:
+	dc		32-1
+	
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
