@@ -60,7 +60,7 @@ vbl_handler:
 
 	clr.l	$ffff9800.w
 	
-	jsr		sprite_engine
+	jsr		graphics_engine
 
 ;.loop:
 ;	cmp.b	#255-10,$fffffa21.w
