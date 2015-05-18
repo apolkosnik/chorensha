@@ -1376,7 +1376,7 @@ clear_sprites_dsp:
 	move	#255,d2
 	sub.b	$fffffa21.w,d2
 	move	d0,d1
-	lsr		#4,d1
+	lsr		#3,d1
 	add		d1,d2
 	cmp		#SPRITE_THROTTLE_DISPLAY_LINES,d2
 	jcs		.start
