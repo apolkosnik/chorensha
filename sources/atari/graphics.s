@@ -16,7 +16,7 @@ SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
 TOTAL_NUMBER_OF_SPRITES=1885
 TOTAL_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
-SPRITE_THROTTLE_DISPLAY_LINES=240*3/4
+SPRITE_THROTTLE_DISPLAY_LINES=180 ; 240*3/4 = 180
 
 ; ------------------------------------------------------------------------------
 	text
@@ -1085,13 +1085,14 @@ prepare_sprite_infos:
 
 	; Sort sprites.
 
-	move.l	work_sprite_infos_address,a3
-	clr		(a3)
-
 	lea		SPRITE_DATA_TABLE,a0
 	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
 	sub.l	a0,d7
 	jeq		.skip_all
+
+	move.l	d7,(sp) ; Return number of prepared sprites.
+
+	move.l	work_sprite_infos_address,a3
 
 	lsr		#3,d7
 	move	d7,(a3)+
@@ -1154,13 +1155,13 @@ prepare_sprite_infos:
 
 	dbf		d7,.reorder_loop
 	
-.skip_all:
 	move.l	work_sprite_infos_address,d0
 	move.l	display_sprite_infos_address,work_sprite_infos_address
 	move.l	d0,display_sprite_infos_address
 	
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
+.skip_all:
 	movem.l	(sp)+,d0-a6
 
 	clr.l	d0
@@ -1176,8 +1177,13 @@ process_sprite_infos:
 
 	clr.l	d7
 	move	(a0)+,d7
-	jeq		.skip_all
+	jne		.go_on
 
+	movem.l	(sp)+,d0-a6
+
+	rts
+
+.go_on:
 	move.l	SPRITE_DATA_ADDRESS,a1
 
 	move.l	work_screen_address,a2
@@ -1241,7 +1247,6 @@ process_sprite_infos:
 
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
-.skip_all:
 	movem.l	(sp)+,d0-a6
 
 	jmp		update_background
@@ -1352,15 +1357,28 @@ draw_sprites:
 clear_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
-;	move.l	#$88000000,$ffff9800.w
+;	move.l	#$00000088,$ffff9800.w
 
 	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
 	jeq		.skip
 
+.wait_for_dsp_loop:
 	btst	#3,$ffffa202.w
-	jne		*-6
+	jeq		.start
 
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.wait_for_dsp_loop
+	
+	move.l	#clear_sprites_dsp,next_graphics_routine
+	
+	movem.l	(sp)+,d0-a6
+	
+	move.l	#$00000000,$ffff9800.w
+
+	rts
+
+.start:
 	bclr	#3,$ffffa200.w
 	
 	lea		$ffffa204.w,a0
@@ -1376,16 +1394,16 @@ clear_sprites_dsp:
 	move	#255,d2
 	sub.b	$fffffa21.w,d2
 	move	d0,d1
-	lsr		#3,d1
+	lsr		#4,d1
 	add		d1,d2
 	cmp		#SPRITE_THROTTLE_DISPLAY_LINES,d2
-	jcs		.start
+	jcs		.rle_loop
 	
 	move.l	#.clear_sprites_dsp2,next_graphics_routine
 	
 	movem.l	(sp)+,d0-a6
 	
-;	move.l	#$ffffffff,$ffff9800.w
+	move.l	#$00000000,$ffff9800.w
 
 	rts
 
@@ -1400,7 +1418,7 @@ clear_sprites_dsp:
 
 ;	move.l	#$ff000000,$ffff9800.w
 
-	jra		.start
+	jra		.rle_loop
 
 	rept 16+256+16
 
@@ -1408,20 +1426,22 @@ clear_sprites_dsp:
 
 	endr
 
-.start:
+.rle_loop:
 	move.l	(a0),d0
 	add.l	d0,a2
 	add.l	d0,a3
 
 	move	(a1),d1
 
-	jmp		.start(pc,d1.w)
+	jmp		.rle_loop(pc,d1.w)
 
 .skip:
 	move.l	work_sprite_infos_address_new,a0	
 	clr.l	(a0)
 	
 	movem.l	(sp)+,d0-a6
+
+	move.l	#$00000000,$ffff9800.w
 
 	jmp		draw_text
 
@@ -1441,7 +1461,7 @@ draw_text:
 
 .text_lines_loop:
 	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.go_on
+	jcc		.start
 	
 	move.l	a0,next_text_bitmap_address
 	move.l	a1,next_text_matrix_address
@@ -1467,7 +1487,7 @@ draw_text:
 
 	move	next_text_bitmap_count,d7
 
-.go_on:	
+.start:	
 	move.l	(a0),d0
 	jeq		.skip_text_line	
 

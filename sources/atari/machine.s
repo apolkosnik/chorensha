@@ -224,8 +224,6 @@ initialize_machine:
 	bclr	#3,$fffffa17.w
 
 	clr.b	$fffffa1b.w
-	move.b	#180,$fffffa21.w
-	move.b	#8,$fffffa1b.w
 	bset	#0,$fffffa07
 	bset	#0,$fffffa13
 
