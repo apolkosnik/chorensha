@@ -5,6 +5,7 @@
 	xdef compile_characters
 	xdef prepare_sprite_infos
 	xdef graphics_engine
+	xdef screen_has_been_flipped
 
 	xdef display_screen_address
 	xdef work_screen_address
@@ -1161,6 +1162,8 @@ prepare_sprite_infos:
 	
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
+	move	#-1,sprite_infos_prepared
+
 .skip_all:
 	movem.l	(sp)+,d0-a6
 
@@ -1171,19 +1174,27 @@ prepare_sprite_infos:
 ; ------------------------------------------------------------------------------
 
 process_sprite_infos:
+	tst		sprite_infos_prepared
+	jmi		.start_processing
+
+	move.l	#process_sprite_infos,next_graphics_routine
+
+	rts
+
+.start_processing:
 	movem.l	d0-a6,-(sp)
 
 	move.l	display_sprite_infos_address,a0
 
 	clr.l	d7
 	move	(a0)+,d7
-	jne		.go_on
+	jne		.start
 
 	movem.l	(sp)+,d0-a6
 
 	rts
 
-.go_on:
+.start:
 	move.l	SPRITE_DATA_ADDRESS,a1
 
 	move.l	work_screen_address,a2
@@ -1247,6 +1258,8 @@ process_sprite_infos:
 
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
+	clr		sprite_infos_prepared
+
 	movem.l	(sp)+,d0-a6
 
 	jmp		update_background
@@ -1299,6 +1312,14 @@ translate_palettes:
 ; ------------------------------------------------------------------------------
 
 clear_text:
+	tst		screen_has_been_flipped
+	jmi		.start_clearing_text
+
+	move.l	#clear_text,next_graphics_routine
+	
+	rts
+
+.start_clearing_text:
 	movem.l	d0-a6,-(sp)
 
 
@@ -1578,11 +1599,11 @@ flip_screen:
 
 	movem.l	(sp)+,d0-d1
 
-	move.l	#process_sprite_infos,next_graphics_routine
+	clr		screen_has_been_flipped
 
 ;	move.l	#$ffffffff,$ffff9800.w
 	
-	rts
+	jmp		process_sprite_infos
 
 ; ------------------------------------------------------------------------------
 
@@ -1647,15 +1668,6 @@ clear_sprites:
 ; ------------------------------------------------------------------------------
 
 graphics_engine:
-;	jsr		process_sprite_infos
-;	jsr		update_background
-;	jsr		translate_palettes
-;	jsr		clear_text
-;	jsr		draw_sprites
-;	jsr		clear_sprites_dsp
-;	jsr		draw_text
-;	jsr		flip_screen
-
 	move.l	next_graphics_routine,-(sp)
 	rts
 
@@ -1899,6 +1911,12 @@ sort_counts:
 
 sorted_sprite_data:
 	ds		512*8
+	
+sprite_infos_prepared:
+	ds		1
+
+screen_has_been_flipped:
+	ds		1
 
 ; ------------------------------------------------------------------------------
 	end
