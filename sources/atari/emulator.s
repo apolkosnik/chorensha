@@ -66,7 +66,7 @@ vbl_handler:
 ;	cmp.b	#255-10,$fffffa21.w
 ;	bcc		.loop
 	
-;	not.l	$ffff9800.w
+	not.l	$ffff9800.w
 	
 	move.l	L_00000118,-(sp)
 	rts

@@ -17,7 +17,7 @@ SCREEN_BUFFER_SIZE=(16+512+256+16)*256*2*2
 SCREEN_DISPLAY_OFFSET=16*2+16*256*2*2
 TOTAL_NUMBER_OF_SPRITES=1885
 TOTAL_NUMBER_OF_CHARACTERS=128 ; 4096 / (4 * 8) = 128
-SPRITE_THROTTLE_DISPLAY_LINES=180 ; 240*3/4 = 180
+SPRITE_THROTTLE_DISPLAY_LINES=170 ; 240*3/4 = 180
 
 ; ------------------------------------------------------------------------------
 	text
@@ -1176,14 +1176,14 @@ prepare_sprite_infos:
 ; ------------------------------------------------------------------------------
 
 process_sprite_infos:
-	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.start_processing
+;	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES-60,$fffffa21.w
+;	jcc		.start_processing
 	
-	move.l	#process_sprite_infos,next_graphics_routine
+;	move.l	#process_sprite_infos,next_graphics_routine
 	
-	rts
+;	rts
 
-.start_processing:
+;.start_processing:
 	movem.l	d0-a6,-(sp)
 
 	move.l	display_sprite_infos_address,a0
@@ -1283,14 +1283,14 @@ update_background:
 ; ------------------------------------------------------------------------------
 
 translate_palettes:
-	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.start_translating
+;	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES-60,$fffffa21.w
+;	jcc		.start_translating
 	
-	move.l	#translate_palettes,next_graphics_routine
+;	move.l	#translate_palettes,next_graphics_routine
 	
-	rts
+;	rts
 
-.start_translating:
+;.start_translating:
 	movem.l	d0-a6,-(sp)
 
 	lea		L_00E82000+$200,a0
@@ -1363,8 +1363,6 @@ draw_sprites:
 	
 	movem.l	(sp)+,d0-a6
 	
-;	move.l	#$ffffffff,$ffff9800.w
-
 	rts
 
 .start:
@@ -1386,8 +1384,6 @@ draw_sprites:
 clear_sprites_dsp:
 	movem.l	d0-a6,-(sp)
 
-;	move.l	#$00000088,$ffff9800.w
-
 	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
 	jeq		.skip
@@ -1403,8 +1399,6 @@ clear_sprites_dsp:
 	
 	movem.l	(sp)+,d0-a6
 	
-	move.l	#$00000000,$ffff9800.w
-
 	rts
 
 .start:
@@ -1415,8 +1409,6 @@ clear_sprites_dsp:
 	lea		background_image+16*256*2*2,a2
 	move.l	work_screen_address,a3
 	add.l	#16*256*2*2,a3
-
-;	move.l	#$ff000000,$ffff9800.w
 
 	move.l	(a0),d0 ; RLE count.
 
@@ -1432,8 +1424,6 @@ clear_sprites_dsp:
 	
 	movem.l	(sp)+,d0-a6
 	
-	move.l	#$00000000,$ffff9800.w
-
 	rts
 
 .clear_sprites_dsp2:
@@ -1444,8 +1434,6 @@ clear_sprites_dsp:
 	lea		background_image+16*256*2*2,a2
 	move.l	work_screen_address,a3
 	add.l	#16*256*2*2,a3
-
-;	move.l	#$ff000000,$ffff9800.w
 
 	jra		.rle_loop
 
@@ -1469,8 +1457,6 @@ clear_sprites_dsp:
 	clr.l	(a0)
 	
 	movem.l	(sp)+,d0-a6
-
-	move.l	#$00000000,$ffff9800.w
 
 	jmp		draw_text
 
@@ -1501,8 +1487,6 @@ draw_text:
 	
 	movem.l	(sp)+,d0-a6
 	
-;	move.l	#$ffffffff,$ffff9800.w
-
 	rts
 
 .draw_text_resume:
@@ -1609,10 +1593,8 @@ flip_screen:
 
 	clr		screen_has_been_flipped
 
-;	move.l	#$ffffffff,$ffff9800.w
-	
-	tst		sprite_infos_prepared
-	jmi		process_sprite_infos
+;	tst		sprite_infos_prepared
+;	jmi		process_sprite_infos
 	
 	move.l	#process_sprite_infos,next_graphics_routine
 	
