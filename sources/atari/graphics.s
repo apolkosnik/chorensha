@@ -1163,9 +1163,11 @@ prepare_sprite_infos:
 	move.l	display_sprite_infos_address,work_sprite_infos_address
 	move.l	d0,display_sprite_infos_address
 	
+	movem.l	(sp)+,d0-a6
+
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
-	movem.l	(sp)+,d0-a6
+	move	#-1,sprite_infos_prepared
 
 	clr.l	d0
 
@@ -1257,6 +1259,8 @@ process_sprite_infos:
 	clr.l	(a4) ; End marker.
 
 	movem.l	(sp)+,d0-a6
+
+	clr		sprite_infos_prepared
 
 	jmp		update_background
 
@@ -1607,7 +1611,12 @@ flip_screen:
 
 ;	move.l	#$ffffffff,$ffff9800.w
 	
-	jmp		process_sprite_infos
+	tst		sprite_infos_prepared
+	jmi		process_sprite_infos
+	
+	move.l	#process_sprite_infos,next_graphics_routine
+	
+	rts
 
 ; ------------------------------------------------------------------------------
 
@@ -1915,6 +1924,9 @@ sort_counts:
 
 sorted_sprite_data:
 	ds		512*8
+
+sprite_infos_prepared:
+	ds		1
 	
 screen_has_been_flipped:
 	ds		1
