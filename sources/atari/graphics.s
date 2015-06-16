@@ -1165,8 +1165,6 @@ prepare_sprite_infos:
 	
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
-	move	#-1,sprite_infos_prepared
-
 	movem.l	(sp)+,d0-a6
 
 	clr.l	d0
@@ -1176,11 +1174,11 @@ prepare_sprite_infos:
 ; ------------------------------------------------------------------------------
 
 process_sprite_infos:
-	tst		sprite_infos_prepared
-	jmi		.start_processing
-
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.start_processing
+	
 	move.l	#process_sprite_infos,next_graphics_routine
-
+	
 	rts
 
 .start_processing:
@@ -1258,8 +1256,6 @@ process_sprite_infos:
 
 	clr.l	(a4) ; End marker.
 
-	clr		sprite_infos_prepared
-
 	movem.l	(sp)+,d0-a6
 
 	jmp		update_background
@@ -1283,6 +1279,14 @@ update_background:
 ; ------------------------------------------------------------------------------
 
 translate_palettes:
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.start_translating
+	
+	move.l	#translate_palettes,next_graphics_routine
+	
+	rts
+
+.start_translating:
 	movem.l	d0-a6,-(sp)
 
 	lea		L_00E82000+$200,a0
@@ -1912,9 +1916,6 @@ sort_counts:
 sorted_sprite_data:
 	ds		512*8
 	
-sprite_infos_prepared:
-	ds		1
-
 screen_has_been_flipped:
 	ds		1
 
