@@ -1097,6 +1097,8 @@ prepare_sprite_infos:
 
 	lsr		#3,d7
 	move	d7,(a3)+
+	jeq		.skip_all
+
 	subq	#1,d7
 
 	lea		sort_buffers,a1
@@ -1156,6 +1158,7 @@ prepare_sprite_infos:
 
 	dbf		d7,.reorder_loop
 	
+.skip_all:
 	move.l	work_sprite_infos_address,d0
 	move.l	display_sprite_infos_address,work_sprite_infos_address
 	move.l	d0,display_sprite_infos_address
@@ -1164,7 +1167,6 @@ prepare_sprite_infos:
 
 	move	#-1,sprite_infos_prepared
 
-.skip_all:
 	movem.l	(sp)+,d0-a6
 
 	clr.l	d0
@@ -1255,8 +1257,6 @@ process_sprite_infos:
 	dbf		d7,.loop
 
 	clr.l	(a4) ; End marker.
-
-	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
 	clr		sprite_infos_prepared
 
