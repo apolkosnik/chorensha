@@ -49,6 +49,7 @@ _loop:
 	jsr		<draw_inverted_masks
 	jsr		<create_rle_data
 	jsr		<send_rle_data
+	jsr		<swap_sprite_infos
 	jsr		<draw_masks
 
 ;	jsr		<send_screen_buffer
@@ -112,7 +113,7 @@ _loop5:
 ; -----------------------------------------------------------------------------
 
 receive_sprite_infos:
-	move	x:<sprite_infos_even,r0
+	move	x:<work_sprite_infos,r0
 
 	move	#>$ffff,x1
 
@@ -140,7 +141,7 @@ receive_sprite_infos:
 	move	a1,x:(r0)+ ; Y position.
 _loop:
 
-	move	x0,x:<number_of_sprite_infos_even
+	move	x0,x:<number_of_work_sprite_infos
 
 	rts
 
@@ -252,10 +253,15 @@ _loop:
 ; -----------------------------------------------------------------------------
 
 draw_inverted_masks:
-	move	x:<sprite_infos_even,r0
+	move	x:<work_sprite_infos,r0
+	move	x:<number_of_work_sprite_infos,a
 
-	move	x:<number_of_sprite_infos_even,x0
+	tst		a a,x0
+	jne		_start
 
+	rts
+
+_start:
 	move	x:(r0)+,a
 
 	do		x0,_loop
@@ -464,11 +470,31 @@ fill_screen_buffer:
 
 ; -----------------------------------------------------------------------------
 
+swap_sprite_infos:
+	move	x:<work_sprite_infos,x0
+	move	x:<display_sprite_infos,x1
+	move	x0,x:<display_sprite_infos
+	move	x1,x:<work_sprite_infos
+
+	move	x:<number_of_work_sprite_infos,x0
+	move	x:<number_of_display_sprite_infos,x1
+	move	x0,x:<number_of_display_sprite_infos
+	move	x1,x:<number_of_work_sprite_infos
+
+	rts
+
+; -----------------------------------------------------------------------------
+
 draw_masks:
-	move	x:<sprite_infos_even,r0
+	move	x:<work_sprite_infos,r0
+	move	x:<number_of_work_sprite_infos,a
 
-	move	x:<number_of_sprite_infos_even,x0
+	tst		a a,x0
+	jne		_start
 
+	rts
+
+_start:
 	move	x:(r0)+,a
 
 	do		x0,_loop
@@ -616,16 +642,16 @@ sprite_convert_masks:
 	dc		$ffff00
 	dc		$00ff00
 
-sprite_infos_even:
+work_sprite_infos:
 	dc		sprite_infos1
 
-sprite_infos_odd:
+display_sprite_infos:
 	dc		sprite_infos2
 
-number_of_sprite_infos_even:
+number_of_work_sprite_infos:
 	dc		0
 
-number_of_sprite_infos_odd:
+number_of_display_sprite_infos:
 	dc		0
 
 ; -----------------------------------------------------------------------------

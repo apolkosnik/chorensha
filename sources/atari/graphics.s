@@ -1552,9 +1552,9 @@ draw_text:
 flip_screen:
 	movem.l	d0-d1,-(sp)
 
-;	move.l	work_screen_address,d0 ; Fixme!
-;	move.l	display_screen_address,work_screen_address
-;	move.l	d0,display_screen_address
+	move.l	work_screen_address,d0
+	move.l	display_screen_address,work_screen_address
+	move.l	d0,display_screen_address
 
 	move	work_background_position,d0
 	move	display_background_position,work_background_position
@@ -1579,8 +1579,6 @@ flip_screen:
 	move.l	display_screen_address,d1
 
 	endif
-
-	move.l	work_screen_address,d1 ; Fixme!
 
 	add.l	#SCREEN_DISPLAY_OFFSET,d1
 	swap	d0
