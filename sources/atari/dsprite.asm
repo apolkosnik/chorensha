@@ -707,7 +707,7 @@ rle_length:
 	ds		1
 
 scrolling_offset:
-	ds		1
+	dc		0
 
 	ds		10
 stack:
