@@ -1102,8 +1102,16 @@ prepare_sprite_infos:
 	subq	#1,d7
 
 	lea		sort_buffers,a1
-	lea		sort_counts+16*2,a2
+	lea		sort_counts+32*2,a2
 
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
+	clr.l	-(a2)
 	clr.l	-(a2)
 	clr.l	-(a2)
 	clr.l	-(a2)
@@ -1118,7 +1126,7 @@ prepare_sprite_infos:
 	clr		d0
 	
 .sort_loop:
-	moveq	#$f,d1
+	moveq	#$1f,d1
 	and		(a0),d1
 	
 	move	(a2,d1.w*2),d2
@@ -1137,7 +1145,7 @@ prepare_sprite_infos:
 
 	lea		SPRITE_DATA_TABLE,a0
 	
-	move	#16-1,d7
+	move	#32-1,d7
 	
 .reorder_loop:
 	move	(a2)+,d6
@@ -1897,10 +1905,10 @@ sprite_count:
 	ds		1
 
 sort_buffers:
-	ds		16*512
+	ds		32*512
 	
 sort_counts:
-	ds		16
+	ds		32
 
 sorted_sprite_data:
 	ds		512*8
