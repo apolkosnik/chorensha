@@ -7,7 +7,7 @@
 	include	'ioequ.inc'
 
 TOTAL_NUMBER_OF_PACKED_SPRITES equ 1900
-NUMBER_OF_PACKED_SPRITES1 equ 1200-14
+NUMBER_OF_PACKED_SPRITES1 equ 1100 ; Keep some space within the X memory for DSP boot code.
 
 push	macro	register
         move    register,y:-(r7)
@@ -314,8 +314,15 @@ _skip:
 	move	a1,x1
 	mpy		x1,y0,b x0,a
 	move	b0,b
-	sub		b,a x:(r0)+,y0
+	sub		b,a x:(r0)+,b
 
+	move	y:<scrolling_offset,y1
+	add		y1,b #>16+256,y1
+	jmi		<_skip_drawing
+	
+	cmp		y1,b b1,y0
+	jcc		<_skip_drawing
+	
 	move	x1,b0
 	move	#>(16+256+16)/8/3/2,y1
 	mac		y0,y1,b a1,n1
@@ -345,6 +352,7 @@ _skip:
 	move	b1,y:(r5)+n5
 _loop2:
 
+_skip_drawing:
 	move	x:(r0)+,a
 _loop:
 
@@ -548,7 +556,6 @@ _skip:
 	mpy		x1,y0,b x0,a
 	move	b0,b
 	sub		b,a x:(r0)+,y0
-
 	move	x1,b0
 	move	#>(16+256+16)/8/3/2,y1
 	mac		y0,y1,b a1,n1
@@ -697,6 +704,9 @@ sprite_convert_shifts:
 	dc		$000080
 
 rle_length:
+	ds		1
+
+scrolling_offset:
 	ds		1
 
 	ds		10
