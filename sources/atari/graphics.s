@@ -1270,7 +1270,7 @@ process_sprite_infos:
 
 	clr		sprite_infos_prepared
 
-	jmp		update_background
+	jra		update_background
 
 ; ------------------------------------------------------------------------------
 
@@ -1286,7 +1286,7 @@ update_background:
 
 	movem.l	(sp)+,d0-d1
 
-	jmp		translate_palettes
+	jra		translate_palettes
 
 ; ------------------------------------------------------------------------------
 
@@ -1323,25 +1323,63 @@ translate_palettes:
 
 	movem.l	(sp)+,d0-a6
 
-	jmp		clear_text
+	jra		clear_text
 
 ; ------------------------------------------------------------------------------
 
 clear_text:
-	tst		screen_has_been_flipped
-	jmi		.start_clearing_text
-
-	move.l	#clear_text,next_graphics_routine
-	
-	rts
-
-.start_clearing_text:
 	movem.l	d0-a6,-(sp)
 
+	move.l	work_text_infos_address,a3
+	
+	jra		.start
+
+.loop:
+	move.l	d0,a2
+	move.l	(a3)+,a1
+	addq.l	#4,a3
+	move.l	(a3)+,a0
+	
+	jra		.jump
+	
+.sprite_loop:
+	add		d0,a1
+	add		d0,a2
+	
+	move	(a0)+,d0
+	jmp		.jump(pc,d0.w)
+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+	move	(a1)+,(a2)+
+
+.jump:
+	move	(a0)+,d0
+	jpl		.sprite_loop
+	
+.start:
+	move.l	(a3)+,d0
+	jne		.loop
+
+	move.l	work_text_infos_address,a0	
+	clr.l	(a0)
 
 	movem.l	(sp)+,d0-a6
 
-	jmp		draw_sprites
+	jra		draw_sprites
 	
 ; ------------------------------------------------------------------------------
 
@@ -1385,7 +1423,7 @@ draw_sprites:
 
 	move.l	#sprite_infos3,next_sprite_infos_address
 
-	jmp		clear_sprites_dsp
+	jra		clear_sprites_dsp
 
 ; ------------------------------------------------------------------------------
 
@@ -1458,7 +1496,7 @@ clear_sprites_dsp:
 
 	move	(a1),d1
 
-	jmp		.rle_loop(pc,d1.w)
+	jra		.rle_loop(pc,d1.w)
 
 .skip:
 	move.l	work_sprite_infos_address_new,a0	
@@ -1466,51 +1504,26 @@ clear_sprites_dsp:
 	
 	movem.l	(sp)+,d0-a6
 
-	jmp		draw_text
+	jra		prepare_text
 
 ; ------------------------------------------------------------------------------
 
-draw_text:
+prepare_text:
 	movem.l	d0-a6,-(sp)
 
-	move.l	next_text_bitmap_address,a0
+	move.l	#text_bitmaps,a0
 	lea		text_matrix,a1
 	move.l	TEXT_GRAPHICS_ADDRESS,a2
-	lea		translated_palettes+4,a5
-	move.l	work_screen_address,a6
-	add.l	#SCREEN_DISPLAY_OFFSET,a6
+	move.l	work_text_infos_address,a3
+	lea		background_image,a4
+	move.l	work_screen_address,a5
+	add.l	#SCREEN_DISPLAY_OFFSET,a5
 
-	move	next_text_bitmap_count,d7
+	move	#32-1,d7
 
-.text_lines_loop:
-	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.start
-	
-	move.l	a0,next_text_bitmap_address
-	move.l	a1,next_text_matrix_address
-	move.l	a6,next_text_screen_address
-	move	d7,next_text_bitmap_count
-
-	move.l	#.draw_text_resume,next_graphics_routine
-	
-	movem.l	(sp)+,d0-a6
-	
-	rts
-
-.draw_text_resume:
-	movem.l	d0-a6,-(sp)
-
-	move.l	next_text_bitmap_address,a0
-	move.l	next_text_matrix_address,a1
-	move.l	TEXT_GRAPHICS_ADDRESS,a2
-	lea		translated_palettes+4,a5
-	move.l	next_text_screen_address,a6
-
-	move	next_text_bitmap_count,d7
-
-.start:	
+.lines_loop:
 	move.l	(a0),d0
-	jeq		.skip_text_line	
+	jeq		.skip_line	
 
 	move	#32-1,d6
 
@@ -1518,42 +1531,82 @@ draw_text:
 	add.l	d0,d0
 	jcc		.skip_character
 
-	movem.l	d0/d6-d7/a0-a2/a5-a6,-(sp)
+	move.l	a5,(a3)+
+	move.l	a4,(a3)+
 
-	clr		d0
-	move.b	(a1),d0
-	lsl		#5,d0
-	move.l	(a2,d0.w),a0
-
-	jsr		(a0)
+	clr		d1
+	move.b	(a1),d1
+	lsl		#5,d1
+	move.l	(a2,d1.w),(a3)+
+	move.l	4(a2,d1.w),(a3)+
 	
-	movem.l	(sp)+,d0/d6-d7/a0-a2/a5-a6
-
 .skip_character:
 	addq.l	#1,a1
-	add.l	#8*2,a6
+	add.l	#8*2,a4
+	add.l	#8*2,a5
 
 	dbf		d6,.characters_loop
 
-	add.l	#256*2*2*8-256*2,a6
+	add.l	#256*2*2*8-256*2,a4
+	add.l	#256*2*2*8-256*2,a5
 
-	jra		.next_text_line
+	jra		.next_line
 
-.skip_text_line:
+.skip_line:
 	add.l	#32,a1
-	add.l	#256*2*2*8,a6
+	add.l	#256*2*2*8,a4
+	add.l	#256*2*2*8,a5
 
-.next_text_line:
+.next_line:
 	move.l	32*4(a0),(a0)+
 
-	dbf		d7,.text_lines_loop	
+	dbf		d7,.lines_loop
+
+	clr.l	(a3) ; End marker.
 
 	movem.l	(sp)+,d0-a6
+	
+	jra		draw_text
+	
+; ------------------------------------------------------------------------------
 
-	move.l	#text_bitmaps,next_text_bitmap_address
-	move	#32-1,next_text_bitmap_count
+draw_text:
+	movem.l	d0-a6,-(sp)
 
-	jmp		flip_screen
+	move.l	next_text_infos_address,a0
+	lea		translated_palettes+4,a5
+
+.loop:
+	move.l	(a0),d0
+	jeq		.end
+
+	movem.l	a0/a5,-(sp)
+
+	move.l	d0,a6
+	move.l	8(a0),a0
+	jsr		(a0)
+
+	movem.l	(sp)+,a0/a5
+
+	add.l	#4*4,a0
+
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.loop
+	
+	move.l	a0,next_text_infos_address
+
+	move.l	#draw_text,next_graphics_routine
+	
+	movem.l	(sp)+,d0-a6
+	
+	rts
+
+.end:
+	move.l	work_text_infos_address,next_text_infos_address
+
+	movem.l	(sp)+,d0-a6
+	
+	jra		flip_screen
 	
 ; ------------------------------------------------------------------------------
 
@@ -1567,6 +1620,10 @@ flip_screen:
 	move	work_background_position,d0
 	move	display_background_position,work_background_position
 	move	d0,display_background_position
+
+	move.l	work_text_infos_address,d0
+	move.l	display_text_infos_address,work_text_infos_address
+	move.l	d0,display_text_infos_address
 
 ;	move.l	work_sprite_infos_address_old,d0 ; Fixme!
 ;	move.l	display_sprite_infos_address_old,work_sprite_infos_address_old
@@ -1810,11 +1867,14 @@ display_sprite_infos_address:
 work_sprite_infos_address:
 	dc.l	emulated_sprite_infos2
 
-next_text_bitmap_address:
-	dc.l	text_bitmaps
+next_text_infos_address:
+	dc.l	text_infos1
 
-next_text_bitmap_count:
-	dc		32-1
+work_text_infos_address:
+	dc.l	text_infos1
+	
+display_text_infos_address:
+	dc.l	text_infos2
 	
 ; ------------------------------------------------------------------------------
 	bss
@@ -1842,16 +1902,16 @@ work_background_position:
 	ds		1
 
 sprite_infos1: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
-	ds.l	512*4
+	ds.l	512*4+1
 
 sprite_infos2: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
-	ds.l	512*4
+	ds.l	512*4+1
 
 sprite_infos3: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
-	ds.l	512*4
+	ds.l	512*4+1
 
 sprite_infos4: ; screen_address, palette_address, sprite_draw_address, sprite_clear_address.
-	ds.l	512*4
+	ds.l	512*4+1
 
 emulated_sprite_infos1:
 	ds		1+512*4
@@ -1862,14 +1922,14 @@ emulated_sprite_infos2:
 text_bitmaps:
 	ds.l	2*32 ; Text clear bitmap infos followed by text draw bitmap infos.
 
-next_text_screen_address:
-	ds.l	1
-
-next_text_matrix_address:
-	ds.l	1
-	
 text_matrix:
 	ds.b	32*32
+
+text_infos1:
+	ds.l	32*32*4+1 ; screen_adress, background_address, text_draw_address, text_clear_address
+
+text_infos2:
+	ds.l	32*32*4+1 ; screen_adress, background_address, text_draw_address, text_clear_address
 
 text_reorder_buffer:
 	ds.b	32*4

@@ -456,11 +456,13 @@ send_rle_data:
 
 	jclr	#1,x:m_hsr,*
 	movep	y:(r4),x:m_htx
+
 	move	y0,y:(r4)+
 
-	jclr	#1,x:m_hsr,*
 	move	y:(r4),a
 	neg		a y0,y:(r4)+
+
+	jclr	#1,x:m_hsr,*
 	movep	a1,x:m_htx
 _loop:
 
