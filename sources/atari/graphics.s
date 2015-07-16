@@ -1360,6 +1360,22 @@ clear_text:
 	jpl		.sprite_loop
 	
 .start:
+	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
+	jcc		.start2
+	
+	move.l	a3,next_text_infos_address
+	move.l	#.resume,next_graphics_routine
+	
+	movem.l	(sp)+,d0-a6
+	
+	rts
+
+.resume:
+	movem.l	d0-a6,-(sp)
+
+	move.l	next_text_infos_address,a3
+	
+.start2:
 	move.l	(a3)+,d0
 	jne		.loop
 
@@ -1599,8 +1615,6 @@ draw_text:
 	jra		.loop
 
 .end:
-	move.l	work_text_infos_address,next_text_infos_address
-
 	movem.l	(sp)+,d0-a6
 	
 	jra		flip_screen
