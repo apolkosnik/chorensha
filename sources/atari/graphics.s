@@ -1349,22 +1349,11 @@ clear_text:
 	move	(a0)+,d0
 	jmp		.jump(pc,d0.w)
 
+	rept 16
+
 	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
-	move	(a1)+,(a2)+
+	
+	endr
 
 .jump:
 	move	(a0)+,d0
@@ -1515,7 +1504,7 @@ prepare_text:
 	lea		text_matrix,a1
 	move.l	TEXT_GRAPHICS_ADDRESS,a2
 	move.l	work_text_infos_address,a3
-	lea		background_image,a4
+	lea		background_image+SCREEN_DISPLAY_OFFSET,a4
 	move.l	work_screen_address,a5
 	add.l	#SCREEN_DISPLAY_OFFSET,a5
 
@@ -1573,7 +1562,7 @@ prepare_text:
 draw_text:
 	movem.l	d0-a6,-(sp)
 
-	move.l	next_text_infos_address,a0
+	move.l	work_text_infos_address,a0
 	lea		translated_palettes+4,a5
 
 .loop:
@@ -1595,11 +1584,19 @@ draw_text:
 	
 	move.l	a0,next_text_infos_address
 
-	move.l	#draw_text,next_graphics_routine
+	move.l	#.resume,next_graphics_routine
 	
 	movem.l	(sp)+,d0-a6
 	
 	rts
+
+.resume:
+	movem.l	d0-a6,-(sp)
+
+	move.l	next_text_infos_address,a0
+	lea		translated_palettes+4,a5
+
+	jra		.loop
 
 .end:
 	move.l	work_text_infos_address,next_text_infos_address
