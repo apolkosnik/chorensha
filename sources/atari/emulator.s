@@ -39,13 +39,13 @@ start_emulator:
 ; ------------------------------------------------------------------------------
 
 vbl_handler:
-	tst		program_exit_request
-	jeq		.no_exit_request
+;	tst		program_exit_request
+;	jeq		.no_exit_request
 
-	move.l	saved_stack_address,sp
-	rts
+;	move.l	saved_stack_address,sp
+;	rts
 
-.no_exit_request:
+;.no_exit_request:
 	move.b	display_window_address+1,$ffff8201.w
 	move.b	display_window_address+2,$ffff8203.w
 	move.b	display_window_address+3,$ffff820d.w
@@ -60,15 +60,115 @@ vbl_handler:
 
 	clr.l	$ffff9800.w
 	
-	jsr		graphics_engine
+	jbsr	joypad_handler
+	jbsr	graphics_engine
 
-;.loop:
-;	cmp.b	#255-10,$fffffa21.w
-;	bcc		.loop
-	
 ;	not.l	$ffff9800.w
 	
 	move.l	L_00000118,-(sp)
+	rts
+
+; ------------------------------------------------------------------------------
+
+joypad_handler:
+	movem.l	d0/a0,-(sp)
+
+	lea		last_joypad_data,a0
+
+	move	#$fffe,$ffff9202.w ; Select joypad input group 4.
+
+	move	$ffff9200.w,d0
+
+	cmp		(a0),d0
+	jeq		.button_a_unchanged
+	
+	btst	#1,d0
+	jeq		.button_a_down
+	
+	bset	#5,iocs_joystick_data+3 ; Joystick button #2 up.	
+
+	jra		.button_a_unchanged
+	
+.button_a_down:
+	bclr	#5,iocs_joystick_data+3 ; Joystick button #2 down.	
+
+.button_a_unchanged:
+	move	d0,(a0)+
+
+	move	$ffff9202.w,d0
+
+	cmp		(a0),d0
+	jeq		.direction_unchanged
+	
+	btst	#8,d0 ; Joypad up.
+	jeq		.up
+	
+	bset	#0,iocs_joystick_data+3 ; Not joystick up.
+
+	jra		.not_up
+	
+.up:
+	bclr	#0,iocs_joystick_data+3 ; Joystick up.
+
+.not_up:
+	btst	#9,d0 ; Joypad down.
+	jeq		.down
+	
+	bset	#1,iocs_joystick_data+3 ; Not joystick down.
+
+	jra		.not_down
+	
+.down:
+	bclr	#1,iocs_joystick_data+3 ; Joystick down.
+
+.not_down:
+	btst	#10,d0 ; Joypad left.
+	jeq		.left
+	
+	bset	#2,iocs_joystick_data+3 ; Not joystick left.
+
+	jra		.not_left
+	
+.left:
+	bclr	#2,iocs_joystick_data+3 ; Joystick left.
+
+.not_left:
+	btst	#11,d0 ; Joypad right.
+	jeq		.right
+	
+	bset	#3,iocs_joystick_data+3 ; Not joystick right.
+
+	jra		.not_right
+	
+.right:
+	bclr	#3,iocs_joystick_data+3 ; Joystick right.
+
+.not_right:
+.direction_unchanged:
+	move	d0,(a0)+
+
+	move	#$fffd,$ffff9202.w ; Select joypad input group 3.
+
+	move	$ffff9200.w,d0
+
+	cmp		(a0),d0
+	jeq		.button_b_unchanged
+	
+	btst	#1,d0
+	jeq		.button_b_down
+	
+	bset	#6,iocs_joystick_data+3 ; Joystick button #1 up.	
+
+	jra		.button_b_unchanged
+	
+.button_b_down:
+	bclr	#6,iocs_joystick_data+3 ; Joystick button #1 down.	
+
+.button_b_unchanged:
+	move	d0,(a0)+
+
+	movem.l	(sp)+,d0/a0
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -600,6 +700,9 @@ trap_f_handler:
 ; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
+
+last_joypad_data:
+	dc		-1,-1,-1
 
 iocs_joystick_data:
 	dc.l	-1
