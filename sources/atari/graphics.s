@@ -5,7 +5,6 @@
 	xdef compile_characters
 	xdef prepare_sprite_infos
 	xdef graphics_engine
-	xdef screen_has_been_flipped
 
 	xdef display_screen_address
 	xdef work_screen_address
@@ -1175,8 +1174,6 @@ prepare_sprite_infos:
 
 	move.l	#SPRITE_DATA_TABLE,CURRENT_SPRITE_DATA_ENTRY
 
-	move	#-1,sprite_infos_prepared
-
 	clr.l	d0
 
 	rts
@@ -1267,8 +1264,6 @@ process_sprite_infos:
 	clr.l	(a4) ; End marker.
 
 	movem.l	(sp)+,d0-a6
-
-	clr		sprite_infos_prepared
 
 	jra		update_background
 
@@ -1665,11 +1660,6 @@ flip_screen:
 
 	movem.l	(sp)+,d0-d1
 
-	clr		screen_has_been_flipped
-
-;	tst		sprite_infos_prepared
-;	jmi		process_sprite_infos
-	
 	move.l	#process_sprite_infos,next_graphics_routine
 	
 	rts
@@ -1983,12 +1973,6 @@ sort_counts:
 
 sorted_sprite_data:
 	ds		512*8
-
-sprite_infos_prepared:
-	ds		1
-	
-screen_has_been_flipped:
-	ds		1
 
 ; ------------------------------------------------------------------------------
 	end

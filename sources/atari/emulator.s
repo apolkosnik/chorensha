@@ -50,8 +50,6 @@ vbl_handler:
 	move.b	display_window_address+2,$ffff8203.w
 	move.b	display_window_address+3,$ffff820d.w
 
-	move	#-1,screen_has_been_flipped
-
 	addq	#1,vbl_wait_counter
 
 	clr.b	$fffffa1b.w
