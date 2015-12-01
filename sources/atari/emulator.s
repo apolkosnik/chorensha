@@ -40,7 +40,7 @@ start_emulator:
 
 vbl_handler:
 ;	tst		program_exit_request
-;	jeq		.no_exit_request
+;	beq		.no_exit_request
 
 ;	move.l	saved_stack_address,sp
 ;	rts
@@ -58,8 +58,8 @@ vbl_handler:
 
 	clr.l	$ffff9800.w
 	
-	jbsr	joypad_handler
-	jbsr	graphics_engine
+	bsr		joypad_handler
+	bsr		graphics_engine
 
 ;	not.l	$ffff9800.w
 	
@@ -78,14 +78,14 @@ joypad_handler:
 	move	$ffff9200.w,d0
 
 	cmp		(a0),d0
-	jeq		.button_a_unchanged
+	beq		.button_a_unchanged
 	
 	btst	#1,d0
-	jeq		.button_a_down
+	beq		.button_a_down
 	
 	bset	#5,iocs_joystick_data+3 ; Joystick button #2 up.	
 
-	jra		.button_a_unchanged
+	bra		.button_a_unchanged
 	
 .button_a_down:
 	bclr	#5,iocs_joystick_data+3 ; Joystick button #2 down.	
@@ -96,47 +96,47 @@ joypad_handler:
 	move	$ffff9202.w,d0
 
 	cmp		(a0),d0
-	jeq		.direction_unchanged
+	beq		.direction_unchanged
 	
 	btst	#8,d0 ; Joypad up.
-	jeq		.up
+	beq		.up
 	
 	bset	#0,iocs_joystick_data+3 ; Not joystick up.
 
-	jra		.not_up
+	bra		.not_up
 	
 .up:
 	bclr	#0,iocs_joystick_data+3 ; Joystick up.
 
 .not_up:
 	btst	#9,d0 ; Joypad down.
-	jeq		.down
+	beq		.down
 	
 	bset	#1,iocs_joystick_data+3 ; Not joystick down.
 
-	jra		.not_down
+	bra		.not_down
 	
 .down:
 	bclr	#1,iocs_joystick_data+3 ; Joystick down.
 
 .not_down:
 	btst	#10,d0 ; Joypad left.
-	jeq		.left
+	beq		.left
 	
 	bset	#2,iocs_joystick_data+3 ; Not joystick left.
 
-	jra		.not_left
+	bra		.not_left
 	
 .left:
 	bclr	#2,iocs_joystick_data+3 ; Joystick left.
 
 .not_left:
 	btst	#11,d0 ; Joypad right.
-	jeq		.right
+	beq		.right
 	
 	bset	#3,iocs_joystick_data+3 ; Not joystick right.
 
-	jra		.not_right
+	bra		.not_right
 	
 .right:
 	bclr	#3,iocs_joystick_data+3 ; Joystick right.
@@ -150,14 +150,14 @@ joypad_handler:
 	move	$ffff9200.w,d0
 
 	cmp		(a0),d0
-	jeq		.button_b_unchanged
+	beq		.button_b_unchanged
 	
 	btst	#1,d0
-	jeq		.button_b_down
+	beq		.button_b_down
 	
 	bset	#6,iocs_joystick_data+3 ; Joystick button #1 up.	
 
-	jra		.button_b_unchanged
+	bra		.button_b_unchanged
 	
 .button_b_down:
 	bclr	#6,iocs_joystick_data+3 ; Joystick button #1 down.	
@@ -186,84 +186,84 @@ line_f_handler:
 	addq.l	#2,22(sp)
 
 	cmp		#$fe00,d1 ; __LMUL
-	jne		.not__lmul
+	bne		.not__lmul
 
 	muls.l	(sp),d0
 
-	jra		.exit
+	bra		.exit
 
 .not__lmul:
 	cmp		#$fe01,d1 ; __LDIV
-	jne		.not__ldiv
+	bne		.not__ldiv
 
 	divs.l	(sp),d0
 
-	jra		.exit
+	bra		.exit
 
 .not__ldiv:
 	cmp		#$fe0d,d1 ; __SRAND
-	jne		.not__srand
+	bne		.not__srand
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not__srand:
 	cmp		#$ff06,d1 ; _INPOUT
-	jne		.not_inpout
+	bne		.not_inpout
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not_inpout:
 	cmp		#$ff20,d1 ; _SUPER
-	jne		.not_super
+	bne		.not_super
 
 	move.l	26+LINE_F_OFFSET+0(sp),a0
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not_super:
 	cmp		#$ff23,d1 ; _CONCTRL
-	jne		.not_conctrl
+	bne		.not_conctrl
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not_conctrl:
 	cmp		#$ff25,d1 ; _INTVCS
-	jne		.not_intvcs
+	bne		.not_intvcs
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move	26+LINE_F_OFFSET+4(sp),a0
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not_intvcs:
 	cmp		#$ff36,d1 ; _DSKFRE
-	jne		.not_dskfre
+	bne		.not_dskfre
 
 	move.l	#10000000,d0
 
-	jra		.exit
+	bra		.exit
 
 .not_dskfre:
 	cmp		#$ff37,d1 ; _NAMECK
-	jne		.not_nameck
+	bne		.not_nameck
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not_nameck:
 	cmp		#$ff3d,d1 ; _OPEN
-	jne		.not_open
+	bne		.not_open
 
 	move.l	26+LINE_F_OFFSET+0(sp),a0
 	move	26+LINE_F_OFFSET+4(sp),d0
@@ -292,14 +292,14 @@ line_f_handler:
 	trap	#1
 	addq	#8,sp
 
-	jra		.exit
+	bra		.exit
 
 .new_line:
 	dc.b	10,13,0,0
 
 .not_open:
 	cmp		#$ff3f,d1 ; _READ
-	jne		.not_read
+	bne		.not_read
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move.l	26+LINE_F_OFFSET+2(sp),a0
@@ -313,11 +313,11 @@ line_f_handler:
 	trap	#1
 	lea		12(sp),sp
 
-	jra		.exit
+	bra		.exit
 
 .not_read:
 	cmp		#$ff3e,d1 ; _CLOSE
-	jne		.not_close
+	bne		.not_close
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 
@@ -326,11 +326,11 @@ line_f_handler:
 	trap	#1
 	addq	#4,sp
 
-	jra		.exit
+	bra		.exit
 
 .not_close:
 	cmp		#$ff40,d1 ; _WRITE
-	jne		.not_write
+	bne		.not_write
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move.l	26+LINE_F_OFFSET+2(sp),a0
@@ -343,11 +343,11 @@ line_f_handler:
 	trap	#1
 	lea		12(sp),sp
 
-	jra		.exit	
+	bra		.exit	
 
 .not_write:
 	cmp		#$ff42,d1 ; _SEEK
-	jne		.not_seek
+	bne		.not_seek
 
 	move	26+LINE_F_OFFSET+0(sp),d0
 	move.l	26+LINE_F_OFFSET+2(sp),a0
@@ -360,33 +360,33 @@ line_f_handler:
 	trap	#1
 	lea		10(sp),sp
 
-	jra		.exit	
+	bra		.exit	
 
 .not_seek:
 	cmp		#$ff44,d1 ; _IOCTRL
-	jne		.not_ioctrl
+	bne		.not_ioctrl
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .not_ioctrl:
 	cmp		#$ff4a,d1 ; _SETBLOCK
-	jne		.not_setblock
+	bne		.not_setblock
 
 	move.l	26+LINE_F_OFFSET+4(sp),d0
 
 	cmp.l	#$ffffff,d0
-	jeq		.1
+	beq		.1
 
 	clr.l	d0
 
-	jra		.exit
+	bra		.exit
 
 .1:
 	move.l	#$81200000,d0
 
-	jra		.exit
+	bra		.exit
 
 .not_setblock:
 	illegal
@@ -412,7 +412,7 @@ trap_4_handler:
 
 trap_f_handler:
 	cmp.b	#$4,d0 ; _BITSNS
-	jne		.no_bitsns
+	bne		.no_bitsns
 
 	clr.l	d0
 
@@ -420,7 +420,7 @@ trap_f_handler:
 
 .no_bitsns:
 	cmp.b	#$10,d0 ; _CRTMOD
-	jne		.no_crtmod
+	bne		.no_crtmod
 
 	clr.l	d0
 
@@ -428,7 +428,7 @@ trap_f_handler:
 
 .no_crtmod:
 	cmp.b	#$14,d0 ; _TPALET2
-	jne		.no_tpalet2
+	bne		.no_tpalet2
 
 	movem.l	d1-d2/a0,-(sp)
 
@@ -438,11 +438,11 @@ trap_f_handler:
 	clr.l	d0
 
 	tst.l	d2
-	jmi		.tpalet2_get_color
+	bmi		.tpalet2_get_color
 
 	move	d2,(a0,d1.w*2)
 
-	jra		.tpalet2_skip
+	bra		.tpalet2_skip
 
 .tpalet2_get_color:
 	move	(a0,d1.w*2),d0
@@ -454,7 +454,7 @@ trap_f_handler:
 
 .no_tpalet2:
 	cmp.b	#$20,d0 ; _B_PUTC
-	jne		.no_b_putc
+	bne		.no_b_putc
 
 	clr.l	d0
 
@@ -462,7 +462,7 @@ trap_f_handler:
 
 .no_b_putc:
 	cmp.b	#$22,d0 ; _B_COLOR
-	jne		.no_b_color
+	bne		.no_b_color
 
 	clr.l	d0
 
@@ -470,7 +470,7 @@ trap_f_handler:
 
 .no_b_color:
 	cmp.b	#$23,d0 ; _B_LOCATE
-	jne		.no_b_locate
+	bne		.no_b_locate
 
 	clr.l	d0
 
@@ -478,7 +478,7 @@ trap_f_handler:
 
 .no_b_locate:
 	cmp.b	#$3b,d0 ; _JOYGET
-	jne		.no_joyget
+	bne		.no_joyget
 
 	move.l	iocs_joystick_data,d0
 
@@ -486,7 +486,7 @@ trap_f_handler:
 
 .no_joyget:
 	cmp.b	#$60,d0 ; _ADPCMOUT
-	jne		.no_adpcmout
+	bne		.no_adpcmout
 
 	movem.l	d0-d2/a0-a2,-(sp)
 
@@ -526,12 +526,12 @@ trap_f_handler:
 
 .no_adpcmout:
 	cmp.b	#$66,d0 ; _ADPCMSNS
-	jne		.no_adpcmsns
+	bne		.no_adpcmsns
 
 	clr.l	d0
 
 	btst	#0,$ffff8901.w
-	jeq		.replay_not_running
+	beq		.replay_not_running
 
 	moveq.l	#2,d0
 	
@@ -540,7 +540,7 @@ trap_f_handler:
 
 .no_adpcmsns:
 	cmp.b	#$67,d0 ; _ADPCMMOD
-	jne		.no_adpcmmod
+	bne		.no_adpcmmod
 
 	clr.l	d0
 
@@ -548,13 +548,13 @@ trap_f_handler:
 
 .no_adpcmmod:
 	cmp.b	#$7d,d0 ; _SKEY_MOD
-	jne		.no_skey_mod
+	bne		.no_skey_mod
 
 	rte
 
 .no_skey_mod:
 	cmp.b	#$7f,d0 ; _ONTIME
-	jne		.no_ontime
+	bne		.no_ontime
 
 	move.l	#100*100,d0
 	clr.l	d1
@@ -563,7 +563,7 @@ trap_f_handler:
 
 .no_ontime:
 	cmp.b	#$81,d0 ; _B_SUPER
-	jne		.no_b_super
+	bne		.no_b_super
 
 	move.l	#-1,d0
 
@@ -571,37 +571,37 @@ trap_f_handler:
 
 .no_b_super:
 	cmp.b	#$87,d0 ; _B_WPOKE
-	jne		.no_b_wpoke
+	bne		.no_b_wpoke
 
 	rte
 
 .no_b_wpoke:
 	cmp.b	#$90,d0 ; _G_CLR_ON
-	jne		.no_g_clr_on
+	bne		.no_g_clr_on
 
 	rte
 
 .no_g_clr_on:
 	cmp.b	#$92,d0 ; (未公開)	プライオリティ設定
-	jne		.no_prio_set
+	bne		.no_prio_set
 
 	rte
 
 .no_prio_set:
 	cmp.b	#$ae,d0 ; _OS_CURON
-	jne		.no_os_curon
+	bne		.no_os_curon
 
 	rte
 
 .no_os_curon:
 	cmp.b	#$af,d0 ; _OS_CUROFF
-	jne		.no_os_curoff
+	bne		.no_os_curoff
 
 	rte
 
 .no_os_curoff:
 	cmp.b	#$b1,d0 ; _APAGE
-	jne		.no_apage
+	bne		.no_apage
 
 	clr.l	d0
 
@@ -609,7 +609,7 @@ trap_f_handler:
 
 .no_apage:
 	cmp.b	#$b2,d0 ; _VPAGE
-	jne		.no_vpage
+	bne		.no_vpage
 
 	clr.l	d0
 
@@ -617,7 +617,7 @@ trap_f_handler:
 
 .no_vpage:
 	cmp.b	#$b3,d0 ; _HOME
-	jne		.no_home
+	bne		.no_home
 
 	clr.l	d0
 
@@ -625,7 +625,7 @@ trap_f_handler:
 
 .no_home:
 	cmp.b	#$b4,d0 ; _WINDOW
-	jne		.no_window
+	bne		.no_window
 
 	clr.l	d0
 
@@ -633,7 +633,7 @@ trap_f_handler:
 
 .no_window:
 	cmp.b	#$b5,d0 ; _WIPE
-	jne		.no_wipe
+	bne		.no_wipe
 
 	clr.l	d0
 
@@ -641,25 +641,25 @@ trap_f_handler:
 
 .no_wipe:
 	cmp.b	#$c1,d0 ; _SP_ON
-	jne		.no_sp_on
+	bne		.no_sp_on
 
 	rte
 
 .no_sp_on:
 	cmp.b	#$c2,d0 ; _SP_OFF
-	jne		.no_sp_off
+	bne		.no_sp_off
 
 	rte
 
 .no_sp_off:
 	cmp.b	#$ca,d0 ; _BGCTRLST
-	jne		.no_bgctrlst
+	bne		.no_bgctrlst
 
 	rte
 
 .no_bgctrlst:
 	cmp.b	#$ce,d0 ; _BGTEXTGT
-	jne		.no_bgtextgt
+	bne		.no_bgtextgt
 
 	clr.l	d0
 
@@ -667,7 +667,7 @@ trap_f_handler:
 
 .no_bgtextgt:
 	cmp.b	#$cf,d0 ; _SPALET
-	jne		.no_spalet
+	bne		.no_spalet
 
 	movem.l	d1-d3/a0,-(sp)
 
@@ -678,11 +678,11 @@ trap_f_handler:
 	clr.l	d0
 
 	tst.l	d3
-	jmi		.spalet_get_color
+	bmi		.spalet_get_color
 
 	move	d3,(a0,d2.w*2)
 
-	jra		.spalet_skip
+	bra		.spalet_skip
 
 .spalet_get_color:
 	move	(a0,d2.w*2),d0

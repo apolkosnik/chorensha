@@ -26,7 +26,7 @@ initialize_graphics:
 	; Prepare to send all sprite masks to the DSP.
 
 	btst	#1,$ffffa202.w
-	jeq		*-6
+	beq		*-6
 
 	move.l	#TOTAL_NUMBER_OF_SPRITES,$ffffa204.w
 
@@ -52,7 +52,7 @@ initialize_graphics:
 	and.l	#$fffffff0,d0
 
 	cmp.l	#-1,machine_supervidel
-	jeq		.no_supervidel
+	beq		.no_supervidel
 
 	add.l	#$a0000000,d0
 
@@ -217,7 +217,7 @@ initialize_graphics:
 	move	d4,(a0)+
 
 	addq	#1,d0
-	jne		.color_translation_loop
+	bne		.color_translation_loop
 
 	rts
 
@@ -272,7 +272,7 @@ convert_sprite_to_drawing_code:
 	clr		d2 ; Gap offset.
 
 	cmp		#15,sprite_color_count
-	jne		.skip_color_fix1
+	bne		.skip_color_fix1
 
 	move	#$2f2d,(a2)+ ; "move.l x(a5),-(sp)".
 	move	#15*4,(a2)+ ; "x".
@@ -282,18 +282,18 @@ convert_sprite_to_drawing_code:
 
 .colors_loop:
 	tst		(a3)+
-	jeq		.process_gap
+	beq		.process_gap
 
 	tst		d2
-	jeq		.count_colors
+	beq		.count_colors
 
 	cmp		#8,d2
-	jle		.quick_add1
+	ble		.quick_add1
 
 	move	#$4bed,(a2)+ ; "lea x(a5),a5".
 	move	d2,(a2)+ ; "x".
 
-	jra		.count_colors
+	bra		.count_colors
 
 .quick_add1:
 	and		#$7,d2
@@ -307,16 +307,16 @@ convert_sprite_to_drawing_code:
 
 	move	2(a0,d0.w*2),d3
 	cmp		#15,d3
-	jeq		.skip_color_fix2
+	beq		.skip_color_fix2
 
 	bset	d3,d1
 
 .skip_color_fix2:
-	jra		.next_color
+	bra		.next_color
 
 .process_gap:
 	tst		d1
-	jeq		.count_gaps
+	beq		.count_gaps
 
 	move	#$4cdd,(a2)+ ; "movem.l (a5)+,rx-ry".
 	move	d1,(a2)+ ; "rx-ry".
@@ -332,7 +332,7 @@ convert_sprite_to_drawing_code:
 	dbf		d7,.colors_loop
 
 	tst		d1
-	jeq		.no_final_colors
+	beq		.no_final_colors
 
 	move	#$4cdd,(a2)+ ; "movem.l (a5)+,rx-ry".
 	move	d1,(a2)+ ; "rx-ry".
@@ -350,23 +350,23 @@ convert_sprite_to_drawing_code:
 
 .pixels_loop:
 	move.b	(a1)+,d1
-	jne		.process_pixel
+	bne		.process_pixel
 
 	addq	#2,d0
 
-	jra		.next_pixel
+	bra		.next_pixel
 
 .process_pixel:
 	tst		d0
-	jeq		.draw_pixel
+	beq		.draw_pixel
 
 	cmp		#8,d0
-	jle		.quick_add2
+	ble		.quick_add2
 
 	move	#$4dee,(a2)+ ; "lea x(a6),a6".
 	move	d0,(a2)+ ; "x".
 
-	jra		.draw_pixel
+	bra		.draw_pixel
 
 .quick_add2:
 	and		#$7,d0
@@ -380,22 +380,22 @@ convert_sprite_to_drawing_code:
 
 	move	(a0,d1.w*2),d2 ; "x".
 	cmp		#15,d2
-	jne		.skip_color_fix3
+	bne		.skip_color_fix3
 
 	move	#$3cd7,d2 ; "move.w (sp),(a6)+".
 	cmp		-2(a2),d2 ; Is the last opcode also "move.w (sp),(a6)+"?
-	jne		.set_draw_color_command
+	bne		.set_draw_color_command
 
 	move	#$2cd7,d2 ; "move.l (sp),(a6)+".
 	subq.l	#2,a2
 
-	jra		.set_draw_color_command
+	bra		.set_draw_color_command
 
 .skip_color_fix3:
 	add		#$3cc0,d2 ; "move.w rx,(a6)+".
 
 	cmp		-2(a2),d2 ; Is the last opcode also "move.w rx,(a6)+"?
-	jne		.set_draw_color_command
+	bne		.set_draw_color_command
 
 	sub		#$1000,d2 ; Convert the current opcode to "move.l rx,(a6)+".
 	subq.l	#2,a2
@@ -411,7 +411,7 @@ convert_sprite_to_drawing_code:
 	dbf		d7,.lines_loop2
 
 	cmp		#15,sprite_color_count
-	jne		.skip_color_fix4
+	bne		.skip_color_fix4
 
 	move	#$588f,(a2)+ ; "addq.l #4,sp".
 
@@ -446,10 +446,10 @@ convert_sprite_to_restore_data:
 	
 .pixels_loop:
 	tst.b	(a1)+
-	jeq		.no_pixel
+	beq		.no_pixel
 	
 	tst		d1
-	jne		.skip_pixel_offset
+	bne		.skip_pixel_offset
 	
 	move	d0,(a2)+
 	clr		d0
@@ -457,11 +457,11 @@ convert_sprite_to_restore_data:
 .skip_pixel_offset:
 	subq	#2,d1
 
-	jra		.next_pixel
+	bra		.next_pixel
 	
 .no_pixel:
 	tst		d1
-	jeq		.skip_jump_offset
+	beq		.skip_jump_offset
 	
 	move	d1,(a2)+
 	clr		d1
@@ -473,7 +473,7 @@ convert_sprite_to_restore_data:
 	dbf		d6,.pixels_loop
 	
 	tst		d1
-	jeq		.skip_jump_offset2
+	beq		.skip_jump_offset2
 	
 	move	d1,(a2)+
 	clr		d1
@@ -508,7 +508,7 @@ build_and_send_sprite_mask_to_dsp:
 
 .loop2:
 	tst.b	(a0)+
-	jeq		.no_pixel
+	beq		.no_pixel
 
 	bset	d6,d0
 
@@ -637,7 +637,7 @@ compile_sprite:
 
 .count_loop:
 	tst		(a0)+
-	jeq		.color_not_used
+	beq		.color_not_used
 
 	move	d0,(a1)
 	addq	#1,d0
@@ -969,7 +969,7 @@ compile_characters:
 	
 	addq	#4,d0
 	cmp		#TOTAL_NUMBER_OF_CHARACTERS,d0
-	jne		.reorder_loop
+	bne		.reorder_loop
 	
 	; Compile characters.
 
@@ -1050,7 +1050,7 @@ compile_characters:
 
 .count_loop:
 	tst		(a0)+
-	jeq		.color_not_used
+	beq		.color_not_used
 
 	move	d0,(a1)
 	addq	#1,d0
@@ -1088,7 +1088,7 @@ prepare_sprite_infos:
 	lea		SPRITE_DATA_TABLE,a0
 	move.l	CURRENT_SPRITE_DATA_ENTRY,d7
 	sub.l	a0,d7
-	jeq		.skip_all
+	beq		.skip_all
 
 	move.l	d7,(sp) ; Return number of prepared sprites.
 
@@ -1096,7 +1096,7 @@ prepare_sprite_infos:
 
 	lsr		#3,d7
 	move	d7,(a3)+
-	jeq		.skip_all
+	beq		.skip_all
 
 	subq	#1,d7
 
@@ -1148,7 +1148,7 @@ prepare_sprite_infos:
 	
 .reorder_loop:
 	move	(a2)+,d6
-	jeq		.skip_reorder
+	beq		.skip_reorder
 	
 	lea     (a1,d6.w*2),a4
 	subq	#1,d6
@@ -1182,7 +1182,7 @@ prepare_sprite_infos:
 
 process_sprite_infos:
 ;	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES-60,$fffffa21.w
-;	jcc		.start_processing
+;	bcc		.start_processing
 	
 ;	move.l	#process_sprite_infos,next_graphics_routine
 	
@@ -1195,7 +1195,7 @@ process_sprite_infos:
 
 	clr.l	d7
 	move	(a0)+,d7
-	jne		.start
+	bne		.start
 
 	movem.l	(sp)+,d0-a6
 
@@ -1216,7 +1216,7 @@ process_sprite_infos:
 	lea		$ffffa204+2.w,a6
 
 	btst	#3,$ffffa202.w
-	jeq		*-6
+	beq		*-6
 
 	bset	#3,$ffffa200.w
 
@@ -1265,7 +1265,7 @@ process_sprite_infos:
 
 	movem.l	(sp)+,d0-a6
 
-	jra		update_background
+	bra		update_background
 
 ; ------------------------------------------------------------------------------
 
@@ -1281,13 +1281,13 @@ update_background:
 
 	movem.l	(sp)+,d0-d1
 
-	jra		translate_palettes
+	bra		translate_palettes
 
 ; ------------------------------------------------------------------------------
 
 translate_palettes:
 ;	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES-60,$fffffa21.w
-;	jcc		.start_translating
+;	bcc		.start_translating
 	
 ;	move.l	#translate_palettes,next_graphics_routine
 	
@@ -1318,7 +1318,7 @@ translate_palettes:
 
 	movem.l	(sp)+,d0-a6
 
-	jra		clear_text
+	bra		clear_text
 
 ; ------------------------------------------------------------------------------
 
@@ -1327,7 +1327,7 @@ clear_text:
 
 	move.l	work_text_infos_address,a3
 	
-	jra		.start
+	bra		.start
 
 .loop:
 	move.l	d0,a2
@@ -1335,7 +1335,7 @@ clear_text:
 	addq.l	#4,a3
 	move.l	(a3)+,a0
 	
-	jra		.jump
+	bra		.jump
 	
 .sprite_loop:
 	add		d0,a1
@@ -1352,11 +1352,11 @@ clear_text:
 
 .jump:
 	move	(a0)+,d0
-	jpl		.sprite_loop
+	bpl		.sprite_loop
 	
 .start:
 	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.start2
+	bcc		.start2
 	
 	move.l	a3,next_text_infos_address
 	move.l	#.resume,next_graphics_routine
@@ -1372,14 +1372,14 @@ clear_text:
 	
 .start2:
 	move.l	(a3)+,d0
-	jne		.loop
+	bne		.loop
 
 	move.l	work_text_infos_address,a0	
 	clr.l	(a0)
 
 	movem.l	(sp)+,d0-a6
 
-	jra		draw_sprites
+	bra		draw_sprites
 	
 ; ------------------------------------------------------------------------------
 
@@ -1388,7 +1388,7 @@ draw_sprites:
 
 	move.l	next_sprite_infos_address,a0
 
-	jra		.start
+	bra		.start
 
 .loop:
 	move.l	d0,a6
@@ -1402,7 +1402,7 @@ draw_sprites:
 	move.l	(sp)+,a0
 
 	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.start
+	bcc		.start
 	
 	move.l	a0,next_sprite_infos_address
 	move.l	#draw_sprites,next_graphics_routine
@@ -1413,7 +1413,7 @@ draw_sprites:
 
 .start:
 	move.l	(a0)+,d0
-	jne		.loop
+	bne		.loop
 
 ;	move.l	work_sprite_infos_address_old,d0 ; Fixme!
 ;	move.l	work_sprite_infos_address_new,work_sprite_infos_address_old
@@ -1423,7 +1423,7 @@ draw_sprites:
 
 	move.l	#sprite_infos3,next_sprite_infos_address
 
-	jra		clear_sprites_dsp
+	bra		clear_sprites_dsp
 
 ; ------------------------------------------------------------------------------
 
@@ -1432,14 +1432,14 @@ clear_sprites_dsp:
 
 	move.l	work_sprite_infos_address_new,a0	
 	tst.l	(a0)
-	jeq		.skip
+	beq		.skip
 
 .wait_for_dsp_loop:
 	btst	#3,$ffffa202.w
-	jeq		.start
+	beq		.start
 
 	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.wait_for_dsp_loop
+	bcc		.wait_for_dsp_loop
 	
 	move.l	#clear_sprites_dsp,next_graphics_routine
 	
@@ -1464,7 +1464,7 @@ clear_sprites_dsp:
 	lsr		#4,d1
 	add		d1,d2
 	cmp		#SPRITE_THROTTLE_DISPLAY_LINES,d2
-	jcs		.rle_loop
+	bcs		.rle_loop
 	
 	move.l	#.clear_sprites_dsp2,next_graphics_routine
 	
@@ -1481,7 +1481,7 @@ clear_sprites_dsp:
 	move.l	work_screen_address,a3
 	add.l	#16*256*2*2,a3
 
-	jra		.rle_loop
+	bra		.rle_loop
 
 	rept 16+256+16
 
@@ -1496,7 +1496,7 @@ clear_sprites_dsp:
 
 	move	(a1),d1
 
-	jra		.rle_loop(pc,d1.w)
+	jmp		.rle_loop(pc,d1.w)
 
 .skip:
 	move.l	work_sprite_infos_address_new,a0	
@@ -1504,7 +1504,7 @@ clear_sprites_dsp:
 	
 	movem.l	(sp)+,d0-a6
 
-	jra		prepare_text
+	bra		prepare_text
 
 ; ------------------------------------------------------------------------------
 
@@ -1523,13 +1523,13 @@ prepare_text:
 
 .lines_loop:
 	move.l	(a0),d0
-	jeq		.skip_line	
+	beq		.skip_line	
 
 	move	#32-1,d6
 
 .characters_loop:
 	add.l	d0,d0
-	jcc		.skip_character
+	bcc		.skip_character
 
 	move.l	a5,(a3)+
 	move.l	a4,(a3)+
@@ -1550,7 +1550,7 @@ prepare_text:
 	add.l	#256*2*2*8-256*2,a4
 	add.l	#256*2*2*8-256*2,a5
 
-	jra		.next_line
+	bra		.next_line
 
 .skip_line:
 	add.l	#32,a1
@@ -1566,7 +1566,7 @@ prepare_text:
 
 	movem.l	(sp)+,d0-a6
 	
-	jra		draw_text
+	bra		draw_text
 	
 ; ------------------------------------------------------------------------------
 
@@ -1578,7 +1578,7 @@ draw_text:
 
 .loop:
 	move.l	(a0),d0
-	jeq		.end
+	beq		.end
 
 	movem.l	a0/a5,-(sp)
 
@@ -1591,7 +1591,7 @@ draw_text:
 	add.l	#4*4,a0
 
 	cmp.b	#255-SPRITE_THROTTLE_DISPLAY_LINES,$fffffa21.w
-	jcc		.loop
+	bcc		.loop
 	
 	move.l	a0,next_text_infos_address
 
@@ -1607,12 +1607,12 @@ draw_text:
 	move.l	next_text_infos_address,a0
 	lea		translated_palettes+4,a5
 
-	jra		.loop
+	bra		.loop
 
 .end:
 	movem.l	(sp)+,d0-a6
 	
-	jra		flip_screen
+	bra		flip_screen
 	
 ; ------------------------------------------------------------------------------
 
@@ -1673,7 +1673,7 @@ clear_sprites:
 	lea		background_image,a4
 	move.l	work_screen_address,d1
 	
-	jra		.start
+	bra		.start
 
 .loop:
 	addq.l	#8,a3
@@ -1683,7 +1683,7 @@ clear_sprites:
 	sub.l	d1,d0
 	lea		(a4,d0.l),a1
 
-	jra		.jump
+	bra		.jump
 	
 .sprite_loop:
 	add		d0,a1
@@ -1711,11 +1711,11 @@ clear_sprites:
 
 .jump:
 	move	(a0)+,d0
-	jpl		.sprite_loop
+	bpl		.sprite_loop
 	
 .start:
 	move.l	(a3)+,d0
-	jne		.loop
+	bne		.loop
 
 	move.l	work_sprite_infos_address_old,a0	
 	clr.l	(a0)
@@ -1745,13 +1745,13 @@ draw_text_slow:
 
 .text_lines_loop:
 	move.l	(a0),d0
-	jeq		.skip_text_line	
+	beq		.skip_text_line	
 
 	move	#32-1,d6
 
 .characters_loop:
 	add.l	d0,d0
-	jcc		.skip_character
+	bcc		.skip_character
 
 	move	#8-1,d5
 
@@ -1791,7 +1791,7 @@ draw_text_slow:
 	swap	d1
 	add.b	d1,d1
 	addx	d3,d3
-	jeq		.skip_pixel
+	beq		.skip_pixel
 
 	move	(a3,d3.w*4),(a4)
 
@@ -1817,7 +1817,7 @@ draw_text_slow:
 	add.l	#128*8-32,a1
 	add.l	#256*2*2*8-256*2,a2
 
-	jra		.next_text_line
+	bra		.next_text_line
 
 .skip_text_line:
 	add.l	#128*8,a1

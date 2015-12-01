@@ -19,67 +19,67 @@ _p_cookies=$5a0
 
 detect_machine:
 	move.l	_p_cookies,d0
-	jeq		.exit
+	beq		.exit
 
 	move.l	d0,a6
 
 	move.l	(a6)+,d0
-	jeq		.no_more_cookies
+	beq		.no_more_cookies
 
 .cookies_loop:
 	move.l	(a6)+,d1
 
 	cmp.l	#'_MCH',d0
-	jne		.skip_mch
+	bne		.skip_mch
 
 	move.l	d1,machine_type
 
-	jra		.next_cookie
+	bra		.next_cookie
 
 .skip_mch:	
 	cmp.l	#'_CPU',d0
-	jne		.skip_cpu
+	bne		.skip_cpu
 
 	move.l	d1,machine_cpu
 
-	jra		.next_cookie
+	bra		.next_cookie
 
 .skip_cpu:
 	cmp.l	#'_FPU',d0
-	jne		.skip_fpu
+	bne		.skip_fpu
 
 	move.l	d1,machine_fpu
 
-	jra		.next_cookie
+	bra		.next_cookie
 
 .skip_fpu:
 	cmp.l	#'_VDO',d0
-	jne		.skip_video
+	bne		.skip_video
 
 	move.l	d1,machine_video
 
-	jra		.next_cookie
+	bra		.next_cookie
 
 .skip_video:
 	cmp.l	#'SupV',d0
-	jne		.skip_supervidel
+	bne		.skip_supervidel
 
 	move.l	d1,machine_supervidel
 
-	jra		.next_cookie
+	bra		.next_cookie
 
 .skip_supervidel:
 	cmp.l	#'_SND',d0
-	jne		.skip_sound
+	bne		.skip_sound
 
 	move.l	d1,machine_sound
 
-	jra		.next_cookie
+	bra		.next_cookie
 
 .skip_sound:
 .next_cookie:
 	move.l	(a6)+,d0
-	jne		.cookies_loop
+	bne		.cookies_loop
 
 .no_more_cookies:
     ; Detect Fast-RAM.
@@ -91,7 +91,7 @@ detect_machine:
 	addq.l	#8,sp
 
     tst.l   d0
-	jeq		.exit
+	beq		.exit
 
     move    #-1,machine_has_fast_ram
 
@@ -171,7 +171,7 @@ initialize_machine:
 	; 256 * 240, TC.
 
 	btst	#6,$ffff8006.w
-	jeq		.set_vga_mode
+	beq		.set_vga_mode
 
 	move.l	#$c7009e,$ffff8282.w
 	move.l	#$1e001b,$ffff8286.w
@@ -186,7 +186,7 @@ initialize_machine:
 	move	#$0,$ffff82c2.w
 	move	#$100,$ffff8210.w
 
-	jra		.skip_vga_mode
+	bra		.skip_vga_mode
 
 .set_vga_mode:
 	move.l	#$c6008d,$ffff8282.w

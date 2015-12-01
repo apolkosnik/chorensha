@@ -4446,7 +4446,7 @@ DRAW_CHARACTER:
 	or.l	d0,32*4(a0)
 
 	cmp.b	#$20,12+3(sp)
-	jne		.not_space
+	bne		.not_space
 
 	not.l	d0
 	and.l	d0,32*4(a0)
@@ -4806,13 +4806,13 @@ L_000226F0:
 
 	ifd __ATARI__
 
-	jra		skip_raster_sync1
+	bra		skip_raster_sync1
 
 	endif
 
 	ifd __AMIGA__
 
-	jra		skip_raster_sync1
+	bra		skip_raster_sync1
 
 	endif
 
@@ -5757,9 +5757,9 @@ WAIT_VBL:
 .vbl_wait_loop:
 	cmp		vbl_wait_counter,d1
 	
-	jge		.vbl_wait_loop
+	bge		.vbl_wait_loop
 
-	jra		skip_raster_sync2
+	bra		skip_raster_sync2
 
 	endif
 
@@ -5767,7 +5767,7 @@ WAIT_VBL:
 
 	illegal
 
-	jra		skip_raster_sync2
+	bra		skip_raster_sync2
 
 	endif
 
@@ -17230,7 +17230,7 @@ sincos_tables_end:
 
 	movem.l	(sp)+,a0-a2
 
-	jra		skip_sincos
+	bra		skip_sincos
 
 	endif
 

@@ -59,7 +59,7 @@ start:
 	; DSP synchronization.
 
 	btst	#0,$ffffa202.w
-	jeq		*-6
+	beq		*-6
 
 	tst.l	$ffffa204.w
 
@@ -109,7 +109,7 @@ print_info_text:
 
 	move.l	machine_type,d0
 	cmp.l	#-1,d0
-	jeq		.no_detection_info
+	beq		.no_detection_info
 
 	lea		machine_type_table,a0
 
@@ -118,10 +118,10 @@ print_info_text:
 	move.l	(a0)+,a6
 
 	cmp.l	#-1,d1
-	jeq		.no_detection_info
+	beq		.no_detection_info
 
 	cmp.l	d0,d1
-	jne		.machine_type_loop
+	bne		.machine_type_loop
 
 	pea		detected_machine_text
 	move	#9,-(sp)
@@ -137,7 +137,7 @@ print_info_text:
 
 	move.l	machine_cpu,d0
 	cmp.l	#-1,d0
-	jeq		.no_detection_info
+	beq		.no_detection_info
 
 	divu	#10,d0
 	add.b	d0,machine_cpu_text+5
@@ -155,10 +155,10 @@ print_info_text:
 	; Print detected FPU.
 
 	cmp.l	#-1,machine_fpu
-	jeq		.no_fpu
+	beq		.no_fpu
 
 	tst		machine_fpu
-	jeq		.no_fpu
+	beq		.no_fpu
 
 	pea		separator_text
 	move	#9,-(sp)
@@ -172,7 +172,7 @@ print_info_text:
 .fpu_loop:
 	lsr		#1,d0
 	addq	#4,a0
-	jcc		.fpu_loop
+	bcc		.fpu_loop
 
 	move.l	(a0),-(sp)
 	move	#9,-(sp)
@@ -183,7 +183,7 @@ print_info_text:
 	; Print detected SuperVidel.
 
 	cmp.l	#-1,machine_supervidel
-	jeq		.no_supervidel
+	beq		.no_supervidel
 
 	pea		separator_text
 	move	#9,-(sp)
@@ -199,7 +199,7 @@ print_info_text:
     ; Detect Fast-RAM.
 
     cmp		#-1,machine_has_fast_ram
-	jne		.no_fast_ram
+	bne		.no_fast_ram
 
 	pea		separator_text
 	move	#9,-(sp)
