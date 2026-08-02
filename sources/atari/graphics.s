@@ -1483,11 +1483,27 @@ clear_sprites_dsp:
 
 	bra		.rle_loop
 
-	rept 16+256+16
+	; Even-length runs jump into this block and finish at the BRA.W.
+	; RLE_LONG_EVEN_BIAS in dsprite.asm must match the distance from
+	; the branch to .rle_loop (the odd-run block plus the BRA.W).
 
-	move	(a2)+,(a3)+
+	rept (16+256+16)/2
+
+	move.l	(a2)+,(a3)+
 
 	endr
+
+	bra.w	.rle_loop
+
+	; Odd-length runs jump into this block and finish with one word.
+
+	rept (16+256+16-1)/2
+
+	move.l	(a2)+,(a3)+
+
+	endr
+
+	move	(a2)+,(a3)+
 
 .rle_loop:
 	move.l	(a0),d0
@@ -1977,4 +1993,3 @@ sorted_sprite_data:
 ; ------------------------------------------------------------------------------
 	end
 ; ------------------------------------------------------------------------------
-

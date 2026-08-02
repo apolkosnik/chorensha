@@ -8,6 +8,8 @@
 
 TOTAL_NUMBER_OF_PACKED_SPRITES equ 1900
 NUMBER_OF_PACKED_SPRITES1 equ 1100 ; Keep some space within the X memory for DSP boot code.
+RLE_RESTORE_WIDTH equ 16+256+16
+RLE_LONG_EVEN_BIAS equ RLE_RESTORE_WIDTH+4 ; Odd-run block plus its preceding BRA.W.
 
 push	macro	register
         move    register,y:-(r7)
@@ -445,6 +447,8 @@ send_rle_data:
 	move	y:rle_length,a
 	bclr	#0,sr
 	ror		a #<0,y0
+	move	#>RLE_LONG_EVEN_BIAS,x0
+	move	#>1,x1
 
 	bclr	#m_hf2,x:m_hcr ; DSP <-> CPU synchronization.
 	jset	#m_hf0,x:m_hsr,*
@@ -460,8 +464,29 @@ send_rle_data:
 	move	y0,y:(r4)+
 
 	move	y:(r4),a
-	neg		a y0,y:(r4)+
+	tst		a y0,y:(r4)+
+	jmi		<_terminal_rle_run
 
+	; Convert the byte length to a jump displacement into the 68030
+	; longword restoration blocks. Odd runs end with one word move.
+
+	bclr	#0,sr
+	ror		a
+	jclr	#0,a1,_even_rle_run
+
+	add		x1,a
+	neg		a
+	jmp		<_send_rle_run
+
+_even_rle_run:
+	add		x0,a
+	neg		a
+	jmp		<_send_rle_run
+
+_terminal_rle_run:
+	neg		a
+
+_send_rle_run:
 	jclr	#1,x:m_hsr,*
 	movep	a1,x:m_htx
 _loop:
@@ -764,5 +789,3 @@ send_screen_buffer:
 _loop:
 	
 	rts
-
-

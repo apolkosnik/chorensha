@@ -1,0 +1,7 @@
+# Build outputs. The tracked binaries/ payload is game data (Amiga BGM_DAT and
+# friends); these are produced by building the Atari target and re-dirty the
+# tree after every build.
+/binaries/*.o
+/binaries/atari/*.o
+/binaries/atari/*.lod
+/binaries/atari/*.tos

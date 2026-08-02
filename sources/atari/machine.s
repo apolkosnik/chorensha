@@ -168,17 +168,23 @@ initialize_machine:
 	move	$ffff820a.w,a2
 	movem.l	d0-a2,old_videl
 
-	; 256 * 240, TC.
+	; 256 * 240, TC, 50 Hz.
+	;
+	; Based on the Snow Bros 256 * 224 mode.  Keep its 625-halfline
+	; RGB/TV frame and expand the active window by 16 lines, centred:
+	; VDB $05f -> $04f and VDE $21f -> $22f.  The VGA mode makes the
+	; corresponding 32-halfline adjustment on each side because its
+	; source lines are scan-doubled.
 
 	btst	#6,$ffff8006.w
 	beq		.set_vga_mode
 
-	move.l	#$c7009e,$ffff8282.w
-	move.l	#$1e001b,$ffff8286.w
-	move.l	#$7300ab,$ffff828a.w
-	move.l	#$20d0201,$ffff82a2.w
-	move.l	#$170025,$ffff82a6.w
-	move.l	#$2050207,$ffff82aa.w
+	move.l	#$c70076,$ffff8282.w
+	move.l	#$3f001e,$ffff8286.w
+	move.l	#$7600ab,$ffff828a.w
+	move.l	#$271022f,$ffff82a2.w
+	move.l	#$4f004f,$ffff82a6.w
+	move.l	#$22f026b,$ffff82aa.w
 	move	#$200,$ffff820a.w
 	move	#$185,$ffff82c0.w
 	clr		$ffff8266.w
@@ -189,14 +195,14 @@ initialize_machine:
 	bra		.skip_vga_mode
 
 .set_vga_mode:
-	move.l	#$c6008d,$ffff8282.w
-	move.l	#$150004,$ffff8286.w
-	move.l	#$6d0097,$ffff828a.w
-	move.l	#$41903ff,$ffff82a2.w
-	move.l	#$3f003d,$ffff82a6.w
-	move.l	#$3fd0415,$ffff82aa.w
+	move.l	#$fc00a9,$ffff8282.w
+	move.l	#$2502f3,$ffff8286.w
+	move.l	#$a800c0,$ffff828a.w
+	move.l	#$41903ef,$ffff82a2.w
+	move.l	#$2d002b,$ffff82a6.w
+	move.l	#$3eb0415,$ffff82aa.w
 	move	#$200,$ffff820a.w
-	move	#$186,$ffff82c0.w
+	move	#$182,$ffff82c0.w
 	clr		$ffff8266.w
 	move	#$100,$ffff8266.w
 	move	#$5,$ffff82c2.w
@@ -368,4 +374,3 @@ machine_has_fast_ram:
 ; ------------------------------------------------------------------------------
 	end
 ; ------------------------------------------------------------------------------
-
