@@ -121,11 +121,11 @@ Game logic always runs at 55.46 Hz; rendering skips frames when the budget is ex
 | 0 | Build and test setup: Amiga section in the build scripts, `__PORT__` fix, Amiga entry point with machine and display-path detection, FS-UAE test harness with an RTG system drive | Executable builds, starts, reports the machine and exits cleanly | Done |
 | 1 | Measure: sprites per frame, game-logic CPU time on a 68020/14 and a 68030/50, palette entries used per layer, background-layer opacity, memory use | Numbers that confirm or correct the frame and memory budgets | Done for the attract demo (results below) |
 | 2 | Port layer, no rendering: user-mode handling of privileged instructions, DOS/IOCS shim, timer interrupt at 55.46 Hz, `WAIT_VBL`, sincos, input, exit path | `DEMO.REP` replay runs to the same score, stage and RNG state as reference runs | Done against an Amiga-generated reference; the comparison with the X68000 original needs an X68000 emulator (see Open items) |
-| 3 | RTG renderer: chunky core, palette mapping, upload, frame skipping | Playable on a 68030/50 with RTG in emulation | |
+| 3 | RTG renderer: chunky core, palette mapping, upload, frame skipping | Playable on a 68030/50 with RTG in emulation | Core done (see below): correct picture, game at full speed, display about 38 fps on a 68030/50; 55 fps needs rendering under about 16 ms |
 | 4 | Audio: sound effects, then the music pipeline | Music and effects in game | |
 | 5 | 68030 optimisation: compiled-sprite tuning, span-based overlay, Zorro II path | 68030/50 holds 55.46 Hz on Zorro III | |
 | 6 | Packaging: icon, install script, optional WHDLoad | Installable release | |
-| 7 | Native AGA output: screen, palette, C2P, frame pacing, memory budget for 8 MB machines | Playable on an A1200 with 8 MB fast RAM | |
+| 7 | Native AGA output: screen, palette, C2P, frame pacing, memory budget for 8 MB machines | Playable on an A1200 with 8 MB fast RAM | Candidates: c2plib (Aminet dev/misc/c2plib.lha; check its licence) for the C2P routines, and graphics.library WriteChunkyPixels, which BlazeWCP (Aminet util/boot/BlazeWCP178.lha) speeds up on users' systems |
 
 ## Phase 1 results (attract demo, 6,000 frames)
 
@@ -156,6 +156,19 @@ The game core runs its attract demo on every supported config and exits cleanly,
 - Leaving through the game's menu (EXIT) returns to the shell; the summary reports the exit reason (game, frame limit or exception).
 - `PRINTF` prints the game's messages (Shift-JIS) to standard output.
 - Unexpected exceptions in the game (bus/address error, illegal instruction, ...) are reported with the code offset instead of a Software Failure requester.
+
+## Renderer status (Phase 3)
+
+`sources/amiga/graphics.s` composes each frame into an 8-bit chunky buffer; `sources/amiga/display.s` shows it on a Picasso96 screen (320 x 256, else 320 x 240; CyberGraphX is not supported yet, the game then runs headless).
+
+- GVRAM pages 0 and 1 are converted once into 8-bit layers (the game builds GVRAM only at start; a hook in sz2.s marks it). Page 1 is copied in the gaps between page 0's opaque runs, page 0's runs on top, so each pixel is written once; runs are copied through computed jumps into unrolled moves. A non-zero horizontal scroll (rotated screen) falls back to a per-pixel path.
+- Palette: the graphics and sprite/text palettes (512 X68000 entries, 117 distinct colours) become one 256-colour palette. Every graphics index in use keeps its own slot, so the layers need no remapping; sprite and text entries share slots by colour. The game cycles about 14 entries every frame; those are updated incrementally and loaded with a partial LoadRGB32 (full rebuilds fell from 2,356 to 113 per 3,000 frames).
+- Sprites: compiled per (pattern, flip) on first use into a 1 MB arena (256 KB if memory is short, generic routine when full): the eight most frequent colours in registers, one move per opaque pixel. Ordered like the Falcon port (32 priority buckets).
+- Text: the four planes are read directly (the game's simultaneous-access clear of all four planes is emulated); a converted copy of the visible window is kept and only character rows written since the last frame are reconverted.
+- Frame timing: game frames follow a fixed schedule at 55.46 Hz; when the game is late the picture is skipped, otherwise the finished frame is rendered at its tick. The 6,000-frame attract demo reaches the reference checkpoints on every config with rendering on.
+- Screenshots: measurement runs read frames back from the screen every 500 frames (`screen_NNNNN.bin`, `tests/amiga/screenshot_png.py` converts them); `-D__RENDER_PROFILE__` builds print the time per render stage.
+
+Measured on the 68030/50 RTG config (cycle-exact), per frame: graphics 6.6 ms, upload 4.9 ms (LoadRGB32 0.9 ms of it), text 3.7 ms (mostly the text-heavy title), sprites 2.1 ms, palette 0.7 ms; median 17.4 ms in total. With about 1 ms of game logic that is just over the 18.0 ms frame, so the display runs at about 38 fps while the game keeps its speed (6,000 frames in 6,590 ticks). The 68020/14 RTG config renders about 15 fps at full game speed. The `rtg-040` config emulates the CPU in "fastest possible" mode, not cycle-exact, so its timings say nothing about a real 68040.
 
 ## Testing
 

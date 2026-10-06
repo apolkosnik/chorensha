@@ -7,8 +7,8 @@
 #
 # The program runs with WORK: as its current directory, next to a copy of the
 # game data (the *_DAT directories of GAME_DATA_DIR, default binaries/amiga).
-# Files it writes there (measure.bin, graphics.bin, checkpoints.bin) are
-# copied to RESULT_DIR if set.
+# Files it writes there (measure.bin, graphics.bin, checkpoints.bin,
+# screen_*.bin) are copied to RESULT_DIR if set.
 # With SERIAL_LOG set, the Amiga serial port is written to that host file.
 # With KEEP_WORK set, the work directory (including fs-uae.log) is kept.
 # FS-UAE runs without a window (SDL offscreen video); SHOW_WINDOW=1 shows it.
@@ -179,6 +179,12 @@ if [ $status -eq 0 ]; then
 			if [ -f "$drive/$result.bin" ]; then
 				cp "$drive/$result.bin" "$RESULT_DIR/$result-$config.bin"
 			fi
+		done
+
+		for screenshot in "$drive"/screen_*.bin; do
+			[ -f "$screenshot" ] || continue
+			name=$(basename "$screenshot" .bin)
+			cp "$screenshot" "$RESULT_DIR/$name-$config.bin"
 		done
 	fi
 

@@ -30,6 +30,8 @@
 	xref update_input
 
 	xdef exit_reason
+	xdef rendered_frames
+	xdef total_vbl_count
 	xdef frame_timer_text
 	xdef frame_timer_hz100
 
@@ -42,6 +44,19 @@
 	xref L_00C00000
 	xref SPRITE_DATA_ADDRESS
 	xref sprite_palette_usage
+	xref render_frame
+	xref hardware_palette
+	xref open_display
+	xref close_display
+	xref present_frame
+	xref capture_screen
+	xref initialize_renderer
+
+	ifd __RENDER_PROFILE__
+	xref render_profile
+	xdef timer_base
+	endif
+	xref release_renderer
 	xref PLAYER_SCORE
 	xref PLAYER_INFO_STRUCT
 	xref WORD_00088E6C
@@ -175,7 +190,15 @@ HUMAN68K_ERROR_IO=-1
 
 OS_STACK_SIZE=16384
 MAXIMUM_MEASURED_FRAMES=65536
-FRAME_RECORD_SIZE=8
+FRAME_RECORD_SIZE=12 ; Game ticks (long), render ticks (long), sprites, VBLs.
+
+; Screenshots (measurement runs): every SCREENSHOT_INTERVAL frames, read back
+; from the display into screen_NNNNN.bin.
+
+SCREENSHOT_INTERVAL=500
+SCREENSHOT_WIDTH=256
+SCREENSHOT_HEIGHT=256
+SCREENSHOT_HEADER_SIZE=12
 
 ; Game state checkpoints (measurement runs), every CHECKPOINT_INTERVAL
 ; frames: frame (long), score (long), random table index (word), background
@@ -281,7 +304,7 @@ start_emulator:
 
 .record_count_ok:
 	move.l	d0,maximum_records
-	lsl.l	#3,d0 ; FRAME_RECORD_SIZE
+	mulu.l	#FRAME_RECORD_SIZE,d0
 	move.l	d0,frame_records_size
 	moveq	#MEMF_ANY,d1
 	jsr		_LVOAllocMem(a6)
@@ -325,6 +348,9 @@ start_emulator:
 	jsr		initialize_input
 	tst.l	d0
 	bmi		.close_timer
+
+	jsr		open_display
+	jsr		initialize_renderer
 
 	; Trap handler (IOCS, PCM8, MCDRV).
 
@@ -430,6 +456,9 @@ amiga_exit_game:
 	move.l	old_trap_code,tc_TrapCode(a0)
 
 	jsr		release_input
+
+	jsr		close_display
+	jsr		release_renderer
 
 	jsr		close_all_files
 
@@ -883,6 +912,7 @@ amiga_wait_vbl:
 	OS_STACK_ENTER
 
 	jsr		frame_wait_begin
+	jsr		render_and_present
 
 	clr		vbl_wait_counter
 
@@ -905,25 +935,52 @@ amiga_wait_vbl:
 
 ; ------------------------------------------------------------------------------
 ;
-; XSP_VSYNC: waits until VBL_VWAIT_COUNTER (counted by the game's VBL
-; handler) reaches d0.w, then returns the counter in d0.w and clears it.
+; XSP_VSYNC: d0.w = number of frames this game frame lasts. Returns the
+; game's VBL counter (VBL_VWAIT_COUNTER) in d0.w and clears it, as on the
+; X68000.
+;
+; Timing follows a fixed schedule: each call advances frame_schedule by d0.
+; If the schedule is already due, the game is late: the picture is left out
+; so the game keeps its 55.46 Hz speed (beyond MAXIMUM_FRAME_DEBT ticks the
+; schedule is reset instead, e.g. after loading). Otherwise the call waits
+; for the scheduled tick and then renders the finished frame.
+
+MAXIMUM_FRAME_DEBT=8
 
 amiga_xsp_vsync:
 	movem.l	d1-d7/a0-a6,-(sp)
 
+	moveq	#0,d7
 	move	d0,d7
 
 	OS_STACK_ENTER
 
 	jsr		frame_wait_begin
 
+	add.l	d7,frame_schedule
+
+	move.l	total_vbl_count,d0
+	sub.l	frame_schedule,d0
+	bmi		.wait_loop ; On time.
+
+	cmp.l	#MAXIMUM_FRAME_DEBT,d0
+	bls		.done ; Late: skip the picture.
+
+	move.l	total_vbl_count,frame_schedule ; Too far behind: start over.
+
+	bra		.done
+
 .wait_loop:
-	cmp		VBL_VWAIT_COUNTER,d7
-	bls		.done
+	move.l	total_vbl_count,d0
+	cmp.l	frame_schedule,d0
+	bcc		.due
 
 	jsr		wait_for_vbl_signal
 
 	bra		.wait_loop
+
+.due:
+	jsr		render_and_present
 
 .done:
 	jsr		frame_wait_end
@@ -979,16 +1036,151 @@ frame_wait_begin:
 	sub.l	vbl_count_at_wake,d2
 
 	move.l	frame_records,a0
-	lsl.l	#3,d0
-	move.l	d1,(a0,d0.l)
-	move	frame_sprite_count,4(a0,d0.l)
-	move	d2,6(a0,d0.l)
+	mulu.l	#FRAME_RECORD_SIZE,d0
+	add.l	d0,a0
+	move.l	a0,current_record
+	move.l	d1,(a0)+
+	clr.l	(a0)+ ; Render ticks: render_and_present.
+	move	frame_sprite_count,(a0)+
+	move	d2,(a0)
 
 	addq.l	#1,measured_frames
 
+	bra		.recorded
+
 .no_previous_frame:
+	clr.l	current_record
+
+.recorded:
 	move	frame_sprite_count,last_sprite_count
 	clr		frame_sprite_count
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Renders and shows the frame the game has just finished (task context, on
+; the OS stack); records the time it took and takes the screenshots of
+; measurement runs.
+
+render_and_present:
+	addq.l	#1,rendered_frames
+
+	move.l	timer_base,a6
+	lea		render_start_time,a0
+	jsr		_LVOReadEClock(a6)
+
+	jsr		render_frame
+
+	ifd __RENDER_PROFILE__
+	move.l	timer_base,a6
+	lea		eclock_value,a0
+	jsr		_LVOReadEClock(a6)
+	move.l	eclock_value+4,-(sp)
+	endif
+
+	jsr		present_frame
+
+	ifd __RENDER_PROFILE__
+	move.l	timer_base,a6
+	lea		eclock_value,a0
+	jsr		_LVOReadEClock(a6)
+	move.l	eclock_value+4,d0
+	sub.l	(sp)+,d0
+	add.l	d0,render_profile+16
+	endif
+
+	move.l	timer_base,a6
+	lea		eclock_value,a0
+	jsr		_LVOReadEClock(a6)
+
+	move.l	current_record,d0
+	beq		.no_record
+
+	move.l	d0,a0
+	move.l	eclock_value+4,d1
+	sub.l	render_start_time+4,d1
+	move.l	d1,4(a0)
+
+.no_record:
+	tst.l	frame_records
+	beq		.done
+
+	move.l	frame_count,d0
+	beq		.done
+
+	divul.l	#SCREENSHOT_INTERVAL,d1:d0
+	tst.l	d1
+	bne		.done
+
+	bsr		write_screenshot
+
+.done:
+	rts
+
+; screen_NNNNN.bin: 'CRSS', width (word), lines (word), colours (word),
+; padding (word), 256 x R, G, B (bytes), then the pixels (palette indices).
+
+write_screenshot:
+	lea		screenshot_pixels,a0
+	jsr		capture_screen
+	move	d0,screenshot_header+6
+
+	move	#SCREENSHOT_WIDTH,screenshot_header+4
+	move	hardware_palette,screenshot_header+8
+
+	lea		hardware_palette+4,a0
+	lea		screenshot_palette,a1
+	move	#256*3-1,d0
+
+.palette:
+	move.b	(a0),(a1)+ ; Top byte of each 32-bit component.
+	addq.l	#4,a0
+	dbf		d0,.palette
+
+	move.l	frame_count,print_arguments
+	lea		screenshot_name_format,a0
+	lea		print_arguments,a1
+	lea		.put_char(pc),a2
+	lea		path_buffer,a3
+	move.l	exec_base,a6
+	jsr		_LVORawDoFmt(a6)
+
+	move.l	dos_base,a6
+	move.l	#path_buffer,d1
+	move.l	#MODE_NEWFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,d4
+	beq		.done
+
+	lea		screenshot_parts,a2
+
+.part_loop:
+	move.l	(a2)+,d2
+	beq		.close
+
+	move.l	(a2)+,d3
+	bne		.write
+
+	moveq	#0,d3 ; Pixels: width * captured lines.
+	move	screenshot_header+6,d3
+	lsl.l	#8,d3
+
+.write:
+	move.l	d4,d1
+	jsr		_LVOWrite(a6)
+
+	bra		.part_loop
+
+.close:
+	move.l	d4,d1
+	jsr		_LVOClose(a6)
+
+.done:
+	rts
+
+.put_char:
+	move.b	d0,(a3)+
 
 	rts
 
@@ -2324,6 +2516,21 @@ graphics_dump_parts:
 	dc.l	-1,PCG_PATTERNS*128
 	dc.l	0
 
+screenshot_name_format:
+	dc.b	'screen_%05ld.bin',0
+
+	even
+
+screenshot_header:
+	dc.b	'CRSS'
+	dc.w	0,0,0,0
+
+screenshot_parts: ; Address, size (0 = pixels).
+	dc.l	screenshot_header,SCREENSHOT_HEADER_SIZE
+	dc.l	screenshot_palette,256*3
+	dc.l	screenshot_pixels,0
+	dc.l	0
+
 unimplemented_call_format:
 	dc.b	'Unimplemented Human68k call $%04lx.',10,0
 
@@ -2428,6 +2635,14 @@ last_wake_time:
 	ds.l	2
 print_arguments:
 	ds.l	10
+current_record:
+	ds.l	1
+frame_schedule:
+	ds.l	1
+rendered_frames:
+	ds.l	1
+render_start_time:
+	ds.l	2
 total_vbl_count:
 	ds.l	1
 vbl_count_at_wake:
@@ -2500,6 +2715,14 @@ unimplemented_iocs:
 
 path_buffer:
 	ds.b	256
+
+screenshot_palette:
+	ds.b	256*3
+
+	even
+
+screenshot_pixels:
+	ds.b	SCREENSHOT_WIDTH*SCREENSHOT_HEIGHT
 
 printf_format_buffer:
 	ds.b	256

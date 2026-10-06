@@ -18,6 +18,8 @@
 
 	xdef exec_base
 	xdef dos_base
+	xdef machine_display
+	xdef machine_rtg
 
 	xref start_emulator
 	xref heap_used
@@ -30,8 +32,19 @@
 	xref eclock_frequency
 	xref unimplemented_iocs
 	xref exit_reason
+	xref rendered_frames
+	xref total_vbl_count
 	xref frame_timer_text
 	xref frame_timer_hz100
+
+	ifd __RENDER_PROFILE__
+	xref render_profile
+	xref palette_rebuilds
+	xref load_rgb_time
+	xref text_lines_converted
+	xref text_lines_drawn
+	xref palette_entry_changes
+	endif
 
 ; exec.library
 
@@ -522,6 +535,8 @@ print_run_summary:
 	move.l	measured_frames,print_arguments+4
 	move.l	eclock_frequency,print_arguments+8
 	move.l	heap_used,print_arguments+12
+	move.l	rendered_frames,print_arguments+16
+	move.l	total_vbl_count,print_arguments+20
 
 	move.l	#run_summary_format,d1
 	move.l	#print_arguments,d2
@@ -544,6 +559,72 @@ print_run_summary:
 	move.l	#exit_format,d1
 	move.l	#print_arguments,d2
 	jsr		_LVOVPrintf(a6)
+
+	ifd __RENDER_PROFILE__
+
+	; Average 1/100 ms per frame for each render stage (ticks * 100000 /
+	; frequency / frames), and palette rebuilds. Supported machines only,
+	; so 68020 code.
+
+	machine	68020
+
+	lea		render_profile,a2
+	lea		print_arguments,a3
+	moveq	#5-1,d3
+
+.profile_loop:
+	move.l	(a2)+,d0
+	mulu.l	#100000,d1:d0
+	divu.l	eclock_frequency,d1:d0
+	move.l	frame_count,d1
+	beq		.no_frames
+
+	divul.l	d1,d1:d0
+
+.no_frames:
+	move.l	d0,(a3)+
+
+	dbf		d3,.profile_loop
+
+	move.l	palette_rebuilds,(a3)+
+	move.l	load_rgb_time,d0
+	mulu.l	#100000,d1:d0
+	divu.l	eclock_frequency,d1:d0
+	move.l	frame_count,d1
+	divul.l	d1,d1:d0
+	move.l	d0,(a3)+
+	move.l	text_lines_converted,(a3)+
+	move.l	text_lines_drawn,(a3)+
+
+	move.l	#profile_format,d1
+	move.l	#print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	; Palette entries that changed in more than 100 rebuilds.
+
+	lea		palette_entry_changes,a2
+	moveq	#0,d3
+
+.entry_loop:
+	moveq	#0,d0
+	move	(a2,d3.l*2),d0
+	cmp		#100,d0
+	bls		.next_entry
+
+	move.l	d3,print_arguments
+	move.l	d0,print_arguments+4
+	move.l	#entry_format,d1
+	move.l	#print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+.next_entry:
+	addq.l	#1,d3
+	cmp.l	#512,d3
+	bne		.entry_loop
+
+	machine	68000
+
+	endif
 
 	; IOCS calls the game made that are not implemented yet.
 
@@ -568,8 +649,9 @@ print_run_summary:
 
 ; ------------------------------------------------------------------------------
 ;
-; measure.bin: 'CRSM', E clock frequency, number of records, then per frame
-; E clock ticks (long), sprites (word), vertical blanks passed (word).
+; measure.bin: 'CRS2', E clock frequency, number of records, then per frame
+; E clock ticks of the game (long), of rendering and display (long), sprites
+; (word), vertical blanks passed while the game worked (word).
 
 write_measurements:
 	move.l	dos_base,a6
@@ -580,7 +662,7 @@ write_measurements:
 	move.l	d0,d4
 	beq		.failed
 
-	move.l	#'CRSM',measure_header
+	move.l	#'CRS2',measure_header
 	move.l	eclock_frequency,measure_header+4
 	move.l	measured_frames,measure_header+8
 
@@ -591,8 +673,11 @@ write_measurements:
 
 	move.l	d4,d1
 	move.l	frame_records,d2
-	move.l	measured_frames,d3
-	lsl.l	#3,d3
+	move.l	measured_frames,d3 ; * 12 (FRAME_RECORD_SIZE), 68000 code.
+	lsl.l	#2,d3
+	move.l	d3,d0
+	add.l	d3,d3
+	add.l	d0,d3
 	jsr		_LVOWrite(a6)
 
 	move.l	d4,d1
@@ -730,7 +815,14 @@ emulator_failed_text:
 	dc.b	'Could not set up the emulation (memory, signal or timer).',10,0
 
 run_summary_format:
-	dc.b	'Frames: %ld (measured: %ld), E clock: %ld Hz, heap used: %ld bytes.',10,0
+	dc.b	'Frames: %ld (measured: %ld), E clock: %ld Hz, heap used: %ld bytes, frames rendered: %ld, timer ticks: %ld.',10,0
+
+	ifd __RENDER_PROFILE__
+profile_format:
+	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld.',10,0
+entry_format:
+	dc.b	'  palette entry %ld changed %ld times',10,0
+	endif
 
 exit_format:
 	dc.b	'Exit: %s. Frame timer: %s (%ld.%02ld Hz).',10,0
@@ -824,7 +916,7 @@ machine_fast_kb:
 	ds.l	1
 
 print_arguments:
-	ds.l	7
+	ds.l	10
 
 ; ------------------------------------------------------------------------------
 	end

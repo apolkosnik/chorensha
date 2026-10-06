@@ -4513,6 +4513,13 @@ DRAW_CHARACTER:
 
 	endif
 
+	ifd __AMIGA__
+
+	move	8+2(sp),d0 ; Text row (0-127): the renderer reconverts it.
+	jsr		amiga_text_row_written
+
+	endif
+
 	suba.l  A1,A1                                   ; 00022372 93C9                     ; S($0002B7C0) 
 	moveq   #-127,D0                                ; 00022374 7081
 	trap    #$F                                     ; 00022376 4E4F                     ; _B_SUPER 
@@ -4724,6 +4731,16 @@ CLEAR_TEXT_PLANE:
 	clr.l	(a0)+
 
 	dbf		d0,.loop
+
+	endif
+
+	ifd __AMIGA__
+
+	; The X68000 clears all four text planes in one pass through the CRTC's
+	; simultaneous access mode (R21 = $1F0), which the shadow memory does
+	; not emulate.
+
+	jmp		amiga_clear_text_planes
 
 	endif
 
@@ -13381,6 +13398,12 @@ L_00026D08:
 	jsr     (A3)                                    ; 00026D1A 4E93
 
 	jsr     INITIALIZE_SPRITES_AND_GRAPHICS                              ; 00026D1C 4EB9 0002 9560
+
+	ifd __AMIGA__
+
+	jsr		amiga_graphics_changed ; GVRAM rebuilt: convert the layers.
+
+	endif
 
 	pea     $0.w                                    ; 00026D22 4878 0000
 	pea     $0.w                                    ; 00026D26 4878 0000
