@@ -11,13 +11,20 @@ __PORT__ equ 1
 __PORT__ equ 1
 	endif
 
-	ifd __ATARI__
+	ifd __PORT__
 
 	xdef SPRITE_DATA_ADDRESS
 	xdef SPRITE_DATA_TABLE
 	xdef CURRENT_SPRITE_DATA_ENTRY
 	xdef BACKGROUND_SCROLL_COUNTER
 	xdef TEXT_GRAPHICS_ADDRESS
+
+	endif
+
+	ifd __AMIGA__
+
+	xdef VBL_VWAIT_COUNTER
+	xdef NEW_STACK
 
 	endif
 
@@ -372,6 +379,14 @@ XSP_VSYNC:
 	bra.s   L_0002021A                              ; 00020208 6010
 
 L_0002020A:
+	ifd __AMIGA__
+
+	jsr		amiga_xsp_vsync ; Sleeps instead of polling the counter.
+
+	bra.s	L_0002021A
+
+	endif
+
 	cmp.w   VBL_VWAIT_COUNTER(pc),D0                    ; 0002020A B07A 1FDE
 	bhi.s   L_0002020A                              ; 0002020E 62FA
 
@@ -530,7 +545,11 @@ L_00020328:
 
 	move.l  D0,SAVED_STACK_POINTER                        ; 00020332 23C0 0002 220A
 
+	ifnd __AMIGA__
+
 	ori     #%0000011100000000,sr                   ; 00020338 007C 0700
+
+	endif
 
 	bsr.w   L_000221A2                              ; 0002033C 6100 1E64
 
@@ -588,7 +607,11 @@ L_00020328:
 
 	bsr.w   L_000221A2                              ; 000203BE 6100 1DE2
 
+	ifnd __AMIGA__
+
 	andi    #%1111100011111111,sr                   ; 000203C2 027C F8FF
+
+	endif
 
 	move.l  SAVED_STACK_POINTER(pc),D0                    ; 000203C6 203A 1E42
 	bmi.s   L_000203D2                              ; 000203CA 6B06
@@ -617,7 +640,11 @@ L_000203EA:
 
 	move.l  D0,SAVED_STACK_POINTER                        ; 000203F0 23C0 0002 220A
 
+	ifnd __AMIGA__
+
 	ori     #%0000011100000000,sr                   ; 000203F6 007C 0700
+
+	endif
 
 	bsr.w   L_000221A2                              ; 000203FA 6100 1DA6
 
@@ -665,7 +692,11 @@ L_000203EA:
 
 	bsr.w   L_000221A2                              ; 0002047C 6100 1D24
 
+	ifnd __AMIGA__
+
 	andi    #%1111100011111111,sr                   ; 00020480 027C F8FF
+
+	endif
 	move.l  SAVED_STACK_POINTER(pc),D0                    ; 00020484 203A 1D84
 	bmi.s   L_00020490                              ; 00020488 6B06
 
@@ -705,7 +736,7 @@ XSP_OUT:
 	rts                                             ; 000204CE 4E75
 
 L_000204D0:
-	ifd __ATARI__
+	ifd __PORT__
 
 	jmp		prepare_sprite_infos
 
@@ -4335,6 +4366,13 @@ L_00022296:
 
 	move.l  D0,LONG_00022360                        ; 000222A0 23C0 0002 2360
 	moveq   #-1,D0                                  ; 000222A6 70FF
+
+	ifd __AMIGA__
+
+	bra.s	L_000222CA
+
+	endif
+
 	movea.l $90.w,A0                                ; 000222A8 2078 0090
 	cmpa.l  #$FFFFFF,A0                             ; 000222AC B1FC 00FF FFFF
 	bhi.s   L_000222CA                              ; 000222B2 6216
@@ -4444,7 +4482,7 @@ SET_TEXT_GRAPHICS:
 	rts                                             ; 00022370 4E75
 
 DRAW_CHARACTER:
-	ifd __ATARI__
+	ifd __PORT__
 
 	lea		text_bitmaps,a0
 	move	8+2(sp),d0
@@ -4672,7 +4710,7 @@ L_000225E0:
 	rts                                             ; 000225E0 4E75
 
 CLEAR_TEXT_PLANE:
-	ifd __ATARI__
+	ifd __PORT__
 
 	lea		text_bitmaps,a0
 
@@ -4812,9 +4850,17 @@ L_000226E2:
 L_000226F0:
 	move.w  2(A0),L_00EB0000+$80C                   ; 000226F0 33E8 0002 00EB 080C      ; J($000226D2) [SPRITE REGISTERS + $80C]  
 
+	ifd __AMIGA__
+
+	move	ccr,-(a7)
+
+	else
+
 	move    sr,-(A7)                                ; 000226F8 40E7
 
 	ori     #%0000011100000000,sr                   ; 000226FA 007C 0700
+
+	endif
 
 	ifd __ATARI__
 
@@ -4841,7 +4887,15 @@ L_0002270A:
 	dbf     D0,L_00022700                           ; 00022714 51C8 FFEA
 
 skip_raster_sync1:
+	ifd __AMIGA__
+
+	move	(a7)+,ccr
+
+	else
+
 	move    (A7)+,sr                                ; 00022718 46DF
+
+	endif
 
 	move.w  (A0),L_00EB0000+$80A                    ; 0002271A 33D0 00EB 080A           ; [SPRITE REGISTERS + $80A]  
 	move.w  4(A0),L_00EB0000+$80E                   ; 00022720 33E8 0004 00EB 080E      ; [SPRITE REGISTERS + $80E]  
@@ -5777,7 +5831,8 @@ WAIT_VBL:
 
 	ifd __AMIGA__
 
-	illegal
+	move.w  6(sp),d1
+	jsr		amiga_wait_vbl
 
 	bra		skip_raster_sync2
 
@@ -5826,7 +5881,11 @@ L_00022CDA:
 	moveq   #0,D1                                   ; 00022CE4 7200
 	move.l  #$1111,D2                               ; 00022CE6 243C 0000 1111
 
+	ifnd __AMIGA__
+
 	ori     #%0000011100000000,sr                   ; 00022CEC 007C 0700
+
+	endif
 
 L_00022CF0:
 	addq.l  #$1,D1                                  ; 00022CF0 5281
@@ -5842,7 +5901,11 @@ L_00022CF0:
 	btst    #$4,L_00E88000+$1                       ; 00022D02 0839 0004 00E8 8001      ; [MFP + $1]  
 	bne.s   L_00022CF0                              ; 00022D0A 66E4
 
+	ifnd __AMIGA__
+
 	andi    #%1111100011111111,sr                   ; 00022D0C 027C F8FF
+
+	endif
 
 	tst.l   D0                                      ; 00022D10 4A80
 	bmi.s   L_00022D1A                              ; 00022D12 6B06
@@ -11467,7 +11530,7 @@ LOAD_TEXT_GRAPHICS:
 	move.l  D3,-(A7)                                ; 00025D04 2F03
 	jsr     READ_FILE                              ; 00025D06 4EB9 0005 A13A
 
-	ifd __ATARI__
+	ifd __PORT__
 	
 	jsr		compile_characters
 	
@@ -13210,6 +13273,12 @@ L_00026C04:
     rts
 
     endif
+
+	ifd __AMIGA__
+
+	jmp		amiga_exit_game
+
+	endif
 
 	jsr     L_00027A74                              ; 00026C14 4EB9 0002 7A74
 
@@ -16387,7 +16456,7 @@ L_00028AE6:
 	move.l  D0,-(A7)                                ; 00028B0E 2F00
 	jsr     READ_FILE                              ; 00028B10 4EB9 0005 A13A
 
-	ifd __ATARI__
+	ifd __PORT__
 
 	movem.l	d0/d7,-(sp)
 
@@ -17219,7 +17288,7 @@ INITIALIZE_GAME:
 
 	addq.w  #$4,A7                                  ; 00029220 584F
 
-	ifd __ATARI__
+	ifd __PORT__
 
 	data
 
@@ -17243,12 +17312,6 @@ sincos_tables_end:
 	movem.l	(sp)+,a0-a2
 
 	bra		skip_sincos
-
-	endif
-
-	ifd __AMIGA__
-
-	illegal
 
 	endif
 
@@ -89621,7 +89684,7 @@ PRINTF:
 
 	ifd __AMIGA__
 
-	rts
+	jmp		amiga_printf
 
 	endif
 
@@ -90960,7 +91023,15 @@ _start:
 
 	move.l  A1,D1                                   ; 0005A874 2209
 	addq.l  #$1,D1                                  ; 0005A876 5281
+	ifd __AMIGA__
+
+	and.l	#$fffffffe,d1 ; Fast RAM may be above 16 MB.
+
+	else
+
 	and.l   #%00000000111111111111111111111110,D1   ; 0005A878 C2BC 00FF FFFE
+
+	endif
 	add.l   #$400,D1                                ; 0005A87E D2BC 0000 0400
 	move.l  D1,LONG_000AB34E                        ; 0005A884 23C1 000A B34E
 

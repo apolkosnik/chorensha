@@ -7,10 +7,25 @@
 ; crashing on a lesser CPU; the executable still needs about 2.3 MB of free
 ; memory to load at all (mostly the X68000 shadow buffers in mem_map.s).
 ;
-; The game core is linked in but not started yet: this build detects the
-; machine, prints what it found and exits cleanly.
+; Usage: sz2 [frames]
+;
+; With a frame count the game exits after that many frames and the per-frame
+; measurements are written to measure.bin in the current directory.
 
 	xdef start
+	xdef start_of_code
+
+	xdef exec_base
+	xdef dos_base
+
+	xref start_emulator
+	xref heap_used
+	xref frame_count
+	xref measured_frames
+	xref frame_records
+	xref free_frame_records
+	xref eclock_frequency
+	xref unimplemented_iocs
 
 ; exec.library
 
@@ -46,8 +61,13 @@ pr_CLI=172
 
 ; dos.library
 
+_LVOOpen=-30
+_LVOClose=-36
+_LVOWrite=-48
 _LVOPutStr=-948
 _LVOVPrintf=-954
+
+MODE_NEWFILE=1006
 
 ; Picasso96API.library
 
@@ -76,8 +96,12 @@ DENISEID_LISA=$f8
 	text
 ; ------------------------------------------------------------------------------
 
+start_of_code: ; Start of the code hunk, for reporting crash addresses.
 start:
 	movem.l	d2-d7/a2-a6,-(sp)
+
+	move.l	a0,argument_string ; CLI arguments (ignored for Workbench starts).
+	move.l	d0,argument_length
 
 	move.l	$4.w,a6
 	move.l	a6,exec_base
@@ -113,6 +137,34 @@ start:
 	jsr		detect_machine
 	jsr		select_display
 	jsr		print_info_text
+
+	tst.l	machine_display
+	beq		.close_graphics
+
+	jsr		parse_frame_limit
+
+	move.l	frame_limit,d0
+	jsr		start_emulator
+	tst.l	d0
+	bmi		.emulator_failed
+
+	jsr		print_run_summary
+
+	tst.l	frame_limit
+	beq		.close_graphics
+
+	jsr		write_measurements
+
+	jsr		free_frame_records
+
+	bra		.close_graphics
+
+.emulator_failed:
+	move.l	dos_base,a6
+	move.l	#emulator_failed_text,d1
+	jsr		_LVOPutStr(a6)
+
+.close_graphics:
 
 	move.l	exec_base,a6
 	move.l	graphics_base,a1
@@ -365,7 +417,127 @@ print_info_text:
 	rts
 
 .supported:
-	move.l	#not_started_text,d1
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; The first number on the command line is the frame limit (0 if none).
+; Only called on supported machines (68020 or better).
+
+	machine	68020
+
+parse_frame_limit:
+	moveq	#0,d0
+
+	tst.l	workbench_message
+	bne		.done
+
+	move.l	argument_string,a0
+	move.l	argument_length,d1
+	beq		.done
+
+.skip_spaces:
+	move.b	(a0),d2
+	cmp.b	#' ',d2
+	bne		.digits
+
+	addq.l	#1,a0
+	subq.l	#1,d1
+	bne		.skip_spaces
+
+	bra		.done
+
+.digits:
+	moveq	#0,d2
+	move.b	(a0)+,d2
+	sub.b	#'0',d2
+	cmp.b	#9,d2
+	bhi		.done
+
+	mulu.l	#10,d0
+	add.l	d2,d0
+
+	subq.l	#1,d1
+	bne		.digits
+
+.done:
+	move.l	d0,frame_limit
+
+	rts
+
+	machine	68000
+
+; ------------------------------------------------------------------------------
+
+print_run_summary:
+	move.l	dos_base,a6
+
+	move.l	frame_count,print_arguments
+	move.l	measured_frames,print_arguments+4
+	move.l	eclock_frequency,print_arguments+8
+	move.l	heap_used,print_arguments+12
+
+	move.l	#run_summary_format,d1
+	move.l	#print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	; IOCS calls the game made that are not implemented yet.
+
+	lea		unimplemented_iocs,a2
+	moveq	#0,d3
+
+.iocs_loop:
+	tst.b	(a2,d3.l)
+	beq		.next_iocs
+
+	move.l	d3,print_arguments
+	move.l	#unimplemented_iocs_format,d1
+	move.l	#print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+.next_iocs:
+	addq.l	#1,d3
+	cmp.l	#256,d3
+	bne		.iocs_loop
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; measure.bin: 'CRSM', E clock frequency, number of records, then per frame
+; E clock ticks (long), sprites (word), vertical blanks passed (word).
+
+write_measurements:
+	move.l	dos_base,a6
+
+	move.l	#measure_file_name,d1
+	move.l	#MODE_NEWFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,d4
+	beq		.failed
+
+	move.l	#'CRSM',measure_header
+	move.l	eclock_frequency,measure_header+4
+	move.l	measured_frames,measure_header+8
+
+	move.l	d4,d1
+	move.l	#measure_header,d2
+	moveq	#12,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	move.l	frame_records,d2
+	move.l	measured_frames,d3
+	lsl.l	#3,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	jsr		_LVOClose(a6)
+
+	rts
+
+.failed:
+	move.l	#measure_file_failed_text,d1
 	jsr		_LVOPutStr(a6)
 
 	rts
@@ -464,8 +636,20 @@ requirements_text:
 	dc.b	'Requires a 68020 or better with an RTG card (Picasso96 or CyberGraphX),',10
 	dc.b	'or an AGA Amiga with 8 MB of fast RAM.',10,0
 
-not_started_text:
-	dc.b	'Game core linked; the emulation layer is not implemented yet.',10,0
+emulator_failed_text:
+	dc.b	'Could not set up the emulation (memory, signal or timer).',10,0
+
+run_summary_format:
+	dc.b	'Frames: %ld (measured: %ld), E clock: %ld Hz, heap used: %ld bytes.',10,0
+
+unimplemented_iocs_format:
+	dc.b	'Unimplemented IOCS call $%02lx.',10,0
+
+measure_file_name:
+	dc.b	'measure.bin',0
+
+measure_file_failed_text:
+	dc.b	'Could not write measure.bin.',10,0
 
 	even
 
@@ -506,6 +690,14 @@ machine_chipset:
 	ds.l	1
 machine_rtg:
 	ds.l	1
+argument_string:
+	ds.l	1
+argument_length:
+	ds.l	1
+frame_limit:
+	ds.l	1
+measure_header:
+	ds.l	3
 machine_display:
 	ds.l	1
 machine_fast_total_kb:

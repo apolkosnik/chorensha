@@ -3,15 +3,25 @@
 # Boot a Workbench 3.2 + Picasso96 system in FS-UAE, run an executable from a
 # second drive (WORK:) and print its output.
 #
-# usage: run_fsuae.sh <config> <executable> [timeout_seconds]
+# usage: run_fsuae.sh <config> <executable> [timeout_seconds] [arguments]
+#
+# The program runs with WORK: as its current directory, next to a copy of the
+# game data (the *_DAT directories of GAME_DATA_DIR, default binaries/amiga).
+# Files it writes there (measure.bin, graphics.bin) are copied to RESULT_DIR if set.
+# With SERIAL_LOG set, the Amiga serial port is written to that host file.
+# With KEEP_WORK set, the work directory (including fs-uae.log) is kept.
 #
 # configs:
-#   a1200-4mb  A1200, AGA, 68020, 2 MB chip, 4 MB fast (below the minimum)
-#   a1200-8mb  A1200, AGA, 68020, 2 MB chip, 8 MB fast (minimum, native)
-#   a1200-030  A1200, AGA, 68030, 64 MB Zorro III fast, no RTG
-#   rtg-020    A1200, AGA, 68020, 4 MB fast, Zorro II uaegfx (minimum, RTG)
-#   rtg-030    A4000, AGA, 68030, 64 MB Zorro III fast, Zorro III uaegfx
-#   rtg-040    A4000, AGA, 68040, 64 MB Zorro III fast, Zorro III uaegfx
+#   a1200-4mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 4 MB fast (below the minimum)
+#   a1200-8mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 8 MB fast (minimum, native)
+#   a1200-030  A1200, AGA, 68030 50 MHz, 64 MB fast, no RTG
+#   rtg-020    A1200, AGA, 68020 14 MHz, 4 MB fast, Zorro II uaegfx (minimum, RTG)
+#   rtg-030    A4000, AGA, 68030 50 MHz, 64 MB Zorro III fast, Zorro III uaegfx
+#   rtg-040    A4000, AGA, 68040 (fastest possible), 64 MB fast, Zorro III uaegfx
+#
+# The 68020 and 68030 configs are cycle-exact (FS-UAE's A1200 default; the
+# 68030 runs at 14 x 3.546895 MHz = 49.7 MHz), so E clock timings measured
+# in them are meaningful. Warp mode only speeds up the host side.
 #
 # The system drive (AMIGA_SYSTEM_DIR) is Workbench 3.2 with Picasso96 and the
 # uaegfx monitor; its S:Startup-Sequence runs WORK:Run-Test once the display
@@ -25,6 +35,9 @@ set -u
 config=$1
 executable=$2
 timeout=${3:-120}
+arguments=${4:-}
+
+game_data_dir=${GAME_DATA_DIR:-$(dirname "$0")/../../binaries/amiga}
 
 kickstart_dir=${KICKSTART_DIR:-$HOME/Documents/FS-UAE/Kickstarts}
 system_dir=${AMIGA_SYSTEM_DIR:-$HOME/Documents/FS-UAE/Hard Drives/chorensha-wb32-rtg}
@@ -41,6 +54,7 @@ case $config in
 		;;
 	a1200-030)
 		options=(--amiga_model=A1200 "$a1200_kickstart" --uae_cpu_model=68030
+			--uae_cpu_cycle_exact=true --uae_cpu_multiplier=14
 			--uae_cpu_24bit_addressing=false --zorro_iii_memory=65536)
 		;;
 	rtg-020)
@@ -49,6 +63,8 @@ case $config in
 		;;
 	rtg-030)
 		options=(--amiga_model=A4000 "$a4000_kickstart" --uae_cpu_model=68030
+			--uae_cpu_speed=real --uae_cpu_compatible=true
+			--uae_cpu_cycle_exact=true --uae_cpu_multiplier=14
 			--zorro_iii_memory=65536 --graphics_card=uaegfx)
 		;;
 	rtg-040)
@@ -74,19 +90,21 @@ drive=$work_dir/WORK
 mkdir -p "$drive"
 
 cp "$executable" "$drive/program"
+cp -r "$game_data_dir"/*_DAT "$drive/"
 
 # The marker is written after the program's output file is closed. FailAt 21
 # keeps the script going when the program cannot be loaded; Why records the
 # shell's error.
 
-printf 'FailAt 21\nWORK:program >WORK:output.txt\nWhy >>WORK:output.txt\nEcho "done" >WORK:marker.txt\n' > "$drive/Run-Test"
+printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output.txt\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"
 
 # FS-UAE runs in its own session. setsid may fork, so $! is not reliably the
 # emulator; the shell inside the new session records its own PID (which is
 # also the process group ID) before exec'ing FS-UAE.
 
 setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$work_dir/fs-uae.pid" \
-	fs-uae "${options[@]}" --hard_drive_0="$system_dir" --hard_drive_1="$drive" \
+	fs-uae "${options[@]}" ${SERIAL_LOG:+--serial_port="$SERIAL_LOG"} \
+	--hard_drive_0="$system_dir" --hard_drive_1="$drive" \
 	--floppy_drive_0= --fullscreen=0 --automatic_input_grab=0 --warp_mode=1 \
 	--base_dir="$work_dir" > "$work_dir/fs-uae.log" 2>&1 &
 
@@ -129,7 +147,22 @@ fi
 
 if [ $status -eq 0 ]; then
 	cat "$drive/output.txt"
-	rm -rf "$work_dir"
+
+	if [ -n "${RESULT_DIR:-}" ]; then
+		mkdir -p "$RESULT_DIR"
+
+		for result in measure graphics; do
+			if [ -f "$drive/$result.bin" ]; then
+				cp "$drive/$result.bin" "$RESULT_DIR/$result-$config.bin"
+			fi
+		done
+	fi
+
+	if [ -n "${KEEP_WORK:-}" ]; then
+		echo "work dir kept: $work_dir" >&2
+	else
+		rm -rf "$work_dir"
+	fi
 else
 	echo "no result after ${timeout}s (config $config), work dir kept: $work_dir" >&2
 fi

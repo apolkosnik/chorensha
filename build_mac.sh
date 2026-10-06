@@ -41,7 +41,9 @@ wine ./tools/cldlod.exe binaries/dsprite.cld > binaries/atari/dsprite.lod
 
 ./tools/vasmm68k_mot_mac sources/amiga/main.s -quiet -Fhunk -m68000 -o binaries/amiga_main.o
 ./tools/vasmm68k_mot_mac sources/amiga/mem_map.s -quiet -Fhunk -m68030 -o binaries/amiga_mem_map.o
+./tools/vasmm68k_mot_mac sources/amiga/emulator.s -quiet -Fhunk -m68030 -o binaries/amiga_emulator.o
+./tools/vasmm68k_mot_mac sources/amiga/graphics.s -quiet -Fhunk -m68030 -o binaries/amiga_graphics.o
 ./tools/vasmm68k_mot_mac sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o binaries/sz2_amiga.o
 
-./tools/vlink_mac binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o -bamigahunk -o binaries/amiga/sz2_dbg
-./tools/vlink_mac binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o -bamigahunk -s -o binaries/amiga/sz2
+./tools/vlink_mac binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_graphics.o -bamigahunk -o binaries/amiga/sz2_dbg
+./tools/vlink_mac binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_graphics.o -bamigahunk -s -o binaries/amiga/sz2
