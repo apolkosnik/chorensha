@@ -192,4 +192,7 @@ Measured on the 68030/50 RTG config (cycle-exact), per frame: graphics 6.6 ms, u
 
 - Self-modifying code on 040/060: `CacheClearU()` after generating sprite code; check the game code for SMC.
 - Rotated-screen mode: disable at first.
-- Music production is the largest single effort and sits outside the code.
+- Audio, on hold (only the sound effects are done):
+  - Music needs the 13 MCDRV tracks rendered: either MAME with the X68000 BIOS ROMs, or our own YM2151 + MDC player.
+  - Planned outputs: MHI for MP3 music on cards that decode it (`mhizz9000` / `mhiz3660`; needs gapless trimming or intro + loop files, and testing on real hardware, since FS-UAE has no ZZ9000/Z3660), with a Paula stream on channels 2 and 3 as the fallback.
+  - Optional AHI output for effects and music when the AHI mode is a sound card (ZZ9000AX, Z3660AX). It frees the chip RAM the effects use, and can be tested with `filesave.audio`. Direct Paula stays the default, because AHI's Paula driver mixes in software.
