@@ -5,3 +5,5 @@
 /binaries/atari/*.o
 /binaries/atari/*.lod
 /binaries/atari/*.tos
+/binaries/amiga/sz2
+/binaries/amiga/sz2_dbg

@@ -35,3 +35,13 @@ diff binaries/sz2.dif binaries/x68000/sz2.dif
 # Amiga
 #
 
+# Target: 68030 with fast RAM and an RTG card. main.s is assembled for the
+# 68000 so it reports missing requirements instead of crashing on a lesser
+# CPU. The game core is plain 68000 code.
+
+./tools/vasmm68k_mot sources/amiga/main.s -quiet -Fhunk -m68000 -o binaries/amiga_main.o
+./tools/vasmm68k_mot sources/amiga/mem_map.s -quiet -Fhunk -m68030 -o binaries/amiga_mem_map.o
+./tools/vasmm68k_mot sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o binaries/sz2_amiga.o
+
+./tools/vlink binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o -bamigahunk -o binaries/amiga/sz2_dbg
+./tools/vlink binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o -bamigahunk -s -o binaries/amiga/sz2

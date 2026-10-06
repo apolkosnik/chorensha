@@ -35,3 +35,13 @@ cp binaries/sz2.x binaries/x68000/CH68_101_B/SZ2.X
 # Amiga
 #
 
+# Target: 68030 with fast RAM and an RTG card. main.s is assembled for the
+# 68000 so it reports missing requirements instead of crashing on a lesser
+# CPU. The game core is plain 68000 code.
+
+./tools/vasmm68k_mot.exe sources/amiga/main.s -quiet -Fhunk -m68000 -o binaries/amiga_main.o
+./tools/vasmm68k_mot.exe sources/amiga/mem_map.s -quiet -Fhunk -m68030 -o binaries/amiga_mem_map.o
+./tools/vasmm68k_mot.exe sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o binaries/sz2_amiga.o
+
+./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o -bamigahunk -o binaries/amiga/sz2_dbg
+./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o -bamigahunk -s -o binaries/amiga/sz2

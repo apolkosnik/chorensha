@@ -1,4 +1,16 @@
 
+	; __PORT__ is defined for every non-X68000 target. vasm's "ifd" only
+	; tests a single symbol ("ifd __ATARI__ || __AMIGA__" ignores the second
+	; one), so blocks shared by the ports test this symbol instead.
+
+	ifd __ATARI__
+__PORT__ equ 1
+	endif
+
+	ifd __AMIGA__
+__PORT__ equ 1
+	endif
+
 	ifd __ATARI__
 
 	xdef SPRITE_DATA_ADDRESS
@@ -530,7 +542,7 @@ L_00020328:
 	move.b  19(A0),19(A1)                           ; 0002035C 1368 0013 0013
 	move.b  21(A0),21(A1)                           ; 00020362 1368 0015 0015
 
-	ifd __ATARI__ || __AMIGA__
+	ifd __PORT__
 
 	move.l  L_00000118,SAVED_VBL_INTERRUPT_HANDLER                    ; 00020368 23F8 0118 0002 21A4
 	move.l  L_00000138,SAVED_RASTER_INTERRUPT_HANDLER                    ; 00020370 23F8 0138 0002 21A8
@@ -544,7 +556,7 @@ L_00020328:
 
 	move.w  L_00E80000+$12,SAVED_RASTER_INTERRUPT_LINE            ; 00020378 33F9 00E8 0012 0002 21AC ; [CRTC + $12]  
 
-	ifd __ATARI__ || __AMIGA__
+	ifd __PORT__
 
 	move.l  #VBL_INTERRUPT_HANDLER,L_00000118                      ; 00020382 21FC 0002 1622 0118
 
@@ -560,7 +572,7 @@ L_00020328:
 
 	move.w  #$3FF,L_00E80000+$12                    ; 0002039C 33FC 03FF 00E8 0012      ; [CRTC + $12]  
 
-	ifd __ATARI__ || __AMIGA__
+	ifd __PORT__
 
 	move.l  #RASTER_INTERRUPT_HANDLER,L_00000138                      ; 000203A4 21FC 0002 17DA 0138
 
@@ -637,7 +649,7 @@ L_000203EA:
 	andi.b  #%10111111,21(A0)                       ; 00020458 0228 00BF 0015
 	or.b    D0,21(A0)                               ; 0002045E 8128 0015
 
-	ifd __ATARI__ || __AMIGA__
+	ifd __PORT__
 
 	move.l  SAVED_VBL_INTERRUPT_HANDLER,L_00000118                    ; 00020462 21F9 0002 21A4 0118
 	move.l  SAVED_RASTER_INTERRUPT_HANDLER,L_00000138                    ; 0002046A 21F9 0002 21A8 0138
