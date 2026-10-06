@@ -7,10 +7,11 @@
 ; crashing on a lesser CPU; the executable still needs about 2.3 MB of free
 ; memory to load at all (mostly the X68000 shadow buffers in mem_map.s).
 ;
-; Usage: sz2 [frames]
+; Usage: sz2 [frames [input script]]
 ;
 ; With a frame count the game exits after that many frames and the per-frame
-; measurements are written to measure.bin in the current directory.
+; measurements are written to measure.bin in the current directory. An input
+; script (see tests/amiga/make_input_script.py) feeds the joystick for tests.
 
 	xdef start
 	xdef start_of_code
@@ -24,8 +25,13 @@
 	xref measured_frames
 	xref frame_records
 	xref free_frame_records
+	xref checkpoints
+	xref checkpoint_count
 	xref eclock_frequency
 	xref unimplemented_iocs
+	xref exit_reason
+	xref frame_timer_text
+	xref frame_timer_hz100
 
 ; exec.library
 
@@ -144,6 +150,7 @@ start:
 	jsr		parse_frame_limit
 
 	move.l	frame_limit,d0
+	move.l	input_script_name,a0
 	jsr		start_emulator
 	tst.l	d0
 	bmi		.emulator_failed
@@ -452,13 +459,52 @@ parse_frame_limit:
 	move.b	(a0)+,d2
 	sub.b	#'0',d2
 	cmp.b	#9,d2
-	bhi		.done
+	bhi		.script_name
 
 	mulu.l	#10,d0
 	add.l	d2,d0
 
 	subq.l	#1,d1
 	bne		.digits
+
+	bra		.done
+
+.script_name:
+	; After the number: optional input script name (up to a space or the
+	; end of the line).
+
+	subq.l	#1,a0
+
+.skip_spaces2:
+	move.b	(a0),d2
+	cmp.b	#' ',d2
+	bne		.name_start
+
+	addq.l	#1,a0
+	subq.l	#1,d1
+	bne		.skip_spaces2
+
+	bra		.done
+
+.name_start:
+	cmp.b	#10,d2
+	beq		.done
+
+	lea		input_script_name_buffer,a1
+	move.l	a1,input_script_name
+	moveq	#64-2,d3
+
+.name_loop:
+	move.b	(a0)+,d2
+	cmp.b	#' ',d2
+	bls		.name_end
+
+	move.b	d2,(a1)+
+	subq.l	#1,d1
+	dbeq	d3,.name_loop
+
+.name_end:
+	clr.b	(a1)
 
 .done:
 	move.l	d0,frame_limit
@@ -478,6 +524,24 @@ print_run_summary:
 	move.l	heap_used,print_arguments+12
 
 	move.l	#run_summary_format,d1
+	move.l	#print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	move.l	exit_reason,d0
+	lsl		#2,d0
+	lea		exit_reason_table,a0
+	move.l	(a0,d0.w),print_arguments
+	move.l	frame_timer_text,print_arguments+4
+	move.l	frame_timer_hz100,d0
+	divu	#100,d0
+	moveq	#0,d1
+	move	d0,d1
+	move.l	d1,print_arguments+8
+	swap	d0
+	move	d0,d1
+	move.l	d1,print_arguments+12
+
+	move.l	#exit_format,d1
 	move.l	#print_arguments,d2
 	jsr		_LVOVPrintf(a6)
 
@@ -529,6 +593,32 @@ write_measurements:
 	move.l	frame_records,d2
 	move.l	measured_frames,d3
 	lsl.l	#3,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	jsr		_LVOClose(a6)
+
+	; checkpoints.bin: 'CRSC', number of checkpoints, then the 32-byte
+	; checkpoints (see CHECKPOINT_SIZE in emulator.s).
+
+	move.l	#checkpoints_file_name,d1
+	move.l	#MODE_NEWFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,d4
+	beq		.failed
+
+	move.l	#'CRSC',measure_header
+	move.l	checkpoint_count,measure_header+4
+
+	move.l	d4,d1
+	move.l	#measure_header,d2
+	moveq	#8,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	move.l	checkpoints,d2
+	move.l	checkpoint_count,d3
+	lsl.l	#5,d3
 	jsr		_LVOWrite(a6)
 
 	move.l	d4,d1
@@ -642,14 +732,34 @@ emulator_failed_text:
 run_summary_format:
 	dc.b	'Frames: %ld (measured: %ld), E clock: %ld Hz, heap used: %ld bytes.',10,0
 
+exit_format:
+	dc.b	'Exit: %s. Frame timer: %s (%ld.%02ld Hz).',10,0
+
+exit_unknown_text:
+	dc.b	'unknown',0
+exit_frame_limit_text:
+	dc.b	'frame limit',0
+exit_game_text:
+	dc.b	'game',0
+exit_exception_text:
+	dc.b	'exception',0
+
+	even
+
+exit_reason_table:
+	dc.l	exit_unknown_text,exit_frame_limit_text,exit_game_text,exit_exception_text
+
 unimplemented_iocs_format:
 	dc.b	'Unimplemented IOCS call $%02lx.',10,0
 
 measure_file_name:
 	dc.b	'measure.bin',0
 
+checkpoints_file_name:
+	dc.b	'checkpoints.bin',0
+
 measure_file_failed_text:
-	dc.b	'Could not write measure.bin.',10,0
+	dc.b	'Could not write the measurement files.',10,0
 
 	even
 
@@ -696,6 +806,10 @@ argument_length:
 	ds.l	1
 frame_limit:
 	ds.l	1
+input_script_name:
+	ds.l	1
+input_script_name_buffer:
+	ds.b	64
 measure_header:
 	ds.l	3
 machine_display:

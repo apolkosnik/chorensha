@@ -25,6 +25,9 @@ __PORT__ equ 1
 
 	xdef VBL_VWAIT_COUNTER
 	xdef NEW_STACK
+	xdef PLAYER_SCORE
+	xdef PLAYER_INFO_STRUCT
+	xdef WORD_00088E6C ; Random table index.
 
 	endif
 

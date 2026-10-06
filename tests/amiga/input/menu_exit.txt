@@ -1,0 +1,10 @@
+# Main menu: START, CONTINUE, CONFIG, EXIT. Move down three times and
+# confirm with trigger A; the game then returns to the shell.
+300 down
+310 -
+320 down
+330 -
+340 down
+350 -
+360 a
+370 -

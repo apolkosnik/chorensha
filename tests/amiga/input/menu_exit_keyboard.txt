@@ -1,0 +1,10 @@
+# Main menu exit with the keyboard: cursor down three times, then CTRL
+# (trigger A). Exercises the input.device handler.
+300 key down press
+304 key down release
+320 key down press
+324 key down release
+340 key down press
+344 key down release
+360 key ctrl press
+364 key ctrl release

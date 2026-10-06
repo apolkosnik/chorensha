@@ -23,8 +23,15 @@
 	xdef amiga_printf
 	xdef free_frame_records
 
-	xdef iocs_joystick_data
-	xdef keyboard_matrix
+	xref iocs_joystick_data
+	xref keyboard_matrix
+	xref initialize_input
+	xref release_input
+	xref update_input
+
+	xdef exit_reason
+	xdef frame_timer_text
+	xdef frame_timer_hz100
 
 	xref _start
 	xref exec_base
@@ -35,6 +42,13 @@
 	xref L_00C00000
 	xref SPRITE_DATA_ADDRESS
 	xref sprite_palette_usage
+	xref PLAYER_SCORE
+	xref PLAYER_INFO_STRUCT
+	xref WORD_00088E6C
+	xref BACKGROUND_SCROLL_COUNTER
+
+	xdef checkpoints
+	xdef checkpoint_count
 	xref VBL_VWAIT_COUNTER
 	xref frame_sprite_count
 	xref start_of_code
@@ -88,6 +102,32 @@ IS_SIZE=22
 
 INTB_VERTB=5
 
+_LVOOpenResource=-498
+_LVOCause=-180
+
+; cia.resource
+
+_LVOAddICRVector=-6
+_LVORemICRVector=-12
+
+CIAICRB_TA=0
+CIAICRB_TB=1
+
+; Frame timer: the X68000's 55.46 Hz (31 kHz, 256-line mode), from a CIA
+; timer counting E clock cycles. Falls back to the 50/60 Hz vertical blank if
+; no CIA timer is free.
+
+FRAME_RATE_HZ100=5546
+
+FRAME_TIMER_CIA=1
+FRAME_TIMER_VERTB=2
+
+; Exit reasons.
+
+EXIT_FRAME_LIMIT=1
+EXIT_GAME=2
+EXIT_EXCEPTION=3
+
 io_Device=20
 TIMEREQUEST_SIZE=40
 UNIT_ECLOCK=2
@@ -137,6 +177,14 @@ OS_STACK_SIZE=16384
 MAXIMUM_MEASURED_FRAMES=65536
 FRAME_RECORD_SIZE=8
 
+; Game state checkpoints (measurement runs), every CHECKPOINT_INTERVAL
+; frames: frame (long), score (long), random table index (word), background
+; scroll counter (word), sprites (word), padding (word), player structure
+; (14 bytes), padding (2 bytes).
+
+CHECKPOINT_INTERVAL=60
+CHECKPOINT_SIZE=32
+
 ; Stacks. exec checks a task's stack pointer against its registered bounds
 ; when it switches tasks, and dos.library relies on the bounds too. The game
 ; sets up its own stacks: first NEW_STACK in its BSS, then one in the process
@@ -170,12 +218,15 @@ OS_STACK_LEAVE macro
 	text
 ; ------------------------------------------------------------------------------
 
-; d0.l = number of frames to run before exiting (0 = until the game exits).
+; d0.l = number of frames to run before exiting (0 = until the game exits),
+; a0 = input script file name or 0.
 ; Returns d0.l = 0, or -1 if the emulation could not be set up.
 
 start_emulator:
 	movem.l	d1-d7/a0-a6,-(sp)
 
+	move.l	a0,input_script_name
+	move.l	#EXIT_GAME,exit_reason
 	move.l	d0,frame_limit
 	clr.l	frame_count
 	clr.l	measured_frames
@@ -237,7 +288,26 @@ start_emulator:
 	move.l	d0,frame_records
 	beq		.free_heap
 
+	move.l	maximum_records,d0
+	divu.l	#CHECKPOINT_INTERVAL,d0
+	addq.l	#1,d0
+	move.l	d0,maximum_checkpoints
+	lsl.l	#5,d0 ; CHECKPOINT_SIZE
+	move.l	d0,checkpoints_size
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,checkpoints
+	bne		.no_measurement
+
+	move.l	frame_records,a1
+	move.l	frame_records_size,d0
+	jsr		_LVOFreeMem(a6)
+	clr.l	frame_records
+
+	bra		.free_heap
+
 .no_measurement:
+	clr.l	checkpoint_count
 
 	; E clock for frame timing.
 
@@ -251,22 +321,20 @@ start_emulator:
 
 	move.l	timer_request+io_Device,timer_base
 
+	move.l	input_script_name,a0
+	jsr		initialize_input
+	tst.l	d0
+	bmi		.close_timer
+
 	; Trap handler (IOCS, PCM8, MCDRV).
 
 	move.l	main_task,a0
 	move.l	tc_TrapCode(a0),old_trap_code
 	move.l	#trap_handler,tc_TrapCode(a0)
 
-	; Vertical blank interrupt server.
+	jsr		start_frame_timer
 
-	lea		vbl_interrupt,a1
-	move.b	#NT_INTERRUPT,ln_Type(a1)
-	clr.b	ln_Pri(a1)
-	move.l	#vbl_interrupt_name,ln_Name(a1)
-	clr.l	is_Data(a1)
-	move.l	#vbl_server,is_Code(a1)
-	moveq	#INTB_VERTB,d0
-	jsr		_LVOAddIntServer(a6)
+	move.l	exec_base,a6
 
 	; Register stack bounds that cover the game's stacks: from the lower of
 	; (NEW_STACK - startup stack, process area) to the higher of (NEW_STACK,
@@ -308,6 +376,13 @@ start_emulator:
 
 	jmp		(a4)
 
+.close_timer:
+	jsr		release_input
+
+	move.l	exec_base,a6
+	lea		timer_request,a1
+	jsr		_LVOCloseDevice(a6)
+
 .free_heap:
 	move.l	heap_address,a1
 	move.l	heap_size,d0
@@ -348,14 +423,13 @@ amiga_exit_game:
 	lea		game_stack_swap,a0
 	jsr		_LVOStackSwap(a6)
 
+	jsr		stop_frame_timer
+
 	move.l	exec_base,a6
-
-	lea		vbl_interrupt,a1
-	moveq	#INTB_VERTB,d0
-	jsr		_LVORemIntServer(a6)
-
 	move.l	main_task,a0
 	move.l	old_trap_code,tc_TrapCode(a0)
+
+	jsr		release_input
 
 	jsr		close_all_files
 
@@ -448,6 +522,17 @@ write_graphics_dump:
 ; Called by main.s after it has written the measurements.
 
 free_frame_records:
+	move.l	checkpoints,d0
+	beq		.no_checkpoints
+
+	move.l	d0,a1
+	move.l	checkpoints_size,d0
+	move.l	exec_base,a6
+	jsr		_LVOFreeMem(a6)
+
+	clr.l	checkpoints
+
+.no_checkpoints:
 	move.l	frame_records,d0
 	beq		.done
 
@@ -463,7 +548,161 @@ free_frame_records:
 
 ; ------------------------------------------------------------------------------
 ;
-; Vertical blank interrupt server (a1 = is_Data, supervisor mode).
+; Frame timer: a CIA timer at 55.46 Hz (the first free one of CIA-B timer A,
+; CIA-B timer B, CIA-A timer A, CIA-A timer B), else the vertical blank.
+
+start_frame_timer:
+	move.l	timer_base,a6
+	lea		eclock_value,a0
+	jsr		_LVOReadEClock(a6) ; d0 = E clock frequency.
+
+	move.l	d0,d2
+	mulu.l	#100,d0
+	add.l	#FRAME_RATE_HZ100/2,d0
+	divu.l	#FRAME_RATE_HZ100,d0
+	move.l	d0,frame_timer_count
+
+	mulu.l	#100,d2 ; Actual rate, in 1/100 Hz (rounded).
+	move.l	d0,d1
+	lsr.l	#1,d1
+	add.l	d1,d2
+	divu.l	d0,d2
+	move.l	d2,frame_timer_hz100
+
+	; The timer (CIA, level 2 or 6; or the vertical blank, level 3) only
+	; causes a software interrupt, in which the game's VBL handler runs. The
+	; handler lowers the interrupt mask on purpose (for the X68000's raster
+	; interrupts); at the software interrupt level that has no effect,
+	; while in a level 6 handler it let other interrupts nest into exec's
+	; dispatcher (dead-end alerts on the A1200).
+
+	lea		frame_interrupt,a1
+	move.b	#NT_INTERRUPT,ln_Type(a1)
+	clr.b	ln_Pri(a1)
+	move.l	#frame_interrupt_name,ln_Name(a1)
+	clr.l	is_Data(a1)
+	move.l	#frame_hardware_tick,is_Code(a1)
+
+	lea		frame_software_interrupt,a1
+	move.b	#NT_INTERRUPT,ln_Type(a1)
+	clr.b	ln_Pri(a1)
+	move.l	#frame_interrupt_name,ln_Name(a1)
+	clr.l	is_Data(a1)
+	move.l	#vbl_server,is_Code(a1)
+
+	lea		cia_timers,a2
+
+	ifd __FORCE_VERTB__
+
+	bra		.vertical_blank ; Debug: no CIA timer.
+
+	endif
+
+.cia_loop:
+	move.l	(a2),d0
+	beq		.vertical_blank
+
+	move.l	d0,a1
+	move.l	exec_base,a6
+	jsr		_LVOOpenResource(a6)
+	tst.l	d0
+	beq		.next_cia
+
+	move.l	d0,a6
+	move.l	4(a2),d0
+	lea		frame_interrupt,a1
+	jsr		_LVOAddICRVector(a6)
+	tst.l	d0
+	beq		.cia_found
+
+.next_cia:
+	lea		CIA_TIMER_SIZE(a2),a2
+
+	bra		.cia_loop
+
+.cia_found:
+	move.l	a6,cia_resource
+	move.l	a2,cia_timer
+	move.l	#FRAME_TIMER_CIA,frame_timer_type
+	move.l	CIA_TIMER_TEXT(a2),frame_timer_text
+
+	; Stop the timer, continuous mode, E clock input; load the count; start.
+
+	move.l	CIA_TIMER_CONTROL(a2),a0
+	move.b	(a0),d0
+	and.b	CIA_TIMER_KEEP_MASK+3(a2),d0
+	move.b	d0,(a0)
+
+	move.l	frame_timer_count,d1
+	move.l	CIA_TIMER_LOW(a2),a1
+	move.b	d1,(a1)
+	lsr		#8,d1
+	move.l	CIA_TIMER_HIGH(a2),a1
+	move.b	d1,(a1)
+
+	or.b	#$11,d0 ; LOAD | START
+	move.b	d0,(a0)
+
+	rts
+
+.vertical_blank:
+	move.l	exec_base,a6
+	lea		frame_interrupt,a1
+	moveq	#INTB_VERTB,d0
+	jsr		_LVOAddIntServer(a6)
+
+	move.l	#FRAME_TIMER_VERTB,frame_timer_type
+	move.l	#vertical_blank_text,frame_timer_text
+	clr.l	frame_timer_hz100
+
+	rts
+
+stop_frame_timer:
+	cmp.l	#FRAME_TIMER_CIA,frame_timer_type
+	bne		.not_cia
+
+	move.l	cia_timer,a2
+	move.l	CIA_TIMER_CONTROL(a2),a0
+	bclr	#0,(a0) ; START
+
+	move.l	cia_resource,a6
+	move.l	4(a2),d0
+	lea		frame_interrupt,a1
+	jsr		_LVORemICRVector(a6)
+
+	bra		.done
+
+.not_cia:
+	cmp.l	#FRAME_TIMER_VERTB,frame_timer_type
+	bne		.done
+
+	move.l	exec_base,a6
+	lea		frame_interrupt,a1
+	moveq	#INTB_VERTB,d0
+	jsr		_LVORemIntServer(a6)
+
+.done:
+	clr.l	frame_timer_type
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Frame timer interrupt (CIA timer or vertical blank).
+
+frame_hardware_tick:
+	lea		frame_software_interrupt,a1
+	move.l	exec_base,a6
+	jsr		_LVOCause(a6)
+
+	moveq	#0,d0 ; Let the other vertical blank servers run.
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Frame software interrupt (a1 = is_Data, supervisor mode): the X68000's
+; vertical blank for the game.
 
 vbl_server:
 	addq.w	#1,vbl_wait_counter
@@ -748,6 +987,7 @@ frame_wait_begin:
 	addq.l	#1,measured_frames
 
 .no_previous_frame:
+	move	frame_sprite_count,last_sprite_count
 	clr		frame_sprite_count
 
 	rts
@@ -761,15 +1001,60 @@ frame_wait_end:
 
 	addq.l	#1,frame_count
 
+	jsr		update_input
+	jsr		record_checkpoint
+
 	move.l	frame_limit,d0
 	beq		.no_limit
 
 	cmp.l	frame_count,d0
 	bhi		.no_limit
 
+	move.l	#EXIT_FRAME_LIMIT,exit_reason
 	jmp		amiga_exit_game
 
 .no_limit:
+	rts
+
+; ------------------------------------------------------------------------------
+
+record_checkpoint:
+	move.l	checkpoints,d0
+	beq		.done
+
+	move.l	d0,a0
+
+	move.l	frame_count,d0
+	divul.l	#CHECKPOINT_INTERVAL,d1:d0 ; 32-bit quotient, remainder in d1.
+	tst.l	d1
+	bne		.done
+
+	move.l	checkpoint_count,d0
+	cmp.l	maximum_checkpoints,d0
+	bcc		.done
+
+	lsl.l	#5,d0 ; CHECKPOINT_SIZE
+	add.l	d0,a0
+
+	move.l	frame_count,(a0)+
+	move.l	PLAYER_SCORE,(a0)+
+	move	WORD_00088E6C,(a0)+
+	move	BACKGROUND_SCROLL_COUNTER,(a0)+
+	move	last_sprite_count,(a0)+
+	clr		(a0)+
+
+	lea		PLAYER_INFO_STRUCT,a1
+	moveq	#14-1,d0
+
+.copy:
+	move.b	(a1)+,(a0)+
+	dbf		d0,.copy
+
+	clr		(a0)+
+
+	addq.l	#1,checkpoint_count
+
+.done:
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -964,6 +1249,7 @@ exception_frame_sizes:
 	even
 
 report_exception:
+	move.l	#EXIT_EXCEPTION,exit_reason
 	move.l	exception_number,print_arguments
 	move.l	exception_pc,d0
 	move.l	d0,print_arguments+4
@@ -1953,8 +2239,44 @@ convert_path:
 timer_name:
 	dc.b	'timer.device',0
 
-vbl_interrupt_name:
-	dc.b	'Cho Ren Sha 68k VBL',0
+frame_interrupt_name:
+	dc.b	'Cho Ren Sha 68k frame',0
+
+ciaa_name:
+	dc.b	'ciaa.resource',0
+ciab_name:
+	dc.b	'ciab.resource',0
+
+ciab_timer_a_text:
+	dc.b	'CIA-B timer A',0
+ciab_timer_b_text:
+	dc.b	'CIA-B timer B',0
+ciaa_timer_a_text:
+	dc.b	'CIA-A timer A',0
+ciaa_timer_b_text:
+	dc.b	'CIA-A timer B',0
+vertical_blank_text:
+	dc.b	'vertical blank',0
+
+	even
+
+; Resource name, ICR bit, low and high count registers, control register,
+; control bits kept when the timer is set up (CRA: serial port mode and
+; TOD input; CRB: alarm), description.
+
+CIA_TIMER_LOW=8
+CIA_TIMER_HIGH=12
+CIA_TIMER_CONTROL=16
+CIA_TIMER_KEEP_MASK=20
+CIA_TIMER_TEXT=24
+CIA_TIMER_SIZE=28
+
+cia_timers:
+	dc.l	ciab_name,CIAICRB_TA,$bfd400,$bfd500,$bfde00,$c0,ciab_timer_a_text
+	dc.l	ciab_name,CIAICRB_TB,$bfd600,$bfd700,$bfdf00,$80,ciab_timer_b_text
+	dc.l	ciaa_name,CIAICRB_TA,$bfe401,$bfe501,$bfee01,$c0,ciaa_timer_a_text
+	dc.l	ciaa_name,CIAICRB_TB,$bfe601,$bfe701,$bfef01,$80,ciaa_timer_b_text
+	dc.l	0
 
 	ifd __DEBUG_OUTPUT__
 
@@ -2061,8 +2383,6 @@ human68k_call_table:
 	dc.l	human68k_getpdb
 	dc.w	0
 
-iocs_joystick_data:
-	dc.l	-1 ; Nothing pressed (bits are active low).
 
 ; ------------------------------------------------------------------------------
 	bss
@@ -2117,6 +2437,8 @@ vbl_wait_counter:
 	ds.w	1
 pending_call_number:
 	ds.w	1
+last_sprite_count:
+	ds.w	1
 
 	even
 
@@ -2137,8 +2459,32 @@ exception_pc:
 
 	even
 
-vbl_interrupt:
+frame_interrupt:
 	ds.b	IS_SIZE
+
+	even
+
+frame_software_interrupt:
+	ds.b	IS_SIZE
+
+	even
+
+cia_resource:
+	ds.l	1
+cia_timer:
+	ds.l	1
+frame_timer_type:
+	ds.l	1
+frame_timer_count:
+	ds.l	1
+frame_timer_hz100:
+	ds.l	1
+frame_timer_text:
+	ds.l	1
+exit_reason:
+	ds.l	1
+input_script_name:
+	ds.l	1
 
 	even
 
@@ -2148,8 +2494,6 @@ timer_request:
 file_handles:
 	ds.l	NUMBER_OF_FILE_HANDLES
 
-keyboard_matrix:
-	ds.b	16
 
 unimplemented_iocs:
 	ds.b	256
@@ -2189,6 +2533,14 @@ frame_records_size:
 maximum_records:
 	ds.l	1
 heap_size:
+	ds.l	1
+checkpoints: ; Allocated when measuring.
+	ds.l	1
+checkpoints_size:
+	ds.l	1
+maximum_checkpoints:
+	ds.l	1
+checkpoint_count:
 	ds.l	1
 
 os_stack_swap:

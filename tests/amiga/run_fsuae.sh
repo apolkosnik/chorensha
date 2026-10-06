@@ -7,9 +7,13 @@
 #
 # The program runs with WORK: as its current directory, next to a copy of the
 # game data (the *_DAT directories of GAME_DATA_DIR, default binaries/amiga).
-# Files it writes there (measure.bin, graphics.bin) are copied to RESULT_DIR if set.
+# Files it writes there (measure.bin, graphics.bin, checkpoints.bin) are
+# copied to RESULT_DIR if set.
 # With SERIAL_LOG set, the Amiga serial port is written to that host file.
 # With KEEP_WORK set, the work directory (including fs-uae.log) is kept.
+# FS-UAE runs without a window (SDL offscreen video); SHOW_WINDOW=1 shows it.
+# With INPUT_SCRIPT set, that file is copied to WORK:input.bin (pass
+# "input.bin" in the arguments to use it).
 #
 # configs:
 #   a1200-4mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 4 MB fast (below the minimum)
@@ -18,6 +22,10 @@
 #   rtg-020    A1200, AGA, 68020 14 MHz, 4 MB fast, Zorro II uaegfx (minimum, RTG)
 #   rtg-030    A4000, AGA, 68030 50 MHz, 64 MB Zorro III fast, Zorro III uaegfx
 #   rtg-040    A4000, AGA, 68040 (fastest possible), 64 MB fast, Zorro III uaegfx
+#   rtg-040-libs, rtg-060-libs
+#              A4000, AGA, 68040 / 68060 with MMU and FPU, Zorro III uaegfx,
+#              on the system drive variant with the MMULib CPU libraries
+#              (68040.library / 68060.library) installed (AMIGA_CPULIBS_DIR)
 #
 # The 68020 and 68030 configs are cycle-exact (FS-UAE's A1200 default; the
 # 68030 runs at 14 x 3.546895 MHz = 49.7 MHz), so E clock timings measured
@@ -41,6 +49,7 @@ game_data_dir=${GAME_DATA_DIR:-$(dirname "$0")/../../binaries/amiga}
 
 kickstart_dir=${KICKSTART_DIR:-$HOME/Documents/FS-UAE/Kickstarts}
 system_dir=${AMIGA_SYSTEM_DIR:-$HOME/Documents/FS-UAE/Hard Drives/chorensha-wb32-rtg}
+cpulibs_system_dir=${AMIGA_CPULIBS_DIR:-$HOME/Documents/FS-UAE/Hard Drives/chorensha-wb32-rtg-cpulibs}
 
 a1200_kickstart="--kickstart_file=$kickstart_dir/A1200.47.115.rom"
 a4000_kickstart="--kickstart_file=$kickstart_dir/A4kOS322.rom"
@@ -71,6 +80,13 @@ case $config in
 		options=(--amiga_model=A4000/040 "$a4000_kickstart"
 			--zorro_iii_memory=65536 --graphics_card=uaegfx)
 		;;
+	rtg-040-libs|rtg-060-libs)
+		cpu=68${config:4:3} # 68040 or 68060
+		options=(--amiga_model=A4000/040 "$a4000_kickstart" --uae_cpu_model=$cpu
+			--uae_fpu_model=$cpu --uae_mmu_model=$cpu --uae_cpu_compatible=true
+			--zorro_iii_memory=65536 --graphics_card=uaegfx)
+		system_dir=$cpulibs_system_dir
+		;;
 	*)
 		echo "unknown config: $config" >&2
 		exit 2
@@ -92,6 +108,10 @@ mkdir -p "$drive"
 cp "$executable" "$drive/program"
 cp -r "$game_data_dir"/*_DAT "$drive/"
 
+if [ -n "${INPUT_SCRIPT:-}" ]; then
+	cp "$INPUT_SCRIPT" "$drive/input.bin"
+fi
+
 # The marker is written after the program's output file is closed. FailAt 21
 # keeps the script going when the program cannot be loaded; Why records the
 # shell's error.
@@ -101,6 +121,10 @@ printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output
 # FS-UAE runs in its own session. setsid may fork, so $! is not reliably the
 # emulator; the shell inside the new session records its own PID (which is
 # also the process group ID) before exec'ing FS-UAE.
+
+if [ -z "${SHOW_WINDOW:-}" ]; then
+	export SDL_VIDEODRIVER=offscreen
+fi
 
 setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$work_dir/fs-uae.pid" \
 	fs-uae "${options[@]}" ${SERIAL_LOG:+--serial_port="$SERIAL_LOG"} \
@@ -151,7 +175,7 @@ if [ $status -eq 0 ]; then
 	if [ -n "${RESULT_DIR:-}" ]; then
 		mkdir -p "$RESULT_DIR"
 
-		for result in measure graphics; do
+		for result in measure graphics checkpoints; do
 			if [ -f "$drive/$result.bin" ]; then
 				cp "$drive/$result.bin" "$RESULT_DIR/$result-$config.bin"
 			fi
