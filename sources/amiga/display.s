@@ -1,11 +1,12 @@
 
-; Display output: an 8-bit RTG screen through Picasso96.
+; Display output: an 8-bit RTG screen through Picasso96 or CyberGraphX.
 ;
 ; The rendered 256 x 256 picture is centred on a 320 x 256 screen (or the
 ; middle 240 lines on a 320 x 240 screen). Without a usable RTG board (native
-; AGA output is a later phase; CyberGraphX is not supported yet) the game
-; runs headless: the renderer still composes frames and screenshots come from
-; its buffer.
+; AGA output is a later phase) the game runs headless: the renderer still
+; composes frames and screenshots come from its buffer. -D__FORCE_CYBERGRAPHX__
+; uses the CyberGraphX calls on a Picasso96 system (its compatibility layer),
+; to test that path.
 
 	xdef open_display
 	xdef close_display
@@ -72,6 +73,13 @@ wd_RPort=50
 ; graphics.library
 
 _LVOLoadRGB32=-882
+_LVOInitRastPort=-198
+_LVOReadPixelArray8=-780
+_LVOAllocBitMap=-918
+_LVOFreeBitMap=-924
+
+RASTPORT_SIZE=100
+rp_BitMap=4
 
 ; Picasso96API.library
 
@@ -87,6 +95,19 @@ RGBFB_CLUT=1
 RGBFF_CLUT=1<<RGBFB_CLUT
 INVALID_ID=-1
 
+; cybergraphics.library
+
+_LVOBestCModeIDTagList=-60
+_LVOWritePixelArray=-126
+
+CYBRBIDTG_Depth=$80050000
+CYBRBIDTG_NominalWidth=$80050001
+CYBRBIDTG_NominalHeight=$80050002
+RECTFMT_LUT8=3
+
+BACKEND_PICASSO96=1
+BACKEND_CYBERGRAPHX=2
+
 ; struct RenderInfo: Memory, BytesPerRow, pad, RGBFormat.
 
 ri_Memory=0
@@ -96,6 +117,7 @@ RENDER_INFO_SIZE=12
 
 DISPLAY_RTG=1
 RTG_PICASSO96=1
+RTG_CYBERGRAPHX=2
 
 ; Render buffer layout: must match graphics.s.
 
@@ -121,8 +143,18 @@ open_display:
 	cmp.l	#DISPLAY_RTG,machine_display
 	bne		.done
 
+	move.l	#BACKEND_PICASSO96,backend
 	cmp.l	#RTG_PICASSO96,machine_rtg
+	beq		.backend_chosen
+
+	move.l	#BACKEND_CYBERGRAPHX,backend
+	cmp.l	#RTG_CYBERGRAPHX,machine_rtg
 	bne		.done
+
+.backend_chosen:
+	ifd __FORCE_CYBERGRAPHX__
+	move.l	#BACKEND_CYBERGRAPHX,backend
+	endif
 
 	move.l	exec_base,a6
 
@@ -138,21 +170,47 @@ open_display:
 	move.l	d0,graphics_base
 	beq		.failed
 
+	cmp.l	#BACKEND_CYBERGRAPHX,backend
+	beq		.open_cybergraphics
+
 	lea		picasso96_name,a1
 	moveq	#2,d0
 	jsr		_LVOOpenLibrary(a6)
 	move.l	d0,picasso96_base
 	beq		.failed
 
+	bra		.library_open
+
+.open_cybergraphics:
+	lea		cybergraphics_name,a1
+	moveq	#40,d0
+	jsr		_LVOOpenLibrary(a6)
+	move.l	d0,cybergraphics_base
+	beq		.failed
+
+.library_open:
 	; Mode: 320 x 256 x 8, else 320 x 240.
 
 	move.l	#PICTURE_HEIGHT,screen_height
 
 .find_mode:
+	cmp.l	#BACKEND_CYBERGRAPHX,backend
+	beq		.find_cybergraphics_mode
+
 	move.l	screen_height,mode_tags_height
 	move.l	picasso96_base,a6
 	lea		mode_tags,a0
 	jsr		_LVOp96BestModeIDTagList(a6)
+
+	bra		.mode_checked
+
+.find_cybergraphics_mode:
+	move.l	screen_height,cybergraphics_mode_tags_height
+	move.l	cybergraphics_base,a6
+	lea		cybergraphics_mode_tags,a0
+	jsr		_LVOBestCModeIDTagList(a6)
+
+.mode_checked:
 	cmp.l	#INVALID_ID,d0
 	bne		.mode_found
 
@@ -209,6 +267,28 @@ open_display:
 	jsr		_LVOSetPointer(a6)
 
 .pointer_done:
+	; Screenshots on CyberGraphX: its ReadPixelArray reads RGB formats only,
+	; so graphics.library ReadPixelArray8 is used, which needs a temporary
+	; RastPort with a one-line bitmap.
+
+	cmp.l	#BACKEND_CYBERGRAPHX,backend
+	bne		.no_temporary
+
+	move.l	graphics_base,a6
+	move.l	#PICTURE_WIDTH,d0
+	moveq	#1,d1
+	moveq	#8,d2
+	moveq	#0,d3
+	sub.l	a0,a0
+	jsr		_LVOAllocBitMap(a6)
+	move.l	d0,temporary_bitmap
+	beq		.no_temporary
+
+	lea		temporary_rastport,a1
+	jsr		_LVOInitRastPort(a6)
+	move.l	temporary_bitmap,temporary_rastport+rp_BitMap
+
+.no_temporary:
 	lea		render_info,a0
 	move.l	#render_buffer,ri_Memory(a0)
 	move	#RENDER_STRIDE,ri_BytesPerRow(a0)
@@ -253,6 +333,15 @@ close_display:
 	jsr		_LVOCloseScreen(a6)
 
 .no_screen:
+	move.l	temporary_bitmap,d0
+	beq		.no_temporary
+
+	clr.l	temporary_bitmap
+	move.l	d0,a0
+	move.l	graphics_base,a6
+	jsr		_LVOFreeBitMap(a6)
+
+.no_temporary:
 	move.l	exec_base,a6
 
 	move.l	pointer_data,d0
@@ -265,7 +354,7 @@ close_display:
 
 .no_pointer:
 	lea		intuition_base,a2
-	moveq	#3-1,d2
+	moveq	#4-1,d2
 
 .close_libraries:
 	move.l	(a2),d0
@@ -327,6 +416,9 @@ present_frame:
 	rts
 	endif
 
+	cmp.l	#BACKEND_CYBERGRAPHX,backend
+	beq		.cybergraphics_upload
+
 	move.l	picasso96_base,a6
 	lea		render_info,a0
 	moveq	#GUARD,d0
@@ -339,6 +431,24 @@ present_frame:
 	move.l	screen_height,d5
 	jsr		_LVOp96WritePixelArray(a6)
 
+	bra		.uploaded
+
+.cybergraphics_upload:
+	move.l	cybergraphics_base,a6
+	lea		render_buffer,a0
+	moveq	#GUARD,d0
+	move.l	source_y,d1
+	move.l	#RENDER_STRIDE,d2
+	move.l	window,a1
+	move.l	wd_RPort(a1),a1
+	moveq	#(SCREEN_WIDTH-PICTURE_WIDTH)/2,d3
+	moveq	#0,d4
+	move.l	#PICTURE_WIDTH,d5
+	move.l	screen_height,d6
+	moveq	#RECTFMT_LUT8,d7
+	jsr		_LVOWritePixelArray(a6)
+
+.uploaded:
 	movem.l	(sp)+,d2-d7/a2-a6
 
 .done:
@@ -356,6 +466,29 @@ capture_screen:
 	tst.b	display_active
 	beq		.from_buffer
 
+	cmp.l	#BACKEND_CYBERGRAPHX,backend
+	bne		.picasso96_capture
+
+	move.l	temporary_bitmap,d0
+	beq		.from_buffer
+
+	move.l	a0,a2 ; Destination.
+	move.l	graphics_base,a6
+	move.l	window,a0
+	move.l	wd_RPort(a0),a0
+	moveq	#(SCREEN_WIDTH-PICTURE_WIDTH)/2,d0
+	moveq	#0,d1
+	move.l	#(SCREEN_WIDTH-PICTURE_WIDTH)/2+PICTURE_WIDTH-1,d2
+	move.l	screen_height,d3
+	subq.l	#1,d3
+	lea		temporary_rastport,a1
+	jsr		_LVOReadPixelArray8(a6)
+
+	move.l	screen_height,d0
+
+	bra		.done
+
+.picasso96_capture:
 	lea		capture_info,a1
 	move.l	a0,ri_Memory(a1)
 	move	#PICTURE_WIDTH,ri_BytesPerRow(a1)
@@ -409,6 +542,8 @@ graphics_name:
 	dc.b	'graphics.library',0
 picasso96_name:
 	dc.b	'Picasso96API.library',0
+cybergraphics_name:
+	dc.b	'cybergraphics.library',0
 
 	even
 
@@ -419,6 +554,14 @@ mode_tags_height:
 	dc.l	PICTURE_HEIGHT
 	dc.l	P96BIDTAG_Depth,8
 	dc.l	P96BIDTAG_FormatsAllowed,RGBFF_CLUT
+	dc.l	TAG_DONE
+
+cybergraphics_mode_tags:
+	dc.l	CYBRBIDTG_NominalWidth,SCREEN_WIDTH
+	dc.l	CYBRBIDTG_NominalHeight
+cybergraphics_mode_tags_height:
+	dc.l	PICTURE_HEIGHT
+	dc.l	CYBRBIDTG_Depth,8
 	dc.l	TAG_DONE
 
 screen_tags:
@@ -457,12 +600,21 @@ window_tags_height:
 	bss
 ; ------------------------------------------------------------------------------
 
-intuition_base: ; The three library bases stay together (close_display).
+intuition_base: ; The four library bases stay together (close_display).
 	ds.l	1
 graphics_base:
 	ds.l	1
 picasso96_base:
 	ds.l	1
+cybergraphics_base:
+	ds.l	1
+
+backend:
+	ds.l	1
+temporary_bitmap:
+	ds.l	1
+temporary_rastport:
+	ds.b	RASTPORT_SIZE
 
 screen:
 	ds.l	1

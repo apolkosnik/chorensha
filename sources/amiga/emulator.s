@@ -1052,6 +1052,23 @@ frame_wait_begin:
 	clr.l	current_record
 
 .recorded:
+	; Screenshots of measurement runs: due every SCREENSHOT_INTERVAL frames,
+	; taken at the next frame that is rendered.
+
+	tst.l	frame_records
+	beq		.no_screenshot
+
+	move.l	frame_count,d0
+	beq		.no_screenshot
+
+	move.l	d0,d2
+	divul.l	#SCREENSHOT_INTERVAL,d1:d0
+	tst.l	d1
+	bne		.no_screenshot
+
+	move.l	d2,screenshot_due
+
+.no_screenshot:
 	move	frame_sprite_count,last_sprite_count
 	clr		frame_sprite_count
 
@@ -1103,16 +1120,10 @@ render_and_present:
 	move.l	d1,4(a0)
 
 .no_record:
-	tst.l	frame_records
+	move.l	screenshot_due,d0
 	beq		.done
 
-	move.l	frame_count,d0
-	beq		.done
-
-	divul.l	#SCREENSHOT_INTERVAL,d1:d0
-	tst.l	d1
-	bne		.done
-
+	clr.l	screenshot_due
 	bsr		write_screenshot
 
 .done:
@@ -1121,7 +1132,11 @@ render_and_present:
 ; screen_NNNNN.bin: 'CRSS', width (word), lines (word), colours (word),
 ; padding (word), 256 x R, G, B (bytes), then the pixels (palette indices).
 
+; d0 = frame number for the file name.
+
 write_screenshot:
+	move.l	d0,d5 ; capture_screen preserves d2-d7.
+
 	lea		screenshot_pixels,a0
 	jsr		capture_screen
 	move	d0,screenshot_header+6
@@ -1138,7 +1153,7 @@ write_screenshot:
 	addq.l	#4,a0
 	dbf		d0,.palette
 
-	move.l	frame_count,print_arguments
+	move.l	d5,print_arguments ; The frame it was due for.
 	lea		screenshot_name_format,a0
 	lea		print_arguments,a1
 	lea		.put_char(pc),a2
@@ -2636,6 +2651,8 @@ last_wake_time:
 print_arguments:
 	ds.l	10
 current_record:
+	ds.l	1
+screenshot_due: ; Frame number of a pending screenshot, or 0.
 	ds.l	1
 frame_schedule:
 	ds.l	1
