@@ -7,13 +7,17 @@
 #
 # The program runs with WORK: as its current directory, next to a copy of the
 # game data (the *_DAT directories of GAME_DATA_DIR, default binaries/amiga).
-# Files it writes there (measure.bin, graphics.bin, checkpoints.bin,
+# Files it writes there (measure.bin, graphics.bin, checkpoints.bin, samples.bin,
 # screen_*.bin) are copied to RESULT_DIR if set.
 # With SERIAL_LOG set, the Amiga serial port is written to that host file.
 # With KEEP_WORK set, the work directory (including fs-uae.log) is kept.
 # FS-UAE runs without a window (SDL offscreen video); SHOW_WINDOW=1 shows it.
 # With INPUT_SCRIPT set, that file is copied to WORK:input.bin (pass
 # "input.bin" in the arguments to use it).
+# With AUDIO_CAPTURE set, the emulated audio is written to that WAV file
+# (OpenAL Soft's wave backend) and the emulation runs at real speed, not in
+# warp mode, so the sound is not skipped. Drive sounds, the emulated output
+# filter and interpolation are off for the capture.
 #
 # configs:
 #   a1200-4mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 4 MB fast (below the minimum)
@@ -126,10 +130,23 @@ if [ -z "${SHOW_WINDOW:-}" ]; then
 	export SDL_VIDEODRIVER=offscreen
 fi
 
+warp_mode=1
+
+if [ -n "${AUDIO_CAPTURE:-}" ]; then
+	printf '[general]\ndrivers = wave\n\n[wave]\nfile = %s\n' "$(realpath -m "$AUDIO_CAPTURE")" \
+		> "$work_dir/alsoft.conf"
+	export ALSOFT_CONF="$work_dir/alsoft.conf"
+	export ALSOFT_DRIVERS=wave
+	warp_mode=0
+	# Paula's output as it is: no drive sounds, no output filter or
+	# interpolation by the emulator.
+	options+=(--floppy_drive_volume=0 --uae_sound_filter=off --uae_sound_interpol=none)
+fi
+
 setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$work_dir/fs-uae.pid" \
 	fs-uae "${options[@]}" ${SERIAL_LOG:+--serial_port="$SERIAL_LOG"} \
 	--hard_drive_0="$system_dir" --hard_drive_1="$drive" \
-	--floppy_drive_0= --fullscreen=0 --automatic_input_grab=0 --warp_mode=1 \
+	--floppy_drive_0= --fullscreen=0 --automatic_input_grab=0 --warp_mode=$warp_mode \
 	--base_dir="$work_dir" > "$work_dir/fs-uae.log" 2>&1 &
 
 for ((i = 0; i < 50; i++)); do
@@ -175,7 +192,7 @@ if [ $status -eq 0 ]; then
 	if [ -n "${RESULT_DIR:-}" ]; then
 		mkdir -p "$RESULT_DIR"
 
-		for result in measure graphics checkpoints; do
+		for result in measure graphics checkpoints samples; do
 			if [ -f "$drive/$result.bin" ]; then
 				cp "$drive/$result.bin" "$RESULT_DIR/$result-$config.bin"
 			fi

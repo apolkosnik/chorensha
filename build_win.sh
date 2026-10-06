@@ -45,7 +45,8 @@ cp binaries/sz2.x binaries/x68000/CH68_101_B/SZ2.X
 ./tools/vasmm68k_mot.exe sources/amiga/graphics.s -quiet -Fhunk -m68030 -o binaries/amiga_graphics.o
 ./tools/vasmm68k_mot.exe sources/amiga/input.s -quiet -Fhunk -m68030 -o binaries/amiga_input.o
 ./tools/vasmm68k_mot.exe sources/amiga/display.s -quiet -Fhunk -m68030 -o binaries/amiga_display.o
+./tools/vasmm68k_mot.exe sources/amiga/audio.s -quiet -Fhunk -m68030 -o binaries/amiga_audio.o
 ./tools/vasmm68k_mot.exe sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o binaries/sz2_amiga.o
 
-./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_graphics.o -bamigahunk -o binaries/amiga/sz2_dbg
-./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_graphics.o -bamigahunk -s -o binaries/amiga/sz2
+./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_graphics.o -bamigahunk -o binaries/amiga/sz2_dbg
+./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_graphics.o -bamigahunk -s -o binaries/amiga/sz2

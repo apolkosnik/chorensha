@@ -54,8 +54,16 @@
 
 	ifd __RENDER_PROFILE__
 	xref render_profile
-	xdef timer_base
 	endif
+	xdef timer_base
+	xdef amiga_samples_loaded
+	xref initialize_audio
+	xref release_audio
+	xref decode_samples
+	xref audio_play
+	xref audio_stop
+	xref audio_status
+	xref write_samples_dump
 	xref release_renderer
 	xref PLAYER_SCORE
 	xref PLAYER_INFO_STRUCT
@@ -351,6 +359,7 @@ start_emulator:
 
 	jsr		open_display
 	jsr		initialize_renderer
+	jsr		initialize_audio
 
 	; Trap handler (IOCS, PCM8, MCDRV).
 
@@ -466,8 +475,11 @@ amiga_exit_game:
 	beq		.no_graphics_dump
 
 	jsr		write_graphics_dump
+	jsr		write_samples_dump
 
 .no_graphics_dump:
+	jsr		release_audio
+
 	; Heap high-water mark: the area was cleared at allocation.
 
 	move.l	heap_address,a0
@@ -896,6 +908,24 @@ vbl_server:
 	jsr		_LVOSignal(a6)
 
 	moveq	#0,d0 ; Let the other vertical blank servers run.
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; After LOAD_PCM_SAMPLE_FILES: decode the game's ADPCM samples for Paula.
+; Preserves all registers.
+
+amiga_samples_loaded:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	OS_STACK_ENTER
+
+	jsr		decode_samples
+
+	OS_STACK_LEAVE
+
+	movem.l	(sp)+,d0-d7/a0-a6
 
 	rts
 
@@ -1586,14 +1616,33 @@ iocs_call:
 	rte
 
 .not_joyget:
-	cmp.b	#$60,d0 ; _ADPCMOUT (no audio yet)
-	beq		.return_zero
+	cmp.b	#$60,d0 ; _ADPCMOUT
+	bne		.not_adpcmout
 
-	cmp.b	#$66,d0 ; _ADPCMSNS (nothing playing)
-	beq		.return_zero
+	jsr		audio_play
 
-	cmp.b	#$67,d0 ; _ADPCMMOD
-	beq		.return_zero
+	bra		.return_zero
+
+.not_adpcmout:
+	cmp.b	#$66,d0 ; _ADPCMSNS
+	bne		.not_adpcmsns
+
+	jsr		audio_status
+
+	rte
+
+.not_adpcmsns:
+	cmp.b	#$67,d0 ; _ADPCMMOD: 0 stops (the PCM8 probe asks with 'PCMA').
+	bne		.not_adpcmmod
+
+	tst.l	d1
+	bne		.return_zero
+
+	jsr		audio_stop
+
+	bra		.return_zero
+
+.not_adpcmmod:
 
 	cmp.b	#$7d,d0 ; _SKEY_MOD
 	beq		.return_zero

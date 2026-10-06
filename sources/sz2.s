@@ -28,6 +28,7 @@ __PORT__ equ 1
 	xdef PLAYER_SCORE
 	xdef PLAYER_INFO_STRUCT
 	xdef WORD_00088E6C ; Random table index.
+	xdef PCM_SAMPLE_INFO_TABLE
 
 	endif
 
@@ -17538,6 +17539,10 @@ skip_sincos:
 	jsr     LOAD_STATUS_CNF                              ; 00029416 4EB9 0002 9D20
 
 	jsr     LOAD_PCM_SAMPLE_FILES                              ; 0002941C 4EB9 0002 62AE
+
+	ifd __AMIGA__
+	jsr		amiga_samples_loaded
+	endif
 
 	jsr     LOAD_RANDOM_TABLE                              ; 00029422 4EB9 0002 78A6
 
