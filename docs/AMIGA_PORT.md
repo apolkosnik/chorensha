@@ -142,6 +142,7 @@ Measured with `sz2 6000` in cycle-exact FS-UAE configs; summaries from `tests/am
 - The game logic is much lighter than estimated: on the X68000 the hardware did the heavy lifting. Almost the whole frame is available for rendering even on a 68020/14.
 - Colours (`graphics_summary.py`): GVRAM page 0 (fast layer) uses 18 colours and is 57% opaque in 3.5 runs per line on average; page 1 (slow layer) uses 10 colours and is fully opaque; the sprites drawn used 151 palette entries (86 colours); the text layer 13. All layers together: 99 distinct colours, so one 256-colour palette (RTG 8-bit or AGA) reproduces them exactly. Only 452 of the 1,886 sprite patterns appear in the demo, so later stages need checking.
 - Memory: an 8 MB A1200 has about 4.8 MB of fast RAM free after Workbench 3.2; the executable takes about 2.2 MB, the process area 1-2 MB.
+- Memory, current: the executable is 2.99 MB (264 KB code, 40 KB data, 2.7 MB uninitialised data in four hunks, the largest 1 MB: the X68000 GVRAM shadow). A 4 MB A1200 with Workbench 3.2 has 3.05 MB of fast RAM free (`rtg-020`), so it only just fits; the game heap (1 MB fallback), the sprite arena (256 KB fallback) and the decoded samples (462 KB) then go to chip RAM. At 3.21 MB, in one 2.9 MB hunk, the executable did not load there at all. Split into hunks, it loaded, but parts of the program spilled into chip RAM (slower), and the samples no longer fitted. Keep the executable's size in mind; `C:Avail` run through `run_fsuae.sh` shows the free memory of a config.
 
 ## Port layer status (Phase 2, headless)
 
@@ -164,7 +165,7 @@ The game core runs its attract demo on every supported config and exits cleanly,
 - GVRAM pages 0 and 1 are converted once into 8-bit layers (the game builds GVRAM only at start; a hook in sz2.s marks it). Page 1 is copied in the gaps between page 0's opaque runs, page 0's runs on top, so each pixel is written once; runs are copied through computed jumps into unrolled moves. A non-zero horizontal scroll (rotated screen) falls back to a per-pixel path.
 - Palette: the graphics and sprite/text palettes (512 X68000 entries, 117 distinct colours) become one 256-colour palette. Every graphics index in use keeps its own slot, so the layers need no remapping; sprite and text entries share slots by colour. The game cycles about 14 entries every frame; those are updated incrementally and loaded with a partial LoadRGB32 (full rebuilds fell from 2,356 to 113 per 3,000 frames).
 - Sprites: compiled per (pattern, flip) on first use into a 1 MB arena (256 KB if memory is short, generic routine when full): the eight most frequent colours in registers, one move per opaque pixel. Ordered like the Falcon port (32 priority buckets).
-- Text: the four planes are read directly (the game's simultaneous-access clear of all four planes is emulated); a converted copy of the visible window is kept and only character rows written since the last frame are reconverted. Each line with text is kept as a list of its non-empty four-pixel groups (mask and palette-mapped colours), so drawing is one masked long write per group. The lists are mapped again only after a conversion, or when the text colours' palette slots change (10 times in the demo).
+- Text: the four planes are read directly (the game's simultaneous-access clear of all four planes is emulated); a converted copy of the visible window is kept and only character rows written since the last frame are reconverted. Each line with text is converted straight into a bit per four-pixel group plus a mask and palette-mapped colours for each group with text, so drawing is one masked long write per group. Lines are converted again when their character row was written, the scroll changed, or the text colours' palette slots changed (10 times in the demo).
 - Upload (Picasso96): the screen's bitmap is locked (`p96LockBitMap`) and the lines are copied directly; `p96WritePixelArray` is the fallback if the lock fails.
 - Frame timing: game frames follow a fixed schedule at 55.46 Hz; when the game is late the picture is skipped, otherwise the finished frame is rendered at its tick. The 6,000-frame attract demo reaches the reference checkpoints on every config with rendering on.
 - Screenshots: measurement runs read frames back from the screen every 500 frames (`screen_NNNNN.bin`, `tests/amiga/screenshot_png.py` converts them). Screenshot frames are rendered even when the game is late, so each screenshot shows exactly its frame and screenshots can be compared between builds (`tests/amiga/screenshot_compare.py`). Picasso96 uses p96ReadPixelArray; CyberGraphX's ReadPixelArray reads only RGB formats, so that path uses graphics.library ReadPixelArray8 with a one-line temporary bitmap; `-D__RENDER_PROFILE__` builds print the time per render stage.
@@ -174,12 +175,12 @@ Measured on the 68030/50 RTG config (cycle-exact, `profile_summary.py`), medians
 | | Phase 3 | Phase 5 so far |
 |---|---|---|
 | Palette | 0.60 ms | 0.60 ms |
-| Graphics | 6.90 ms | 6.90 ms |
-| Text | 2.49 ms (95%: 12.6) | 1.09 ms (95%: 4.7) |
+| Graphics | 6.90 ms | 7.03 ms |
+| Text | 2.49 ms (95%: 12.6) | 1.11 ms (95%: 5.1) |
 | Sprites | 2.08 ms | 2.06 ms |
 | Upload | 5.03 ms | 4.47 ms |
-| Total | 17.09 ms | 15.07 ms |
-| Frames rendered of 6,000 | 4,024 | 4,855 |
+| Total | 17.09 ms | 15.43 ms |
+| Frames rendered of 6,000 | 4,024 | 4,830 |
 
 Gameplay frames have a fixed cost of about 13 ms (graphics, upload, text, palette) plus sprites (0.4 to 4 ms). The game keeps its speed throughout. The 68020/14 RTG config renders about 15 fps at full game speed. The `rtg-040` config emulates the CPU in "fastest possible" mode, not cycle-exact, so its timings say nothing about a real 68040.
 

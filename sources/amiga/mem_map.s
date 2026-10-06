@@ -32,13 +32,21 @@ L_00000138:   ; MFP CRTC IRQ vector (game raster handler).
 	dc.l	dummy_interrupt_handler
 
 ; ------------------------------------------------------------------------------
-	bss
+; The shadows are in sections of their own (separate hunks), so the loader
+; does not need one contiguous block for all of them: machines with 4 MB of
+; fast RAM have no single free block of 3 MB.
 ; ------------------------------------------------------------------------------
+
+	section	gvram_shadow,bss
 
 	align 4
 
 L_00C00000:   ; GVRAM, pages 0 and 1 (512 * 512 * 2 bytes each).
 	ds.b    $100000
+
+	section	text_shadow,bss ; The four planes must stay together.
+
+	align 4
 L_00E00000:   ; TEXT PLANE 1
 	ds.b    $20000
 L_00E20000:   ; TEXT PLANE 2

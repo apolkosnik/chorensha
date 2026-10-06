@@ -75,7 +75,9 @@ MAXIMUM_SPRITES=512
 GUARD=16
 RENDER_WIDTH=256
 RENDER_HEIGHT=256
-TEXT_DRAW_LINE=4+RENDER_WIDTH/4*12 ; text_draw: count, 64 x (mask, colours, offset).
+COLOUR_HASH_SIZE=1024 ; Colour -> slot table of full palette rebuilds.
+TEXT_GROUP_BITS=8 ; text_draw line: a bit per group of four pixels,
+TEXT_DRAW_LINE=TEXT_GROUP_BITS+RENDER_WIDTH/4*8 ; then (mask, colours) per group with text.
 RENDER_STRIDE=GUARD+RENDER_WIDTH+GUARD
 RENDER_LINES=GUARD+RENDER_HEIGHT+GUARD
 
@@ -639,21 +641,15 @@ update_palette:
 	move.l	(a0)+,(a1)+
 	dbf		d0,.copy
 
-	; New generation of the colour -> slot table.
+	; Empty colour -> slot table.
 
-	addq	#1,colour_generation
-	bne		.generation_ok
+	lea		colour_hash_keys,a0
+	move	#COLOUR_HASH_SIZE/2-1,d0
 
-	lea		colour_generations,a0
-	move	#32768/2-1,d0
-
-.clear_generations:
+.clear_hash:
 	clr.l	(a0)+
-	dbf		d0,.clear_generations
+	dbf		d0,.clear_hash
 
-	move	#1,colour_generation
-
-.generation_ok:
 	lea		slot_taken,a0
 	moveq	#256/4-1,d0
 
@@ -661,9 +657,8 @@ update_palette:
 	clr.l	(a0)+
 	dbf		d0,.clear_taken
 
-	move	colour_generation,d5
-	lea		colour_generations,a2
-	lea		colour_slots,a3
+	lea		colour_hash_keys,a2
+	lea		colour_hash_slots,a3
 	lea		slot_taken,a4
 	moveq	#0,d0 ; The colour key indexes tables: keep the upper word clear.
 
@@ -714,10 +709,11 @@ update_palette:
 	move	(a0,d7.w*2),d0
 	lsr		#1,d0
 
-	cmp		(a2,d0.l*2),d5
-	bne		.find_free
+	bsr		.hash_find
+	tst		(a2,d2.w*2)
+	beq		.find_free
 
-	move.b	(a3,d0.l),d1
+	move.b	(a3,d2.w),d1
 	move.b	d1,(a1)+
 	and		#$ff,d1
 	lea		slot_references,a5
@@ -787,11 +783,14 @@ update_palette:
 .set_slot:
 	st		(a4,d6.w)
 
-	cmp		(a2,d0.l*2),d5
-	beq		.registered
+	bsr		.hash_find
+	tst		(a2,d2.w*2)
+	bne		.registered
 
-	move	d5,(a2,d0.l*2)
-	move.b	d6,(a3,d0.l)
+	move	d0,d1
+	addq	#1,d1
+	move	d1,(a2,d2.w*2)
+	move.b	d6,(a3,d2.w)
 
 .registered:
 	lea		hardware_palette+4,a5
@@ -817,6 +816,34 @@ update_palette:
 	bsr		.expand
 	move.l	d2,(a5)
 
+	rts
+
+; d0 = colour key -> d2 = its entry in the colour hash (keys + 1 in
+; colour_hash_keys, 0 = empty; slots in colour_hash_slots), or the empty
+; entry where it belongs. Uses d1. Linear probing; the table has room for
+; every colour of the 512 palette entries.
+
+.hash_find:
+	move	d0,d1
+	addq	#1,d1
+	move	d0,d2
+	mulu	#40503,d2
+	swap	d2
+	and		#COLOUR_HASH_SIZE-1,d2
+
+.probe:
+	cmp		(a2,d2.w*2),d1
+	beq		.hash_done
+
+	tst		(a2,d2.w*2)
+	beq		.hash_done
+
+	addq	#1,d2
+	and		#COLOUR_HASH_SIZE-1,d2
+
+	bra		.probe
+
+.hash_done:
 	rts
 
 ; d1 = 5-bit component -> d2 = 8 bits replicated into 32 bits.
@@ -1273,17 +1300,15 @@ render_graphics_per_pixel:
 ;
 ; Text layer: 4 bit planes of 1024 x 1024 pixels, palette block 0, colour 0
 ; transparent; the horizontal scroll is applied in whole bytes. The visible
-; window is kept converted in text_overlay (colour indices); lines are
-; reconverted only when their character row was written (or the scroll
-; changed), and only lines with text are drawn. Each drawn line is kept as
-; a list of its non-empty four-pixel groups with masks and palette-mapped
-; colours (text_draw), mapped again only after a conversion or when the text
-; colours' slots change, so drawing is one masked long write per group.
+; window is kept converted in text_draw: per line, its four-pixel groups
+; with text, each as a mask and palette-mapped colours, so drawing is one
+; masked long write per group. Lines are converted again only when their
+; character row was written, the scroll changed or the text colours' palette
+; slots changed, and only lines with text are drawn.
 
 render_text:
-	bsr		update_text_overlay
-
-	; The text colours' palette slots changed: every line is mapped again.
+	; The text colours' palette slots changed: every visible line is
+	; converted again.
 
 	lea		sprite_remap,a3
 	lea		text_remap,a0
@@ -1306,19 +1331,20 @@ render_text:
 	move.l	8(a3),8(a0)
 	move.l	12(a3),12(a0)
 
-	lea		text_line_mapped,a0
-	moveq	#RENDER_HEIGHT/4-1,d0
-
-.clear_mapped:
-	clr.l	(a0)+
-	dbf		d0,.clear_mapped
+	lea		text_dirty_rows,a0
+	moveq	#-1,d0
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)
 
 	ifd __RENDER_PROFILE__
 	addq.l	#1,text_remaps
 	endif
 
 .remap_same:
-	lea		text_overlay,a0
+	bsr		update_text_overlay
+
 	lea		text_line_used,a1
 	lea		text_draw,a4
 	lea		render_buffer+GUARD*RENDER_STRIDE+GUARD,a2
@@ -1332,90 +1358,60 @@ render_text:
 	addq.l	#1,text_lines_drawn
 	endif
 
-	lea		text_line_mapped,a5
-	tst.b	(a5,d7.w)
-	bne		.mapped
+	; dst = (dst & ~mask) | colour for each group whose bit is set, in
+	; group order: groups 0-31, then 32-63 (128 bytes to the right).
 
-	; The line's non-empty groups of four pixels: count, then per group its
-	; mask, mapped colours (transparent pixels 0 in both) and byte offset,
-	; all longs.
+	lea		TEXT_GROUP_BITS(a4),a5
+	move.l	a2,a6
+	move.l	(a4),d4
 
-	st		(a5,d7.w)
-	move.l	a0,a5
-	lea		4(a4),a6
-	moveq	#0,d0
-	moveq	#0,d4 ; Groups.
-	moveq	#0,d5 ; Offset.
+.left_loop:
+	bfffo	d4{0:32},d0
+	beq		.left_done
 
-.map_group:
-	tst.l	(a5)
-	bne		.map_pixels
-
-	addq.l	#4,a5
-	bra		.map_next_group
-
-.map_pixels:
-	moveq	#4-1,d2
-
-.map_pixel:
-	move.b	(a5)+,d0
-	beq		.map_transparent
-
-	st		(a6)
-	move.b	(a3,d0.w),4(a6)
-
-	bra		.map_next
-
-.map_transparent:
-	clr.b	(a6)
-	clr.b	4(a6)
-
-.map_next:
-	addq.l	#1,a6
-
-	dbf		d2,.map_pixel
-
-	addq.l	#4,a6
-	move.l	d5,(a6)+
-	addq	#1,d4
-
-.map_next_group:
-	addq	#4,d5
-	cmp		#RENDER_WIDTH,d5
-	bne		.map_group
-
-	move.l	d4,(a4)
-
-.mapped:
-	; Draw: dst = (dst & ~mask) | colour.
-
-	move.l	a4,a5
-	move.l	(a5)+,d1
-	subq	#1,d1
-	bmi		.next_line
-
-.draw_group:
+	bfclr	d4{d0:1}
 	move.l	(a5)+,d2
 	move.l	(a5)+,d3
-	move.l	(a5)+,d0
 	not.l	d2
-	beq		.draw_full
+	beq		.left_full
 
-	and.l	(a2,d0.l),d2
+	and.l	(a6,d0.l*4),d2
 	or.l	d3,d2
-	move.l	d2,(a2,d0.l)
+	move.l	d2,(a6,d0.l*4)
 
-	dbf		d1,.draw_group
+	bra		.left_loop
 
-	bra		.next_line
+.left_full:
+	move.l	d3,(a6,d0.l*4)
 
-.draw_full:
-	move.l	d3,(a2,d0.l)
+	bra		.left_loop
 
-	dbf		d1,.draw_group
+.left_done:
+	lea		RENDER_WIDTH/2(a2),a6
+	move.l	4(a4),d4
+
+.right_loop:
+	bfffo	d4{0:32},d0
+	beq		.next_line
+
+	bfclr	d4{d0:1}
+	move.l	(a5)+,d2
+	move.l	(a5)+,d3
+	not.l	d2
+	beq		.right_full
+
+	and.l	(a6,d0.l*4),d2
+	or.l	d3,d2
+	move.l	d2,(a6,d0.l*4)
+
+	bra		.right_loop
+
+.right_full:
+	move.l	d3,(a6,d0.l*4)
+
+	bra		.right_loop
 
 .next_line:
-	lea		RENDER_WIDTH(a0),a0
 	lea		TEXT_DRAW_LINE(a4),a4
 	lea		RENDER_STRIDE(a2),a2
 
@@ -1425,7 +1421,10 @@ render_text:
 
 	rts
 
-; Reconverts the visible lines whose character row is dirty.
+; Converts the visible lines whose character row is dirty into text_draw:
+; per line, a bit for each of the 64 groups of four pixels that has text,
+; then for each of those groups (in order) its mask and palette-mapped
+; colours (transparent pixels 0 in both).
 
 update_text_overlay:
 	; A scroll change makes the whole window stale.
@@ -1447,8 +1446,9 @@ update_text_overlay:
 
 .scroll_same:
 	lea		L_00E00000,a0
-	lea		text_overlay,a2
+	lea		text_draw,a2
 	lea		text_dirty_rows,a6
+	lea		sprite_remap,a3
 
 	move	L_00E80000+CRTC_TEXT_X,d1
 	lsr		#3,d1
@@ -1472,19 +1472,13 @@ update_text_overlay:
 	lsl.l	#7,d1 ; * TEXT_LINE
 	lea		(a0,d1.l),a4
 
-	; Clear the overlay line, then convert.
+	clr.l	(a2)
+	clr.l	4(a2)
+	lea		TEXT_GROUP_BITS(a2),a5
 
-	move.l	a2,a5
-	moveq	#RENDER_WIDTH/4-1,d0
-
-.clear:
-	clr.l	(a5)+
-	dbf		d0,.clear
-
-	lea		text_line_used,a5
-	sf		(a5,d7.w)
-	lea		text_line_mapped,a5
-	sf		(a5,d7.w)
+	lea		text_line_used,a3
+	sf		(a3,d7.w)
+	lea		sprite_remap,a3
 
 	ifd __RENDER_PROFILE__
 	addq.l	#1,text_lines_converted
@@ -1509,28 +1503,31 @@ update_text_overlay:
 	or.b	d1,d0
 	beq		.next_byte
 
-	lea		text_line_used,a5
-	st		(a5,d7.w)
+	lea		text_line_used,a3
+	st		(a3,d7.w)
+	lea		sprite_remap,a3
 
-	lea		(a2,d6.w*8),a5
-	moveq	#8-1,d2
+	; The byte's two groups (left four pixels first).
 
-.bit_loop:
-	; Colour = plane 3 << 3 | plane 2 << 2 | plane 1 << 1 | plane 0,
-	; leftmost pixel first.
+	bsr		.convert_group
+	tst.l	(a5)
+	beq		.left_empty
 
-	moveq	#0,d0
-	add.b	d1,d1
-	addx.b	d0,d0
-	add.b	d5,d5
-	addx.b	d0,d0
-	add.b	d4,d4
-	addx.b	d0,d0
-	add.b	d3,d3
-	addx.b	d0,d0
-	move.b	d0,(a5)+
+	move	d6,d0
+	add		d0,d0
+	bfset	(a2){d0:1}
+	addq.l	#8,a5
 
-	dbf		d2,.bit_loop
+.left_empty:
+	bsr		.convert_group
+	tst.l	(a5)
+	beq		.next_byte
+
+	move	d6,d0
+	add		d0,d0
+	addq	#1,d0
+	bfset	(a2){d0:1}
+	addq.l	#8,a5
 
 .next_byte:
 	addq	#1,d6
@@ -1538,7 +1535,7 @@ update_text_overlay:
 	bne		.byte_loop
 
 .next_line:
-	lea		RENDER_WIDTH(a2),a2
+	lea		TEXT_DRAW_LINE(a2),a2
 
 	addq	#1,d7
 	cmp		#RENDER_HEIGHT,d7
@@ -1551,6 +1548,45 @@ update_text_overlay:
 	clr.l	(a6)+
 	clr.l	(a6)+
 	clr.l	(a6)
+
+	rts
+
+; Four pixels from the top bits of the planes (d3 plane 0, d4 plane 1,
+; d5 plane 2, d1 plane 3; shifted out): mask bytes at (a5), mapped colours
+; at 4(a5). Colour = plane 3 << 3 | plane 2 << 2 | plane 1 << 1 | plane 0.
+
+.convert_group:
+	moveq	#4-1,d2
+
+.pixel_loop:
+	moveq	#0,d0
+	add.b	d1,d1
+	addx.b	d0,d0
+	add.b	d5,d5
+	addx.b	d0,d0
+	add.b	d4,d4
+	addx.b	d0,d0
+	add.b	d3,d3
+	addx.b	d0,d0
+	tst.b	d0 ; (ADDX leaves Z from the ADD before it.)
+	beq		.transparent
+
+	st		(a5)+
+	move.b	(a3,d0.w),3(a5)
+
+	dbf		d2,.pixel_loop
+
+	subq.l	#4,a5
+
+	rts
+
+.transparent:
+	clr.b	(a5)+
+	clr.b	3(a5)
+
+	dbf		d2,.pixel_loop
+
+	subq.l	#4,a5
 
 	rts
 
@@ -2074,14 +2110,12 @@ text_overlay_scroll:
 	even
 
 ; ------------------------------------------------------------------------------
-	bss
+	section	renderer,bss ; A hunk of its own (see mem_map.s).
 ; ------------------------------------------------------------------------------
 
 frame_sprite_count:
 	ds.w	1
 render_sprite_count:
-	ds.w	1
-colour_generation:
 	ds.w	1
 palette_changed:
 	ds.b	1
@@ -2179,8 +2213,8 @@ graphics_remap: ; Followed directly by sprite_remap (filled in one loop).
 sprite_remap:
 	ds.b	256
 
-colour_slots:
-	ds.b	32768
+colour_hash_slots:
+	ds.b	COLOUR_HASH_SIZE
 
 used_graphics:
 	ds.b	256
@@ -2202,13 +2236,7 @@ span_buffer:
 page1_line:
 	ds.l	1
 
-text_overlay:
-	ds.b	RENDER_WIDTH*RENDER_HEIGHT
-
 text_line_used:
-	ds.b	RENDER_HEIGHT
-
-text_line_mapped: ; Line's text_draw entries are up to date.
 	ds.b	RENDER_HEIGHT
 
 text_remap: ; sprite_remap of the text colours (0-15) the lines were mapped with.
@@ -2216,13 +2244,13 @@ text_remap: ; sprite_remap of the text colours (0-15) the lines were mapped with
 
 	cnop	0,4
 
-text_draw: ; Per line: count, then (mask, mapped colours, offset) per group.
+text_draw: ; Per line: group bits, then (mask, mapped colours) per group with text.
 	ds.b	TEXT_DRAW_LINE*RENDER_HEIGHT
 
 	even
 
-colour_generations:
-	ds.w	32768
+colour_hash_keys:
+	ds.w	COLOUR_HASH_SIZE
 
 ; LoadRGB32 table: count.w, first.w, up to 256 RGB triplets, terminator.
 
