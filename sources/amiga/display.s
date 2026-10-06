@@ -84,6 +84,8 @@ rp_BitMap=4
 ; Picasso96API.library
 
 _LVOp96BestModeIDTagList=-60
+_LVOp96LockBitMap=-48
+_LVOp96UnlockBitMap=-54
 _LVOp96WritePixelArray=-102
 _LVOp96ReadPixelArray=-108
 
@@ -419,7 +421,55 @@ present_frame:
 	cmp.l	#BACKEND_CYBERGRAPHX,backend
 	beq		.cybergraphics_upload
 
+	; Picasso96: lock the screen's bitmap and copy the lines directly;
+	; p96WritePixelArray when the bitmap cannot be locked.
+
 	move.l	picasso96_base,a6
+	move.l	window,a0
+	move.l	wd_RPort(a0),a0
+	move.l	rp_BitMap(a0),a5
+	move.l	a5,a0
+	lea		lock_info,a1
+	moveq	#RENDER_INFO_SIZE,d0
+	jsr		_LVOp96LockBitMap(a6)
+	move.l	d0,d7
+	beq		.write_pixel_array
+
+	move.l	lock_info+ri_Memory,d0
+	beq		.unlock
+
+	move.l	d0,a1
+	add.w	#(SCREEN_WIDTH-PICTURE_WIDTH)/2,a1
+	move	lock_info+ri_BytesPerRow,d2
+	ext.l	d2
+	sub.l	#PICTURE_WIDTH,d2
+
+	lea		render_buffer+GUARD,a0
+	move.l	source_y,d0
+	mulu	#RENDER_STRIDE,d0
+	add.l	d0,a0
+
+	move.l	screen_height,d1
+	subq	#1,d1
+
+.line_loop:
+	rept	PICTURE_WIDTH/4
+	move.l	(a0)+,(a1)+
+	endr
+
+	lea		RENDER_STRIDE-PICTURE_WIDTH(a0),a0
+	add.l	d2,a1
+
+	dbf		d1,.line_loop
+
+.unlock:
+	move.l	a5,a0
+	move.l	d7,d0
+	jsr		_LVOp96UnlockBitMap(a6)
+
+	bra		.uploaded
+
+.write_pixel_array:
 	lea		render_info,a0
 	moveq	#GUARD,d0
 	move.l	source_y,d1
@@ -626,6 +676,11 @@ screen_height:
 	ds.l	1
 source_y:
 	ds.l	1
+
+lock_info: ; Filled by p96LockBitMap.
+	ds.b	RENDER_INFO_SIZE
+
+	even
 
 render_info:
 	ds.b	RENDER_INFO_SIZE

@@ -43,6 +43,7 @@
 	xref load_rgb_time
 	xref text_lines_converted
 	xref text_lines_drawn
+	xref text_remaps
 	xref palette_entry_changes
 	endif
 
@@ -595,6 +596,7 @@ print_run_summary:
 	move.l	d0,(a3)+
 	move.l	text_lines_converted,(a3)+
 	move.l	text_lines_drawn,(a3)+
+	move.l	text_remaps,(a3)+
 
 	move.l	#profile_format,d1
 	move.l	#print_arguments,d2
@@ -819,7 +821,7 @@ run_summary_format:
 
 	ifd __RENDER_PROFILE__
 profile_format:
-	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld.',10,0
+	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld, remapped all %ld times.',10,0
 entry_format:
 	dc.b	'  palette entry %ld changed %ld times',10,0
 	endif

@@ -203,7 +203,11 @@ FRAME_RECORD_SIZE=12 ; Game ticks (long), render ticks (long), sprites, VBLs.
 ; Screenshots (measurement runs): every SCREENSHOT_INTERVAL frames, read back
 ; from the display into screen_NNNNN.bin.
 
+	ifd __LOCKSTEP__
+SCREENSHOT_INTERVAL=100 ; Lockstep test builds compare screenshots between builds.
+	else
 SCREENSHOT_INTERVAL=500
+	endif
 SCREENSHOT_WIDTH=256
 SCREENSHOT_HEIGHT=256
 SCREENSHOT_HEADER_SIZE=12
@@ -477,6 +481,10 @@ amiga_exit_game:
 	jsr		write_graphics_dump
 	jsr		write_samples_dump
 
+	ifd __RENDER_PROFILE__
+	bsr		write_profile
+	endif
+
 .no_graphics_dump:
 	jsr		release_audio
 
@@ -524,6 +532,79 @@ amiga_exit_game:
 ; game heap, so this runs before the heap is freed.
 
 PCG_PATTERNS=$75e
+
+	ifd __RENDER_PROFILE__
+
+; Profiling builds: the E clock ticks of each stage for every rendered frame
+; (profile.bin: 'CRSP', number of records, then per record the frame number
+; and the ticks for palette, graphics, text, sprites and upload, all longs;
+; tests/amiga/profile_summary.py reads it).
+
+PROFILE_RECORDS=8000
+PROFILE_RECORD_SIZE=24
+
+profile_record:
+	movem.l	d0-d2/a0-a2,-(sp)
+
+	move.l	profile_count,d0
+	cmp.l	#PROFILE_RECORDS,d0
+	bcc		.done
+
+	mulu.l	#PROFILE_RECORD_SIZE,d0
+	lea		profile_records,a0
+	add.l	d0,a0
+	move.l	frame_count,(a0)+
+
+	lea		render_profile,a1
+	lea		profile_previous,a2
+	moveq	#5-1,d2
+
+.stage_loop:
+	move.l	(a1)+,d1
+	move.l	d1,d0
+	sub.l	(a2),d1
+	move.l	d0,(a2)+
+	move.l	d1,(a0)+
+
+	dbf		d2,.stage_loop
+
+	addq.l	#1,profile_count
+
+.done:
+	movem.l	(sp)+,d0-d2/a0-a2
+
+	rts
+
+write_profile:
+	move.l	dos_base,a6
+
+	move.l	#profile_file_name,d1
+	move.l	#MODE_NEWFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,d4
+	beq		.done
+
+	move.l	#'CRSP',profile_header
+	move.l	profile_count,profile_header+4
+
+	move.l	d4,d1
+	move.l	#profile_header,d2
+	moveq	#8,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	move.l	#profile_records,d2
+	move.l	profile_count,d3
+	mulu.l	#PROFILE_RECORD_SIZE,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	jsr		_LVOClose(a6)
+
+.done:
+	rts
+
+	endif
 
 write_graphics_dump:
 	move.l	dos_base,a6
@@ -732,6 +813,11 @@ stop_frame_timer:
 ; Frame timer interrupt (CIA timer or vertical blank).
 
 frame_hardware_tick:
+	ifd __LOCKSTEP__
+	moveq	#0,d0 ; Lockstep test builds: the game frames make the VBLs.
+	rts
+	endif
+
 	lea		frame_software_interrupt,a1
 	move.l	exec_base,a6
 	jsr		_LVOCause(a6)
@@ -944,6 +1030,22 @@ amiga_wait_vbl:
 	jsr		frame_wait_begin
 	jsr		render_and_present
 
+	ifd __LOCKSTEP__
+
+	; Lockstep: d7 + 1 VBLs, one after the other (none for a negative d7,
+	; like the wait below).
+
+	tst		d7
+	bmi		.done
+
+.lockstep_loop:
+	bsr		lockstep_vbl
+	dbf		d7,.lockstep_loop
+
+	bra		.done
+
+	endif
+
 	clr		vbl_wait_counter
 
 .wait_loop:
@@ -989,14 +1091,37 @@ amiga_xsp_vsync:
 
 	add.l	d7,frame_schedule
 
+	ifd __LOCKSTEP__
+
+	; Lockstep: the frame's VBLs (d7), then its picture. No frame is skipped.
+
+	subq	#1,d7
+	bmi		.due
+
+.lockstep_loop:
+	bsr		lockstep_vbl
+	dbf		d7,.lockstep_loop
+
+	bra		.due
+
+	endif
+
 	move.l	total_vbl_count,d0
 	sub.l	frame_schedule,d0
 	bmi		.wait_loop ; On time.
 
 	cmp.l	#MAXIMUM_FRAME_DEBT,d0
-	bls		.done ; Late: skip the picture.
+	bls		.late
 
 	move.l	total_vbl_count,frame_schedule ; Too far behind: start over.
+
+.late:
+	; Late: skip the picture, except for a screenshot (measurement runs),
+	; so that screenshots show exactly their frame and compare between
+	; builds.
+
+	tst.l	screenshot_due
+	bne		.due
 
 	bra		.done
 
@@ -1025,6 +1150,24 @@ amiga_xsp_vsync:
 	rts
 
 ; ------------------------------------------------------------------------------
+
+	ifd __LOCKSTEP__
+
+; Lockstep test builds (-D__LOCKSTEP__): the frame timer does not drive the
+; game. Each frame wait runs the game's VBLs itself, through the same
+; software interrupt, so the VBL handler (sprite buffer flip, palette and
+; raster effects) always runs at the same point of the game's frame, and
+; every frame is rendered: screenshots are the same in every run and can be
+; compared between builds. The game runs slower or faster than real time.
+
+lockstep_vbl:
+	move.l	exec_base,a6
+	lea		frame_software_interrupt,a1
+	jsr		_LVOCause(a6)
+
+	bra		wait_for_vbl_signal ; vbl_server signals when the handler is done.
+
+	endif
 
 wait_for_vbl_signal:
 	move.l	exec_base,a6
@@ -1135,6 +1278,7 @@ render_and_present:
 	move.l	eclock_value+4,d0
 	sub.l	(sp)+,d0
 	add.l	d0,render_profile+16
+	bsr		profile_record
 	endif
 
 	move.l	timer_base,a6
@@ -2564,6 +2708,12 @@ trace_heartbeat_text:
 exception_format:
 	dc.b	'Exception %ld at $%08lx (code offset $%lx).',10,0
 
+	ifd __RENDER_PROFILE__
+profile_file_name:
+	dc.b	'profile.bin',0
+	even
+	endif
+
 graphics_file_name:
 	dc.b	'graphics.bin',0
 
@@ -2840,6 +2990,17 @@ os_stack_active:
 	ds.b	1
 
 	even
+
+	ifd __RENDER_PROFILE__
+profile_count:
+	ds.l	1
+profile_header:
+	ds.l	2
+profile_previous:
+	ds.l	5
+profile_records:
+	ds.b	PROFILE_RECORDS*PROFILE_RECORD_SIZE
+	endif
 
 os_stack:
 	ds.b	OS_STACK_SIZE

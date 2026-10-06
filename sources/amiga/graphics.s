@@ -64,6 +64,7 @@
 	xdef palette_rebuilds
 	xdef text_lines_converted
 	xdef text_lines_drawn
+	xdef text_remaps
 	xdef palette_entry_changes
 	endif
 
@@ -74,6 +75,7 @@ MAXIMUM_SPRITES=512
 GUARD=16
 RENDER_WIDTH=256
 RENDER_HEIGHT=256
+TEXT_DRAW_LINE=4+RENDER_WIDTH/4*12 ; text_draw: count, 64 x (mask, colours, offset).
 RENDER_STRIDE=GUARD+RENDER_WIDTH+GUARD
 RENDER_LINES=GUARD+RENDER_HEIGHT+GUARD
 
@@ -576,6 +578,10 @@ build_layers:
 ; or take a free slot, or the nearest colour if none is left.
 
 update_palette:
+	ifd __FULL_PALETTE__
+	st		palette_rebuild ; Test builds: a full rebuild for every frame.
+	endif
+
 	lea		L_00E82000,a0
 	lea		palette_copy,a1
 	move	#512/2-1,d0
@@ -1269,16 +1275,53 @@ render_graphics_per_pixel:
 ; transparent; the horizontal scroll is applied in whole bytes. The visible
 ; window is kept converted in text_overlay (colour indices); lines are
 ; reconverted only when their character row was written (or the scroll
-; changed), and only lines with text are drawn.
+; changed), and only lines with text are drawn. Each drawn line is kept as
+; a list of its non-empty four-pixel groups with masks and palette-mapped
+; colours (text_draw), mapped again only after a conversion or when the text
+; colours' slots change, so drawing is one masked long write per group.
 
 render_text:
 	bsr		update_text_overlay
 
+	; The text colours' palette slots changed: every line is mapped again.
+
+	lea		sprite_remap,a3
+	lea		text_remap,a0
+	move.l	(a3),d0
+	cmp.l	(a0),d0
+	bne		.remap_changed
+	move.l	4(a3),d0
+	cmp.l	4(a0),d0
+	bne		.remap_changed
+	move.l	8(a3),d0
+	cmp.l	8(a0),d0
+	bne		.remap_changed
+	move.l	12(a3),d0
+	cmp.l	12(a0),d0
+	beq		.remap_same
+
+.remap_changed:
+	move.l	(a3),(a0)
+	move.l	4(a3),4(a0)
+	move.l	8(a3),8(a0)
+	move.l	12(a3),12(a0)
+
+	lea		text_line_mapped,a0
+	moveq	#RENDER_HEIGHT/4-1,d0
+
+.clear_mapped:
+	clr.l	(a0)+
+	dbf		d0,.clear_mapped
+
+	ifd __RENDER_PROFILE__
+	addq.l	#1,text_remaps
+	endif
+
+.remap_same:
 	lea		text_overlay,a0
 	lea		text_line_used,a1
-	lea		sprite_remap,a3
+	lea		text_draw,a4
 	lea		render_buffer+GUARD*RENDER_STRIDE+GUARD,a2
-	moveq	#0,d0
 	moveq	#0,d7 ; Line.
 
 .line_loop:
@@ -1289,39 +1332,91 @@ render_text:
 	addq.l	#1,text_lines_drawn
 	endif
 
-	move.l	a0,a4
-	move.l	a2,a5
-	moveq	#RENDER_WIDTH/4-1,d1
+	lea		text_line_mapped,a5
+	tst.b	(a5,d7.w)
+	bne		.mapped
 
-.group_loop:
-	tst.l	(a4)+ ; Four pixels without text?
-	bne		.group
+	; The line's non-empty groups of four pixels: count, then per group its
+	; mask, mapped colours (transparent pixels 0 in both) and byte offset,
+	; all longs.
+
+	st		(a5,d7.w)
+	move.l	a0,a5
+	lea		4(a4),a6
+	moveq	#0,d0
+	moveq	#0,d4 ; Groups.
+	moveq	#0,d5 ; Offset.
+
+.map_group:
+	tst.l	(a5)
+	bne		.map_pixels
 
 	addq.l	#4,a5
+	bra		.map_next_group
 
-	dbf		d1,.group_loop
+.map_pixels:
+	moveq	#4-1,d2
+
+.map_pixel:
+	move.b	(a5)+,d0
+	beq		.map_transparent
+
+	st		(a6)
+	move.b	(a3,d0.w),4(a6)
+
+	bra		.map_next
+
+.map_transparent:
+	clr.b	(a6)
+	clr.b	4(a6)
+
+.map_next:
+	addq.l	#1,a6
+
+	dbf		d2,.map_pixel
+
+	addq.l	#4,a6
+	move.l	d5,(a6)+
+	addq	#1,d4
+
+.map_next_group:
+	addq	#4,d5
+	cmp		#RENDER_WIDTH,d5
+	bne		.map_group
+
+	move.l	d4,(a4)
+
+.mapped:
+	; Draw: dst = (dst & ~mask) | colour.
+
+	move.l	a4,a5
+	move.l	(a5)+,d1
+	subq	#1,d1
+	bmi		.next_line
+
+.draw_group:
+	move.l	(a5)+,d2
+	move.l	(a5)+,d3
+	move.l	(a5)+,d0
+	not.l	d2
+	beq		.draw_full
+
+	and.l	(a2,d0.l),d2
+	or.l	d3,d2
+	move.l	d2,(a2,d0.l)
+
+	dbf		d1,.draw_group
 
 	bra		.next_line
 
-.group:
-	subq.l	#4,a4
-	moveq	#4-1,d2
+.draw_full:
+	move.l	d3,(a2,d0.l)
 
-.pixel_loop:
-	move.b	(a4)+,d0
-	beq		.transparent
-
-	move.b	(a3,d0.w),(a5)
-
-.transparent:
-	addq.l	#1,a5
-
-	dbf		d2,.pixel_loop
-
-	dbf		d1,.group_loop
+	dbf		d1,.draw_group
 
 .next_line:
 	lea		RENDER_WIDTH(a0),a0
+	lea		TEXT_DRAW_LINE(a4),a4
 	lea		RENDER_STRIDE(a2),a2
 
 	addq	#1,d7
@@ -1387,6 +1482,8 @@ update_text_overlay:
 	dbf		d0,.clear
 
 	lea		text_line_used,a5
+	sf		(a5,d7.w)
+	lea		text_line_mapped,a5
 	sf		(a5,d7.w)
 
 	ifd __RENDER_PROFILE__
@@ -2008,6 +2105,8 @@ text_lines_converted:
 	ds.l	1
 text_lines_drawn:
 	ds.l	1
+text_remaps:
+	ds.l	1
 palette_entry_changes:
 	ds.w	512
 palette_rebuilds:
@@ -2108,6 +2207,17 @@ text_overlay:
 
 text_line_used:
 	ds.b	RENDER_HEIGHT
+
+text_line_mapped: ; Line's text_draw entries are up to date.
+	ds.b	RENDER_HEIGHT
+
+text_remap: ; sprite_remap of the text colours (0-15) the lines were mapped with.
+	ds.b	16
+
+	cnop	0,4
+
+text_draw: ; Per line: count, then (mask, mapped colours, offset) per group.
+	ds.b	TEXT_DRAW_LINE*RENDER_HEIGHT
 
 	even
 
