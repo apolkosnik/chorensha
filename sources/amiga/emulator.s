@@ -180,6 +180,7 @@ _LVOReadEClock=-60
 
 ; Trap numbers passed to tc_TrapCode (exception vector numbers).
 
+PRIVILEGE_VIOLATION=8
 LINE_F=11
 TRAP_2=32+2
 TRAP_4=32+4
@@ -1565,8 +1566,90 @@ trap_handler:
 
 	endif
 
+	ifd __CP_PRIVILEGE_TEST__
+
+	; Test builds: what a real 68020/68030 does and FS-UAE does not. A line
+	; F exception for cpSAVE ($FF00-$FF3F; (An), -(An), d16(An),
+	; d8(An,Xn), abs.w, abs.l) or cpRESTORE ($FF40-$FF7F; also (An)+ and
+	; the PC-relative modes) becomes a privilege violation, so the path
+	; below is exercised.
+
+	cmp.l	#LINE_F,(sp)
+	bne		.not_cp_test
+
+	movem.l	d0-d1/a0,-(sp)
+	move.l	12+4+2(sp),a0
+	move	(a0),d0
+	moveq	#0,d1
+	move	d0,d1
+	and		#$ff80,d1
+	cmp		#$ff00,d1
+	bne		.cp_test_done ; Not $FF00-$FF7F.
+
+	move	d0,d1
+	lsr		#3,d1
+	and		#7,d1 ; Mode.
+	btst	#6,d0
+	bne		.cp_restore
+
+	lea		cp_save_modes,a0
+	bra		.cp_mode
+
+.cp_restore:
+	lea		cp_restore_modes,a0
+
+.cp_mode:
+	cmp		#7,d1
+	bne		.cp_mode_bit
+
+	moveq	#7,d1
+	and		d0,d1 ; Register field selects the mode 7 variant.
+	addq	#8,d1
+
+.cp_mode_bit:
+	cmp		#8,d1
+	bcc		.cp_high_byte
+
+	btst	d1,1(a0) ; (A memory BTST takes the bit number modulo 8.)
+	beq		.cp_test_done
+
+	bra		.cp_privileged
+
+.cp_high_byte:
+	subq	#8,d1
+	btst	d1,(a0)
+	beq		.cp_test_done
+
+.cp_privileged:
+	move.l	#PRIVILEGE_VIOLATION,12(sp)
+
+.cp_test_done:
+	movem.l	(sp)+,d0-d1/a0
+
+.not_cp_test:
+
+	endif
+
 	cmp.l	#LINE_F,(sp)
 	beq		line_f_call
+
+	; On a 68020/68030, $FF00-$FF7F are cpSAVE/cpRESTORE for coprocessor 7,
+	; which are privileged: when the low six bits are a valid addressing
+	; mode for them (_INTVCS $FF25 is cpSAVE -(A5)), the CPU raises a
+	; privilege violation instead of a line F exception. Those are DOS calls
+	; too. (Same frame: format 0, PC at the instruction. FS-UAE's 68030
+	; raises line F for them; the 68040 and 68060 always do.)
+
+	cmp.l	#PRIVILEGE_VIOLATION,(sp)
+	bne		.not_dos_privilege
+
+	move.l	a0,-(sp)
+	move.l	4+4+2(sp),a0
+	cmp.b	#$ff,(a0)
+	movea.l	(sp)+,a0 ; (Keeps the condition codes.)
+	beq		line_f_call
+
+.not_dos_privilege:
 
 	cmp.l	#TRAP_15,(sp)
 	beq		iocs_call
@@ -2713,6 +2796,20 @@ exception_format:
 profile_file_name:
 	dc.b	'profile.bin',0
 	even
+	endif
+
+	ifd __CP_PRIVILEGE_TEST__
+
+; Valid addressing modes (bit = mode 0-7, then mode 7 with register 0-7 as
+; bits 8-15), high byte first.
+
+cp_save_modes:
+	dc.b	%00000011,%01110100 ; (An) -(An) d16(An) d8(An,Xn); abs.w abs.l
+cp_restore_modes:
+	dc.b	%00001111,%01101100 ; (An) (An)+ d16(An) d8(An,Xn); abs, PC modes
+
+	even
+
 	endif
 
 graphics_file_name:

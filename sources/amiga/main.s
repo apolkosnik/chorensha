@@ -569,6 +569,15 @@ print_run_summary:
 
 	machine	68020
 
+	; Nothing to report if the game left before its first frame (missing
+	; data files): the averages would divide by zero.
+
+	tst.l	frame_count
+	beq		.no_profile
+
+	tst.l	eclock_frequency
+	beq		.no_profile
+
 	lea		render_profile,a2
 	lea		print_arguments,a3
 	moveq	#5-1,d3
@@ -624,6 +633,7 @@ print_run_summary:
 	cmp.l	#512,d3
 	bne		.entry_loop
 
+.no_profile:
 	machine	68000
 
 	endif

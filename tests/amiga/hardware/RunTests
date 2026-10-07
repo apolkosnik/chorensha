@@ -3,6 +3,13 @@
 ; XSP_DAT): Execute RunTests
 FailAt 21
 
+If NOT EXISTS XSP_DAT
+  Echo "The game's data is not in this directory. Copy sz2_profile,"
+  Echo "vram_bench and RunTests into the game's directory (the one with"
+  Echo "BGM_DAT, ETC_DAT, PCM_DAT and XSP_DAT), CD there and run again."
+  Quit 10
+EndIf
+
 Echo "1/3 Machine information"
 Version >hardware.txt
 CPU >>hardware.txt

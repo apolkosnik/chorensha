@@ -11,6 +11,7 @@
 # profile.bin, screen_*.bin) are copied to RESULT_DIR if set.
 # With SERIAL_LOG set, the Amiga serial port is written to that host file.
 # With KEEP_WORK set, the work directory (including fs-uae.log) is kept.
+# FSUAE_OPTIONS adds FS-UAE options (e.g. --uae_mmu_model=68030).
 # FS-UAE runs without a window (SDL offscreen video); SHOW_WINDOW=1 shows it.
 # With INPUT_SCRIPT set, that file is copied to WORK:input.bin (pass
 # "input.bin" in the arguments to use it). Files listed in WORK_FILES are
@@ -150,7 +151,7 @@ if [ -n "${AUDIO_CAPTURE:-}" ]; then
 fi
 
 setsid bash -c 'echo $$ > "$1"; shift; exec "$@"' _ "$work_dir/fs-uae.pid" \
-	fs-uae "${options[@]}" ${SERIAL_LOG:+--serial_port="$SERIAL_LOG"} \
+	fs-uae "${options[@]}" ${FSUAE_OPTIONS:-} ${SERIAL_LOG:+--serial_port="$SERIAL_LOG"} \
 	--hard_drive_0="$system_dir" --hard_drive_1="$drive" \
 	--floppy_drive_0= --fullscreen=0 --automatic_input_grab=0 --warp_mode=$warp_mode \
 	--base_dir="$work_dir" > "$work_dir/fs-uae.log" 2>&1 &
