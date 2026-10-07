@@ -1,0 +1,24 @@
+; Cho Ren Sha 68k (Amiga port): hardware test.
+; Run from the game's directory (the one with BGM_DAT, ETC_DAT, PCM_DAT and
+; XSP_DAT): Execute RunTests
+FailAt 21
+
+Echo "1/3 Machine information"
+Version >hardware.txt
+CPU >>hardware.txt
+Avail >>hardware.txt
+
+Echo "2/3 Screen memory benchmark (a few seconds; the screen goes blank)"
+vram_bench >vram_bench.txt
+Type vram_bench.txt
+
+Echo "3/3 Attract demo with render profiling: 6000 frames, about 2 minutes"
+Echo "    (do not touch the joystick or keyboard)"
+sz2_profile 6000 >profile_run.txt
+Type profile_run.txt
+
+Echo ""
+Echo "Done. Please send back these files from this directory:"
+Echo "  hardware.txt vram_bench.txt profile_run.txt"
+Echo "  profile.bin measure.bin checkpoints.bin samples.bin"
+Echo "  screen_03000.bin"

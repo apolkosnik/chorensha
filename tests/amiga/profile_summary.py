@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Summarise profile.bin files written by -D__RENDER_PROFILE__ builds.
 
-profile.bin: 'CRSP', number of records, then one record per rendered frame:
-frame number, then E clock ticks for palette, graphics, text, sprites and
-upload (longs, big-endian). The E clock is taken as 709379 Hz (PAL) unless
---eclock is given.
+profile.bin: 'CRSQ', E clock frequency (Hz), number of records, then one
+record per rendered frame: frame number, then E clock ticks for palette,
+graphics, text, sprites and upload (longs, big-endian). Older 'CRSP' files
+have no frequency: 709379 Hz (PAL) is assumed unless --eclock is given.
 
 For each stage: median, 95th percentile and maximum in ms; then the frames
 over the budget (default 16 ms of rendering) and the mean of each stage in
@@ -27,16 +27,23 @@ def percentile(values, fraction):
 def summarise(path, eclock, budget):
     data = open(path, "rb").read()
 
-    if data[:4] != b"CRSP":
+    if data[:4] == b"CRSQ":
+        file_eclock, count = struct.unpack(">II", data[4:12])
+        eclock = eclock or file_eclock
+        start = 12
+    elif data[:4] == b"CRSP":
+        count = struct.unpack(">I", data[4:8])[0]
+        eclock = eclock or 709379
+        start = 8
+    else:
         raise SystemExit(f"{path}: not a profile.bin file")
 
-    count = struct.unpack(">I", data[4:8])[0]
-    records = [struct.unpack(">I5I", data[8 + 24 * i:32 + 24 * i]) for i in range(count)]
+    records = [struct.unpack(">I5I", data[start + 24 * i:start + 24 + 24 * i]) for i in range(count)]
     scale = 1000.0 / eclock
     stages = [[r[1 + s] * scale for r in records] for s in range(5)]
     totals = [sum(stage[i] for stage in stages) for i in range(count)]
 
-    print(f"{path}: {count} rendered frames")
+    print(f"{path}: {count} rendered frames, E clock {eclock} Hz")
 
     for name, values in zip(STAGES + ("total",), stages + [totals]):
         print(f"  {name:8s} median {percentile(values, 0.5):6.2f}  95% {percentile(values, 0.95):6.2f}"
@@ -52,7 +59,7 @@ def summarise(path, eclock, budget):
 
 
 arguments = sys.argv[1:]
-eclock = 709379
+eclock = None
 budget = 16.0
 
 while arguments and arguments[0].startswith("--"):

@@ -13,7 +13,9 @@
 # With KEEP_WORK set, the work directory (including fs-uae.log) is kept.
 # FS-UAE runs without a window (SDL offscreen video); SHOW_WINDOW=1 shows it.
 # With INPUT_SCRIPT set, that file is copied to WORK:input.bin (pass
-# "input.bin" in the arguments to use it).
+# "input.bin" in the arguments to use it). Files listed in WORK_FILES are
+# copied to WORK: as well; text files the program writes there are copied to
+# RESULT_DIR.
 # With AUDIO_CAPTURE set, the emulated audio is written to that WAV file
 # (OpenAL Soft's wave backend) and the emulation runs at real speed, not in
 # warp mode, so the sound is not skipped. Drive sounds, the emulated output
@@ -116,6 +118,10 @@ if [ -n "${INPUT_SCRIPT:-}" ]; then
 	cp "$INPUT_SCRIPT" "$drive/input.bin"
 fi
 
+for file in ${WORK_FILES:-}; do
+	cp "$file" "$drive/"
+done
+
 # The marker is written after the program's output file is closed. FailAt 21
 # keeps the script going when the program cannot be loaded; Why records the
 # shell's error.
@@ -202,6 +208,12 @@ if [ $status -eq 0 ]; then
 			[ -f "$screenshot" ] || continue
 			name=$(basename "$screenshot" .bin)
 			cp "$screenshot" "$RESULT_DIR/$name-$config.bin"
+		done
+
+		for text in "$drive"/*.txt; do # Text files the program wrote.
+			name=$(basename "$text")
+			case $name in output.txt|marker.txt) continue;; esac
+			[ -f "$text" ] && cp "$text" "$RESULT_DIR/${name%.txt}-$config.txt"
 		done
 	fi
 

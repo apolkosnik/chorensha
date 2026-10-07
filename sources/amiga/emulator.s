@@ -536,9 +536,9 @@ PCG_PATTERNS=$75e
 	ifd __RENDER_PROFILE__
 
 ; Profiling builds: the E clock ticks of each stage for every rendered frame
-; (profile.bin: 'CRSP', number of records, then per record the frame number
-; and the ticks for palette, graphics, text, sprites and upload, all longs;
-; tests/amiga/profile_summary.py reads it).
+; (profile.bin: 'CRSQ', E clock frequency, number of records, then per
+; record the frame number and the ticks for palette, graphics, text, sprites
+; and upload, all longs; tests/amiga/profile_summary.py reads it).
 
 PROFILE_RECORDS=8000
 PROFILE_RECORD_SIZE=24
@@ -584,12 +584,13 @@ write_profile:
 	move.l	d0,d4
 	beq		.done
 
-	move.l	#'CRSP',profile_header
-	move.l	profile_count,profile_header+4
+	move.l	#'CRSQ',profile_header
+	move.l	eclock_frequency,profile_header+4
+	move.l	profile_count,profile_header+8
 
 	move.l	d4,d1
 	move.l	#profile_header,d2
-	moveq	#8,d3
+	moveq	#12,d3
 	jsr		_LVOWrite(a6)
 
 	move.l	d4,d1
@@ -2995,7 +2996,7 @@ os_stack_active:
 profile_count:
 	ds.l	1
 profile_header:
-	ds.l	2
+	ds.l	3
 profile_previous:
 	ds.l	5
 profile_records:

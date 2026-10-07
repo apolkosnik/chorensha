@@ -50,3 +50,14 @@ cp binaries/sz2.x binaries/x68000/CH68_101_B/SZ2.X
 
 ./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_graphics.o -bamigahunk -o binaries/amiga/sz2_dbg
 ./tools/vlink.exe binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_graphics.o -bamigahunk -s -o binaries/amiga/sz2
+
+# Hardware test kit (tests/amiga/hardware): the game with render profiling
+# (writes profile.bin) and the screen memory benchmark.
+
+./tools/vasmm68k_mot.exe sources/amiga/main.s -quiet -Fhunk -m68000 -D__RENDER_PROFILE__ -o binaries/amiga_main_profile.o
+./tools/vasmm68k_mot.exe sources/amiga/emulator.s -quiet -Fhunk -m68030 -D__RENDER_PROFILE__ -o binaries/amiga_emulator_profile.o
+./tools/vasmm68k_mot.exe sources/amiga/graphics.s -quiet -Fhunk -m68030 -D__RENDER_PROFILE__ -o binaries/amiga_graphics_profile.o
+./tools/vasmm68k_mot.exe sources/amiga/display.s -quiet -Fhunk -m68030 -D__RENDER_PROFILE__ -o binaries/amiga_display_profile.o
+./tools/vlink.exe binaries/amiga_main_profile.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator_profile.o binaries/amiga_input.o binaries/amiga_display_profile.o binaries/amiga_audio.o binaries/amiga_graphics_profile.o -bamigahunk -s -o binaries/amiga/sz2_profile
+./tools/vasmm68k_mot.exe tests/amiga/hardware/vram_bench.s -quiet -Fhunk -m68020 -o binaries/amiga_vram_bench.o
+./tools/vlink.exe binaries/amiga_vram_bench.o -bamigahunk -s -o binaries/amiga/vram_bench

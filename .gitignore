@@ -7,3 +7,7 @@
 /binaries/atari/*.tos
 /binaries/amiga/sz2
 /binaries/amiga/sz2_dbg
+/binaries/amiga/sz2_profile
+/binaries/amiga/vram_bench
+/binaries/amiga/hardware_test/
+/binaries/amiga/hardware_test.zip
