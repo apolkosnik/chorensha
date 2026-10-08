@@ -17,6 +17,8 @@
 # "input.bin" in the arguments to use it). Files listed in WORK_FILES are
 # copied to WORK: as well; text files the program writes there are copied to
 # RESULT_DIR.
+# With RUN_FROM_RAM set, the program and data are copied to RAM: and run from
+# there (no UAE host-directory filesystem during the run).
 # With AUDIO_CAPTURE set, the emulated audio is written to that WAV file
 # (OpenAL Soft's wave backend) and the emulation runs at real speed, not in
 # warp mode, so the sound is not skipped. Drive sounds, the emulated output
@@ -144,7 +146,13 @@ done
 # keeps the script going when the program cannot be loaded; Why records the
 # shell's error.
 
-printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output.txt\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"
+if [ -n "${RUN_FROM_RAM:-}" ]; then
+	# Everything copied to RAM: first, so the run does not use UAE's
+	# host-directory filesystem (WORK:); the files it writes are copied back.
+	printf 'FailAt 21\nCopy WORK: RAM:game ALL QUIET\nCD RAM:game\nRAM:game/program %s >RAM:game/output.txt\nWhy >>RAM:game/output.txt\nCopy RAM:game/#?.(bin|txt) WORK: QUIET\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"
+else
+	printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output.txt\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"
+fi
 
 # FS-UAE runs in its own session. setsid may fork, so $! is not reliably the
 # emulator; the shell inside the new session records its own PID (which is
