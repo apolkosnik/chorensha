@@ -268,7 +268,6 @@ start_emulator:
 	clr.l	measured_frames
 	clr.l	last_wake_time
 	clr.l	last_wake_time+4
-	clr.w	vbl_wait_counter
 
 	move.l	exec_base,a6
 
@@ -834,7 +833,6 @@ frame_hardware_tick:
 ; vertical blank for the game.
 
 vbl_server:
-	addq.w	#1,vbl_wait_counter
 	addq.l	#1,total_vbl_count
 
 	ifd __HEARTBEAT__
@@ -969,6 +967,47 @@ vbl_server:
 	lea		trace_heartbeat_buffer,a0
 	jsr		serial_print
 
+	; The last CALL_RING_SIZE Human68k calls, oldest first.
+
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	move.l	call_ring_next,d3
+	moveq	#CALL_RING_SIZE-1,d4
+
+.ring_loop:
+	moveq	#CALL_RING_SIZE-1,d0
+	and.l	d3,d0
+	lsl.l	#5,d0
+	lea		call_ring,a4
+	add.l	d0,a4
+	tst		(a4)
+	beq		.ring_next
+
+	lea		call_ring_arguments,a1
+	moveq	#0,d0
+	move	(a4),d0
+	move.l	d0,(a1)
+	move.l	4(a4),4(a1)
+	move.l	8(a4),8(a1)
+	move.l	12(a4),12(a1)
+	lea		16(a4),a0
+	move.l	a0,16(a1)
+
+	lea		call_ring_format,a0
+	lea		.heartbeat_char(pc),a2
+	lea		trace_heartbeat_buffer,a3
+	move.l	exec_base,a6
+	jsr		_LVORawDoFmt(a6)
+
+	lea		trace_heartbeat_buffer,a0
+	jsr		serial_print
+
+.ring_next:
+	addq.l	#1,d3
+	dbf		d4,.ring_loop
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
 	bra		.no_heartbeat
 
 .heartbeat_char:
@@ -1021,6 +1060,13 @@ amiga_samples_loaded:
 ;
 ; WAIT_VBL: d1.w = number of frames to wait minus one. Preserves all
 ; registers.
+;
+; Same fixed schedule as XSP_VSYNC: the frame lasts d1 + 1 ticks (none for a
+; negative d1). On time, the picture is rendered, then the call waits for the
+; scheduled tick; late, the picture is left out (except for a screenshot).
+; Rendering first and then waiting d1 + 1 ticks would slow the game down
+; whenever rendering takes longer than a tick (the title and menus ran at
+; half speed on a real 68030 with a slow graphics card).
 
 amiga_wait_vbl:
 	movem.l	d0-d7/a0-a6,-(sp)
@@ -1030,12 +1076,12 @@ amiga_wait_vbl:
 	OS_STACK_ENTER
 
 	jsr		frame_wait_begin
-	jsr		render_and_present
 
 	ifd __LOCKSTEP__
 
-	; Lockstep: d7 + 1 VBLs, one after the other (none for a negative d7,
-	; like the wait below).
+	; Lockstep: the picture, then d7 + 1 VBLs, one after the other.
+
+	jsr		render_and_present
 
 	tst		d7
 	bmi		.done
@@ -1048,11 +1094,39 @@ amiga_wait_vbl:
 
 	endif
 
-	clr		vbl_wait_counter
+	ext.l	d7
+	addq.l	#1,d7 ; Ticks.
+	bpl		.ticks_ok
+
+	moveq	#0,d7
+
+.ticks_ok:
+	add.l	d7,frame_schedule
+
+	move.l	total_vbl_count,d0
+	sub.l	frame_schedule,d0
+	bmi		.on_time
+
+	cmp.l	#MAXIMUM_FRAME_DEBT,d0
+	bls		.late
+
+	move.l	total_vbl_count,frame_schedule ; Too far behind: start over.
+
+.late:
+	tst.l	screenshot_due
+	beq		.done
+
+	jsr		render_and_present
+
+	bra		.done
+
+.on_time:
+	jsr		render_and_present
 
 .wait_loop:
-	cmp		vbl_wait_counter,d7
-	blt		.done
+	move.l	total_vbl_count,d0
+	cmp.l	frame_schedule,d0
+	bcc		.done
 
 	jsr		wait_for_vbl_signal
 
@@ -2036,7 +2110,15 @@ human68k_call:
 	cmp		d1,d7
 	bne		.find_loop
 
+	ifd __HEARTBEAT__
+	bsr		call_ring_enter
+	endif
+
 	jsr		(a1)
+
+	ifd __HEARTBEAT__
+	bsr		call_ring_leave
+	endif
 
 	bra		.done
 
@@ -2066,6 +2148,59 @@ human68k_call:
 	movem.l	(sp)+,d1-d7/a0-a6
 
 	rts
+
+	ifd __HEARTBEAT__
+
+; Heartbeat builds: a ring of the last Human68k calls (opcode, the first two
+; argument longs, result or $DEADBEEF while the call runs, and the file name
+; for _OPEN), printed with each heartbeat.
+
+CALL_RING_SIZE=16
+
+call_ring_enter: ; d7 = call, a5 = arguments.
+	movem.l	d0-d1/a0-a2,-(sp)
+
+	moveq	#CALL_RING_SIZE-1,d0
+	and.l	call_ring_next,d0
+	lsl.l	#5,d0
+	lea		call_ring,a0
+	add.l	d0,a0
+	move.l	a0,call_ring_current
+
+	move	d7,(a0)+
+	clr		(a0)+
+	move.l	(a5),(a0)+
+	move.l	4(a5),(a0)+
+	move.l	#$deadbeef,(a0)+
+	clr.b	(a0)
+
+	cmp		#$ff3d,d7 ; _OPEN: (a5) = file name.
+	bne		.done
+
+	move.l	(a5),a1
+	moveq	#15-1,d1
+
+.name:
+	move.b	(a1)+,(a0)+
+	dbeq	d1,.name
+
+	clr.b	(a0)
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a2
+
+	rts
+
+call_ring_leave: ; d0 = result.
+	move.l	a0,-(sp)
+	move.l	call_ring_current,a0
+	move.l	d0,12(a0)
+	addq.l	#1,call_ring_next
+	move.l	(sp)+,a0
+
+	rts
+
+	endif
 
 	ifd __DEBUG_OUTPUT__
 
@@ -2812,6 +2947,12 @@ cp_restore_modes:
 
 	endif
 
+	ifd __HEARTBEAT__
+call_ring_format:
+	dc.b	'  call $%04lx args $%08lx $%08lx -> $%08lx %s',10,0
+	even
+	endif
+
 graphics_file_name:
 	dc.b	'graphics.bin',0
 
@@ -2962,8 +3103,6 @@ total_vbl_count:
 vbl_count_at_wake:
 	ds.l	1
 
-vbl_wait_counter:
-	ds.w	1
 pending_call_number:
 	ds.w	1
 last_sprite_count:
@@ -3098,6 +3237,17 @@ profile_previous:
 	ds.l	5
 profile_records:
 	ds.b	PROFILE_RECORDS*PROFILE_RECORD_SIZE
+	endif
+
+	ifd __HEARTBEAT__
+call_ring_next:
+	ds.l	1
+call_ring_current:
+	ds.l	1
+call_ring_arguments:
+	ds.l	5
+call_ring:
+	ds.b	CALL_RING_SIZE*32
 	endif
 
 os_stack:
