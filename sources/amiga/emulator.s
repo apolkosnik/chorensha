@@ -41,7 +41,9 @@
 	xref L_00000118
 	xref L_00E82000
 	xref L_00EB8000
+	ifd __STATE_SUMS__
 	xref L_00EB0000
+	endif
 	xref L_00C00000
 	xref SPRITE_DATA_ADDRESS
 	xref sprite_palette_usage
@@ -686,6 +688,32 @@ record_state_sum:
 
 	rts
 
+; _BGTEXTGT calls (frame, page, x, y, result as words; up to BG_LOG_SIZE).
+
+BG_LOG_SIZE=16384
+
+log_bgtextgt:
+	movem.l	d4/a0,-(sp)
+
+	move.l	bg_log_count,d4
+	cmp.l	#BG_LOG_SIZE,d4
+	bcc		.done
+
+	lsl.l	#3,d4
+	lea		bg_log,a0
+	add.l	d4,a0
+	move	frame_count+2,(a0)+
+	move.b	d1,(a0)+
+	move.b	d2,(a0)+
+	move	d3,(a0)+
+	move	d0,(a0)+
+	addq.l	#1,bg_log_count
+
+.done:
+	movem.l	(sp)+,d4/a0
+
+	rts
+
 write_state_sums:
 	move.l	dos_base,a6
 	move.l	#state_sums_file_name,d1
@@ -705,6 +733,17 @@ write_state_sums:
 	move.l	#state_sums,d2
 	move.l	state_sum_count,d3
 	mulu.l	#STATE_SUM_SIZE,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	move.l	#bg_log_count,d2
+	moveq	#4,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	move.l	#bg_log,d2
+	move.l	bg_log_count,d3
+	lsl.l	#3,d3
 	jsr		_LVOWrite(a6)
 
 	move.l	d4,d1
@@ -2142,6 +2181,10 @@ iocs_call:
 
 	movem.l	(sp)+,d1-d3/a0
 
+	ifd __STATE_SUMS__
+	bsr		log_bgtextgt
+	endif
+
 	rte
 
 .not_bgtextgt:
@@ -3379,6 +3422,10 @@ state_sums_header:
 	ds.l	2
 state_sums:
 	ds.b	STATE_SUMS*STATE_SUM_SIZE
+bg_log_count:
+	ds.l	1
+bg_log:
+	ds.b	BG_LOG_SIZE*8
 	endif
 
 os_stack:

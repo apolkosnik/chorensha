@@ -17993,7 +17993,11 @@ L_0002981E:
 	ext.l   D0                                      ; 00029820 48C0
 	move.l  D0,D1                                   ; 00029822 2200
 	asl.l   #$2,D1                                  ; 00029824 E581
+	ifd __AMIGA__
+	sub.l	#L_00EB8000+$1C,D1 ; -$EB801C was the X68000 PCG address (row $1C of the pattern, read upwards).
+	else
 	add.l   #$FF147FE4,D1                           ; 00029826 D2BC FF14 7FE4
+	endif
 	movea.l D5,A0                                   ; 0002982C 2045
 	suba.l  D1,A0                                   ; 0002982E 91C1
 	move.l  (A0),D2                                 ; 00029830 2410
@@ -18075,7 +18079,11 @@ L_000298C8:
 	ext.l   D0                                      ; 000298CA 48C0
 	move.l  D0,D1                                   ; 000298CC 2200
 	asl.l   #$2,D1                                  ; 000298CE E581
+	ifd __AMIGA__
+	sub.l	#L_00EB8000+$1C,D1 ; -$EB801C was the X68000 PCG address (row $1C of the pattern, read upwards).
+	else
 	add.l   #$FF147FE4,D1                           ; 000298D0 D2BC FF14 7FE4
+	endif
 	movea.l D5,A0                                   ; 000298D6 2045
 	suba.l  D1,A0                                   ; 000298D8 91C1
 	move.l  (A0),D2                                 ; 000298DA 2410
@@ -18395,7 +18403,11 @@ L_00029B82:
 	ext.l   D1                                      ; 00029B84 48C1
 	move.l  D1,D0                                   ; 00029B86 2001
 	asl.l   #$2,D0                                  ; 00029B88 E580
+	ifd __AMIGA__
+	sub.l	#L_00EB8000+$1C,D0 ; -$EB801C was the X68000 PCG address (row $1C of the pattern, read upwards).
+	else
 	add.l   #$FF147FE4,D0                           ; 00029B8A D0BC FF14 7FE4
+	endif
 	movea.l D5,A0                                   ; 00029B90 2045
 	suba.l  D0,A0                                   ; 00029B92 91C0
 	move.l  (A0),D2                                 ; 00029B94 2410
@@ -18476,7 +18488,11 @@ L_00029C32:
 	ext.l   D1                                      ; 00029C34 48C1
 	move.l  D1,D0                                   ; 00029C36 2001
 	asl.l   #$2,D0                                  ; 00029C38 E580
+	ifd __AMIGA__
+	sub.l	#L_00EB8000+$1C,D0 ; -$EB801C was the X68000 PCG address (row $1C of the pattern, read upwards).
+	else
 	add.l   #$FF147FE4,D0                           ; 00029C3A D0BC FF14 7FE4
+	endif
 	movea.l D5,A0                                   ; 00029C40 2045
 	suba.l  D0,A0                                   ; 00029C42 91C0
 	move.l  (A0),D2                                 ; 00029C44 2410
