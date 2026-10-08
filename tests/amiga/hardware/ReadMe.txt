@@ -20,8 +20,10 @@ What it measures
 
 Requirements
 
-  68020 or better, Picasso96 (or CyberGraphX for sz2_profile), AmigaOS 3.x,
-  about 4 MB of free fast RAM, and the game's data directories.
+  68020 or better, AmigaOS 3.x, about 4 MB of free fast RAM, the game's data
+  directories, and either a graphics card (Picasso96 or CyberGraphX) or an
+  AGA chipset with 8 MB of fast RAM (sz2_profile then uses a native AGA
+  screen; vram_bench needs Picasso96 and reports that it cannot run).
 
 How to run
 
