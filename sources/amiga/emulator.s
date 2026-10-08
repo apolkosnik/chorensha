@@ -41,6 +41,7 @@
 	xref L_00000118
 	xref L_00E82000
 	xref L_00EB8000
+	xref L_00EB0000
 	xref L_00C00000
 	xref SPRITE_DATA_ADDRESS
 	xref sprite_palette_usage
@@ -481,6 +482,10 @@ amiga_exit_game:
 	jsr		write_graphics_dump
 	jsr		write_samples_dump
 
+	ifd __STATE_SUMS__
+	bsr		write_state_sums
+	endif
+
 	ifd __RENDER_PROFILE__
 	bsr		write_profile
 	endif
@@ -597,6 +602,109 @@ write_profile:
 	move.l	#profile_records,d2
 	move.l	profile_count,d3
 	mulu.l	#PROFILE_RECORD_SIZE,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	jsr		_LVOClose(a6)
+
+.done:
+	rts
+
+	endif
+
+	ifd __STATE_SUMS__
+
+; Debug builds (-D__STATE_SUMS__): at every frame wait, a sum of the
+; sprite pattern RAM shadow ($EB8000, 32 KB) and of the sprite and video
+; controller registers, to find the first frame where two runs differ
+; (sums.bin: 'CRSU', count, then per frame number, pattern RAM sum,
+; register sum; tests compare two files).
+
+STATE_SUMS=8000
+STATE_SUM_SIZE=20 ; Frame, pattern RAM, registers, GVRAM, palettes.
+
+record_state_sum:
+	movem.l	d0-d2/a0-a1,-(sp)
+
+	move.l	state_sum_count,d0
+	cmp.l	#STATE_SUMS,d0
+	bcc		.done
+
+	mulu.l	#STATE_SUM_SIZE,d0
+	lea		state_sums,a1
+	add.l	d0,a1
+	move.l	frame_count,(a1)+
+
+	lea		L_00EB8000,a0
+	moveq	#0,d1
+	move	#$8000/4-1,d2
+
+.pattern_loop:
+	add.l	(a0)+,d1
+	rol.l	#1,d1
+	dbf		d2,.pattern_loop
+
+	move.l	d1,(a1)+
+
+	lea		L_00EB0000,a0
+	moveq	#0,d1
+	move	#$1000/4-1,d2
+
+.register_loop:
+	add.l	(a0)+,d1
+	rol.l	#1,d1
+	dbf		d2,.register_loop
+
+	move.l	d1,(a1)+
+
+	lea		L_00C00000,a0 ; GVRAM pages 0 and 1.
+	moveq	#0,d1
+	move.l	#$100000/4-1,d2
+
+.gvram_loop:
+	add.l	(a0)+,d1
+	rol.l	#1,d1
+	subq.l	#1,d2
+	bpl		.gvram_loop
+
+	move.l	d1,(a1)+
+
+	lea		L_00E82000,a0 ; Video controller palettes.
+	moveq	#0,d1
+	move	#$400/4-1,d2
+
+.palette_loop:
+	add.l	(a0)+,d1
+	rol.l	#1,d1
+	dbf		d2,.palette_loop
+
+	move.l	d1,(a1)+
+	addq.l	#1,state_sum_count
+
+.done:
+	movem.l	(sp)+,d0-d2/a0-a1
+
+	rts
+
+write_state_sums:
+	move.l	dos_base,a6
+	move.l	#state_sums_file_name,d1
+	move.l	#MODE_NEWFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,d4
+	beq		.done
+
+	move.l	#'CRSU',state_sums_header
+	move.l	state_sum_count,state_sums_header+4
+	move.l	d4,d1
+	move.l	#state_sums_header,d2
+	moveq	#8,d3
+	jsr		_LVOWrite(a6)
+
+	move.l	d4,d1
+	move.l	#state_sums,d2
+	move.l	state_sum_count,d3
+	mulu.l	#STATE_SUM_SIZE,d3
 	jsr		_LVOWrite(a6)
 
 	move.l	d4,d1
@@ -1260,6 +1368,10 @@ wait_for_vbl_signal:
 ; the next one is the CPU time the game needed for that frame.
 
 frame_wait_begin:
+	ifd __STATE_SUMS__
+	bsr		record_state_sum
+	endif
+
 	move.l	timer_base,a6
 	lea		eclock_value,a0
 	jsr		_LVOReadEClock(a6)
@@ -2957,6 +3069,12 @@ call_ring_format:
 	even
 	endif
 
+	ifd __STATE_SUMS__
+state_sums_file_name:
+	dc.b	'sums.bin',0
+	even
+	endif
+
 graphics_file_name:
 	dc.b	'graphics.bin',0
 
@@ -3252,6 +3370,15 @@ call_ring_arguments:
 	ds.l	5
 call_ring:
 	ds.b	CALL_RING_SIZE*32
+	endif
+
+	ifd __STATE_SUMS__
+state_sum_count:
+	ds.l	1
+state_sums_header:
+	ds.l	2
+state_sums:
+	ds.b	STATE_SUMS*STATE_SUM_SIZE
 	endif
 
 os_stack:

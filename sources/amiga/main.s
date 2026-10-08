@@ -52,6 +52,7 @@
 ; exec.library
 
 _LVOForbid=-132
+_LVOCacheControl=-648
 _LVOAvailMem=-216
 _LVOFindTask=-294
 _LVOGetMsg=-372
@@ -165,9 +166,33 @@ start:
 
 	jsr		parse_frame_limit
 
+	ifd __NO_CPU_CACHES__
+
+	; Test builds: instruction and data caches off for the run (the
+	; X68000 original ran on a 68000 without caches).
+
+	move.l	exec_base,a6
+	moveq	#0,d0
+	move.l	#$0101,d1 ; CACRF_EnableI | CACRF_EnableD
+	jsr		_LVOCacheControl(a6)
+	move.l	d0,saved_cache_bits
+
+	endif
+
 	move.l	frame_limit,d0
 	move.l	input_script_name,a0
 	jsr		start_emulator
+
+	ifd __NO_CPU_CACHES__
+
+	move.l	d0,-(sp)
+	move.l	exec_base,a6
+	move.l	saved_cache_bits,d0
+	move.l	#$0101,d1
+	jsr		_LVOCacheControl(a6)
+	move.l	(sp)+,d0
+
+	endif
 	tst.l	d0
 	bmi		.emulator_failed
 
@@ -898,6 +923,11 @@ fpu_text_table:
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
+
+	ifd __NO_CPU_CACHES__
+saved_cache_bits:
+	ds.l	1
+	endif
 
 exec_base:
 	ds.l	1

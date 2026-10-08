@@ -25,7 +25,10 @@
 # configs:
 #   a1200-4mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 4 MB fast (below the minimum)
 #   a1200-8mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 8 MB fast (minimum, native)
+#   a1200-8mb-nce  the same with FS-UAE's non-cycle-exact 68020 core (emulation checks)
 #   a1200-030  A1200, AGA, 68030 50 MHz, 64 MB fast, no RTG
+#   a1200-030-8mb  A1200, AGA, 68030 50 MHz, 8 MB fast below 16 MB (Zorro II), no RTG
+#   a1200-030-14   the same with the 68030 at 14 MHz (CPU type versus speed tests)
 #   rtg-020    A1200, AGA, 68020 14 MHz, 4 MB fast, Zorro II uaegfx (minimum, RTG)
 #   rtg-030    A4000, AGA, 68030 50 MHz, 64 MB Zorro III fast, Zorro III uaegfx
 #   rtg-040    A4000, AGA, 68040 (fastest possible), 64 MB fast, Zorro III uaegfx
@@ -67,6 +70,20 @@ case $config in
 		;;
 	a1200-8mb)
 		options=(--amiga_model=A1200 "$a1200_kickstart" --fast_memory=8192)
+		;;
+	a1200-8mb-nce)
+		options=(--amiga_model=A1200 "$a1200_kickstart" --fast_memory=8192
+			--uae_cpu_cycle_exact=false --uae_cpu_compatible=false)
+		;;
+	a1200-030-14)
+		options=(--amiga_model=A1200 "$a1200_kickstart" --uae_cpu_model=68030
+			--uae_cpu_cycle_exact=true --uae_cpu_multiplier=4
+			--uae_cpu_24bit_addressing=false --fast_memory=8192)
+		;;
+	a1200-030-8mb)
+		options=(--amiga_model=A1200 "$a1200_kickstart" --uae_cpu_model=68030
+			--uae_cpu_cycle_exact=true --uae_cpu_multiplier=14
+			--uae_cpu_24bit_addressing=false --fast_memory=8192)
 		;;
 	a1200-030)
 		options=(--amiga_model=A1200 "$a1200_kickstart" --uae_cpu_model=68030
@@ -199,7 +216,7 @@ if [ $status -eq 0 ]; then
 	if [ -n "${RESULT_DIR:-}" ]; then
 		mkdir -p "$RESULT_DIR"
 
-		for result in measure graphics checkpoints samples profile; do
+		for result in measure graphics checkpoints samples profile sums; do
 			if [ -f "$drive/$result.bin" ]; then
 				cp "$drive/$result.bin" "$RESULT_DIR/$result-$config.bin"
 			fi
