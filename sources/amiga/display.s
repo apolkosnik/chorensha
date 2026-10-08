@@ -1,12 +1,19 @@
 
-; Display output: an 8-bit RTG screen through Picasso96 or CyberGraphX.
+; Display output: an 8-bit RTG screen through Picasso96 or CyberGraphX, or a
+; native AGA screen.
 ;
 ; The rendered 256 x 256 picture is centred on a 320 x 256 screen (or the
-; middle 240 lines on a 320 x 240 screen). Without a usable RTG board (native
-; AGA output is a later phase) the game runs headless: the renderer still
-; composes frames and screenshots come from its buffer. -D__FORCE_CYBERGRAPHX__
-; uses the CyberGraphX calls on a Picasso96 system (its compatibility layer),
-; to test that path.
+; middle 240 lines on a 320 x 240 RTG screen). Without a usable display the
+; game runs headless: the renderer still composes frames and screenshots come
+; from its buffer. -D__FORCE_CYBERGRAPHX__ uses the CyberGraphX calls on a
+; Picasso96 system (its compatibility layer), -D__FORCE_AGA__ the AGA screen
+; on a machine with an RTG board, to test those paths.
+;
+; AGA: a 320 x 256 x 8 PAL lores screen (interleaved bitplanes), double
+; buffered with ScreenBuffers: each frame is converted from the chunky render
+; buffer into the hidden bitmap (c2p), which ChangeScreenBuffer() then shows
+; at the next vertical blank. Before converting into a bitmap again, its safe
+; message (the previous flip has taken effect) is awaited.
 
 	xdef open_display
 	xdef close_display
@@ -17,6 +24,12 @@
 	xref exec_base
 	xref machine_display
 	xref machine_rtg
+
+	ifd __C2PLIB__
+	xref machine_cpu
+	xref _c2p_8x8_mexg
+	xref _c2p_8x8_mexg_040
+	endif
 	xref render_buffer
 	xref hardware_palette
 	xref palette_load_table
@@ -25,6 +38,7 @@
 	ifd __RENDER_PROFILE__
 	xref timer_base
 	xdef load_rgb_time
+	xdef c2p_time
 	endif
 
 ; exec.library
@@ -33,6 +47,10 @@ _LVOOpenLibrary=-552
 _LVOCloseLibrary=-414
 _LVOAllocMem=-198
 _LVOFreeMem=-210
+_LVOGetMsg=-372
+_LVOWaitPort=-384
+_LVOCreateMsgPort=-666
+_LVODeleteMsgPort=-672
 
 MEMF_CHIP=1<<1
 MEMF_CLEAR=1<<16
@@ -44,6 +62,9 @@ _LVOCloseWindow=-72
 _LVOSetPointer=-270
 _LVOOpenWindowTagList=-606
 _LVOOpenScreenTagList=-612
+_LVOAllocScreenBuffer=-768
+_LVOFreeScreenBuffer=-774
+_LVOChangeScreenBuffer=-780
 
 TAG_DONE=0
 SA_Width=$80000023
@@ -55,7 +76,21 @@ SA_ShowTitle=$80000036
 SA_Quiet=$80000038
 SA_Draggable=$8000003e
 SA_Exclusive=$8000003f
+SA_Interleaved=$80000042
 CUSTOMSCREEN=15
+
+PAL_MONITOR_ID=$00021000
+LORES_KEY=$00000000
+
+SB_SCREEN_BITMAP=1
+sb_BitMap=0
+sb_DBufInfo=4
+dbi_SafeMessage=8
+mn_ReplyPort=14
+
+bm_BytesPerRow=0
+bm_Depth=5
+bm_Planes=8
 
 WA_Width=$80000066
 WA_Height=$80000067
@@ -73,6 +108,7 @@ wd_RPort=50
 ; graphics.library
 
 _LVOLoadRGB32=-882
+_LVOWaitTOF=-270
 _LVOInitRastPort=-198
 _LVOReadPixelArray8=-780
 _LVOAllocBitMap=-918
@@ -109,6 +145,7 @@ RECTFMT_LUT8=3
 
 BACKEND_PICASSO96=1
 BACKEND_CYBERGRAPHX=2
+BACKEND_AGA=3
 
 ; struct RenderInfo: Memory, BytesPerRow, pad, RGBFormat.
 
@@ -118,6 +155,7 @@ ri_RGBFormat=8
 RENDER_INFO_SIZE=12
 
 DISPLAY_RTG=1
+DISPLAY_AGA=2
 RTG_PICASSO96=1
 RTG_CYBERGRAPHX=2
 
@@ -129,6 +167,8 @@ PICTURE_HEIGHT=256
 RENDER_STRIDE=GUARD+PICTURE_WIDTH+GUARD
 SCREEN_WIDTH=320
 POINTER_SIZE=16
+AGA_DEPTH=8
+AGA_X_BYTES=(SCREEN_WIDTH-PICTURE_WIDTH)/2/8 ; Picture start in a plane row.
 
 ; ------------------------------------------------------------------------------
 	text
@@ -141,6 +181,13 @@ open_display:
 	movem.l	d2-d7/a2-a6,-(sp)
 
 	clr.b	display_active
+
+	ifd __FORCE_AGA__
+	bra		.open_aga
+	endif
+
+	cmp.l	#DISPLAY_AGA,machine_display
+	beq		.open_aga
 
 	cmp.l	#DISPLAY_RTG,machine_display
 	bne		.done
@@ -226,6 +273,15 @@ open_display:
 .mode_found:
 	move.l	d0,screen_tags_mode
 	move.l	screen_height,screen_tags_height
+
+	move.l	intuition_base,a6
+	sub.l	a0,a0
+	lea		screen_tags,a1
+	jsr		_LVOOpenScreenTagList(a6)
+	move.l	d0,screen
+	beq		.failed
+
+.screen_open:
 	move.l	screen_height,window_tags_height
 
 	; Source rows: the middle screen_height lines of the picture.
@@ -237,13 +293,7 @@ open_display:
 	move.l	d0,source_y
 
 	move.l	intuition_base,a6
-	sub.l	a0,a0
-	lea		screen_tags,a1
-	jsr		_LVOOpenScreenTagList(a6)
-	move.l	d0,screen
-	beq		.failed
-
-	move.l	d0,window_tags_screen
+	move.l	screen,window_tags_screen
 	sub.l	a0,a0
 	lea		window_tags,a1
 	jsr		_LVOOpenWindowTagList(a6)
@@ -296,6 +346,14 @@ open_display:
 	move	#RENDER_STRIDE,ri_BytesPerRow(a0)
 	move.l	#RGBFB_CLUT,ri_RGBFormat(a0)
 
+	cmp.l	#BACKEND_AGA,backend
+	bne		.buffers_done
+
+	bsr		open_screen_buffers
+	tst.l	d0
+	beq		.failed
+
+.buffers_done:
 	move.l	#hardware_palette,palette_load_table ; The whole palette first.
 	st		palette_changed
 	st		display_active
@@ -307,6 +365,134 @@ open_display:
 
 .failed:
 	bsr		close_display
+
+	bra		.done
+
+	; Native AGA screen: PAL lores 320 x 256 x 8, else the default monitor.
+
+.open_aga:
+	move.l	#BACKEND_AGA,backend
+	move.l	exec_base,a6
+
+	lea		intuition_name,a1
+	moveq	#39,d0
+	jsr		_LVOOpenLibrary(a6)
+	move.l	d0,intuition_base
+	beq		.failed
+
+	lea		graphics_name,a1
+	moveq	#39,d0
+	jsr		_LVOOpenLibrary(a6)
+	move.l	d0,graphics_base
+	beq		.failed
+
+	move.l	#PICTURE_HEIGHT,screen_height
+	move.l	#PAL_MONITOR_ID|LORES_KEY,aga_screen_tags_mode
+
+	move.l	intuition_base,a6
+	sub.l	a0,a0
+	lea		aga_screen_tags,a1
+	jsr		_LVOOpenScreenTagList(a6)
+	move.l	d0,screen
+	bne		.screen_open
+
+	move.l	#LORES_KEY,aga_screen_tags_mode
+	sub.l	a0,a0
+	lea		aga_screen_tags,a1
+	jsr		_LVOOpenScreenTagList(a6)
+	move.l	d0,screen
+	beq		.failed
+
+	bra		.screen_open
+
+; ------------------------------------------------------------------------------
+;
+; AGA: the two ScreenBuffers (the screen's own bitmap and a second one), the
+; port for their safe messages, and the plane layout for c2p. Returns d0 = 0
+; on failure.
+
+open_screen_buffers:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	move.l	exec_base,a6
+	jsr		_LVOCreateMsgPort(a6)
+	move.l	d0,safe_port
+	beq		.failed
+
+	move.l	intuition_base,a6
+	move.l	screen,a0
+	sub.l	a1,a1
+	moveq	#SB_SCREEN_BITMAP,d0
+	jsr		_LVOAllocScreenBuffer(a6)
+	move.l	d0,screen_buffers
+	beq		.failed
+
+	move.l	screen,a0
+	sub.l	a1,a1
+	moveq	#0,d0
+	jsr		_LVOAllocScreenBuffer(a6)
+	move.l	d0,screen_buffers+4
+	beq		.failed
+
+	; Safe messages to safe_port; both bitmaps must have 8 evenly spaced
+	; planes (interleaved: one row of each plane after the other) with the
+	; same layout.
+
+	lea		screen_buffers,a2
+	moveq	#2-1,d4
+
+.buffer_loop:
+	move.l	(a2)+,a0
+	move.l	sb_DBufInfo(a0),a1
+	move.l	safe_port,dbi_SafeMessage+mn_ReplyPort(a1)
+
+	move.l	sb_BitMap(a0),a1
+	cmp.b	#AGA_DEPTH,bm_Depth(a1)
+	bne		.failed
+
+	moveq	#0,d0
+	move	bm_BytesPerRow(a1),d0
+	move.l	bm_Planes+4(a1),d1
+	sub.l	bm_Planes(a1),d1 ; Plane spacing.
+
+	cmp.l	#1,d4
+	bne		.compare_layout
+
+	move.l	d0,plane_row_bytes
+	move.l	d1,plane_spacing
+
+.compare_layout:
+	cmp.l	plane_row_bytes,d0
+	bne		.failed
+
+	cmp.l	plane_spacing,d1
+	bne		.failed
+
+	move.l	bm_Planes(a1),d2
+	lea		bm_Planes+4(a1),a3
+	moveq	#AGA_DEPTH-1-1,d3
+
+.plane_loop:
+	add.l	d1,d2
+	cmp.l	(a3)+,d2
+	bne		.failed
+
+	dbf		d3,.plane_loop
+
+	dbf		d4,.buffer_loop
+
+	clr.l	shown_buffer ; Buffer 0 (the screen's bitmap) is shown.
+	sf		safe_pending
+
+	moveq	#1,d0
+
+.done:
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+.failed:
+	moveq	#0,d0
 
 	bra		.done
 
@@ -327,6 +513,8 @@ close_display:
 	jsr		_LVOCloseWindow(a6)
 
 .no_window:
+	bsr		close_screen_buffers
+
 	move.l	screen,d0
 	beq		.no_screen
 
@@ -375,6 +563,100 @@ close_display:
 
 	rts
 
+; AGA: show the screen's own bitmap again, then free both ScreenBuffers and
+; the port.
+
+close_screen_buffers:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	tst.l	screen_buffers
+	beq		.free_second
+
+	tst.l	screen_buffers+4
+	beq		.free_first
+
+	bsr		wait_until_safe
+
+	tst.l	shown_buffer
+	beq		.free_second
+
+.show_first:
+	move.l	intuition_base,a6
+	move.l	screen,a0
+	move.l	screen_buffers,a1
+	jsr		_LVOChangeScreenBuffer(a6)
+	tst.l	d0
+	bne		.shown
+
+	move.l	graphics_base,a6
+	jsr		_LVOWaitTOF(a6)
+
+	bra		.show_first
+
+.shown:
+	clr.l	shown_buffer
+	st		safe_pending
+	bsr		wait_until_safe
+
+.free_second:
+	move.l	screen_buffers+4,d0
+	beq		.free_first
+
+	clr.l	screen_buffers+4
+	move.l	intuition_base,a6
+	move.l	screen,a0
+	move.l	d0,a1
+	jsr		_LVOFreeScreenBuffer(a6)
+
+.free_first:
+	move.l	screen_buffers,d0
+	beq		.free_port
+
+	clr.l	screen_buffers
+	move.l	intuition_base,a6
+	move.l	screen,a0
+	move.l	d0,a1
+	jsr		_LVOFreeScreenBuffer(a6)
+
+.free_port:
+	move.l	safe_port,d0
+	beq		.done
+
+	clr.l	safe_port
+	move.l	exec_base,a6
+	move.l	d0,a0
+	jsr		_LVODeleteMsgPort(a6)
+
+.done:
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+; AGA: waits for the safe message of the last flip, if one is due.
+
+wait_until_safe:
+	tst.b	safe_pending
+	beq		.done
+
+	move.l	exec_base,a6
+
+.loop:
+	move.l	safe_port,a0
+	jsr		_LVOGetMsg(a6)
+	tst.l	d0
+	bne		.received
+
+	move.l	safe_port,a0
+	jsr		_LVOWaitPort(a6)
+
+	bra		.loop
+
+.received:
+	sf		safe_pending
+
+.done:
+	rts
+
 ; ------------------------------------------------------------------------------
 ;
 ; Shows the rendered frame (task context).
@@ -385,34 +667,11 @@ present_frame:
 
 	movem.l	d2-d7/a2-a6,-(sp)
 
-	tst.b	palette_changed
-	beq		.palette_done
+	cmp.l	#BACKEND_AGA,backend
+	beq		.aga
 
-	sf		palette_changed
+	bsr		load_palette
 
-	ifd __RENDER_PROFILE__
-	move.l	timer_base,a6
-	lea		profile_time,a0
-	jsr		-60(a6) ; ReadEClock
-	endif
-
-	move.l	graphics_base,a6
-	move.l	screen,a0
-	lea		sc_ViewPort(a0),a0
-	move.l	palette_load_table,a1 ; All colours, or just the changed ones.
-	jsr		_LVOLoadRGB32(a6)
-
-	ifd __RENDER_PROFILE__
-	move.l	profile_time+4,-(sp)
-	move.l	timer_base,a6
-	lea		profile_time,a0
-	jsr		-60(a6)
-	move.l	profile_time+4,d0
-	sub.l	(sp)+,d0
-	add.l	d0,load_rgb_time
-	endif
-
-.palette_done:
 	ifd __NO_UPLOAD__
 	movem.l	(sp)+,d2-d7/a2-a6
 	rts
@@ -421,9 +680,78 @@ present_frame:
 	cmp.l	#BACKEND_CYBERGRAPHX,backend
 	beq		.cybergraphics_upload
 
+	bra		.picasso96_upload
+
+	; AGA: convert into the hidden bitmap, show it, then the palette (both
+	; take effect at the next vertical blank).
+
+.aga:
+	bsr		wait_until_safe
+
+	moveq	#1,d0
+	sub.l	shown_buffer,d0
+	lea		screen_buffers,a0
+	move.l	(a0,d0.l*4),a1
+	move.l	a1,hidden_screen_buffer
+	move.l	sb_BitMap(a1),a1
+	move.l	bm_Planes(a1),a1
+	add.w	#AGA_X_BYTES,a1
+
+	lea		render_buffer+GUARD,a0
+	move.l	source_y,d0
+	mulu	#RENDER_STRIDE,d0
+	add.l	d0,a0
+
+	move.l	plane_spacing,a2
+	move.l	screen_height,d0
+	move.l	plane_row_bytes,d1
+
+	ifd __RENDER_PROFILE__
+	movem.l	d0-d1/a0-a2,-(sp)
+	move.l	timer_base,a6
+	lea		profile_time,a0
+	jsr		-60(a6) ; ReadEClock
+	movem.l	(sp)+,d0-d1/a0-a2
+	move.l	profile_time+4,c2p_start
+	endif
+
+	ifd __C2PLIB__
+	bsr		c2p_c2plib
+	else
+	bsr		c2p
+	endif
+
+	ifd __RENDER_PROFILE__
+	move.l	timer_base,a6
+	lea		profile_time,a0
+	jsr		-60(a6)
+	move.l	profile_time+4,d0
+	sub.l	c2p_start,d0
+	add.l	d0,c2p_time
+	endif
+
+	move.l	intuition_base,a6
+	move.l	screen,a0
+	move.l	hidden_screen_buffer,a1
+	jsr		_LVOChangeScreenBuffer(a6)
+	tst.l	d0
+	beq		.aga_shown ; Not shown (busy): converted again next frame.
+
+	moveq	#1,d0
+	sub.l	d0,shown_buffer
+	neg.l	shown_buffer
+	st		safe_pending
+
+.aga_shown:
+	bsr		load_palette
+
+	bra		.uploaded
+
+
 	; Picasso96: lock the screen's bitmap and copy the lines directly;
 	; p96WritePixelArray when the bitmap cannot be locked.
 
+.picasso96_upload:
 	move.l	picasso96_base,a6
 	move.l	window,a0
 	move.l	wd_RPort(a0),a0
@@ -506,6 +834,41 @@ present_frame:
 
 ; ------------------------------------------------------------------------------
 ;
+; Loads the palette changes into the screen (all colours or a range).
+
+load_palette:
+	tst.b	palette_changed
+	beq		.done
+
+	sf		palette_changed
+
+	ifd __RENDER_PROFILE__
+	move.l	timer_base,a6
+	lea		profile_time,a0
+	jsr		-60(a6) ; ReadEClock
+	endif
+
+	move.l	graphics_base,a6
+	move.l	screen,a0
+	lea		sc_ViewPort(a0),a0
+	move.l	palette_load_table,a1 ; All colours, or just the changed ones.
+	jsr		_LVOLoadRGB32(a6)
+
+	ifd __RENDER_PROFILE__
+	move.l	profile_time+4,-(sp)
+	move.l	timer_base,a6
+	lea		profile_time,a0
+	jsr		-60(a6)
+	move.l	profile_time+4,d0
+	sub.l	(sp)+,d0
+	add.l	d0,load_rgb_time
+	endif
+
+.done:
+	rts
+
+; ------------------------------------------------------------------------------
+;
 ; a0 = buffer for PICTURE_WIDTH x PICTURE_HEIGHT pixels. Reads the picture
 ; back from the screen (or from the render buffer when headless). Returns
 ; d0 = number of lines.
@@ -515,6 +878,9 @@ capture_screen:
 
 	tst.b	display_active
 	beq		.from_buffer
+
+	cmp.l	#BACKEND_AGA,backend
+	beq		.aga_capture
 
 	cmp.l	#BACKEND_CYBERGRAPHX,backend
 	bne		.picasso96_capture
@@ -560,6 +926,63 @@ capture_screen:
 
 	bra		.done
 
+	; AGA: the shown bitmap's planes back to chunky pixels.
+
+.aga_capture:
+	move.l	shown_buffer,d0
+	lea		screen_buffers,a1
+	move.l	(a1,d0.l*4),a1
+	move.l	sb_BitMap(a1),a1
+	move.l	bm_Planes(a1),a3
+	add.w	#AGA_X_BYTES,a3 ; Plane 0, first row.
+	move.l	plane_spacing,a4
+	move.l	screen_height,d7
+	subq	#1,d7
+
+.capture_row:
+	move.l	a3,a1
+	moveq	#PICTURE_WIDTH/8-1,d6
+
+.capture_byte:
+	move.l	a1,a5
+	lea		capture_bytes,a6
+	moveq	#AGA_DEPTH-1,d5
+
+.gather:
+	move.b	(a5),(a6)+
+	add.l	a4,a5
+	dbf		d5,.gather
+
+	moveq	#8-1,d4
+
+.capture_pixel:
+	moveq	#0,d0
+	lea		capture_bytes+AGA_DEPTH,a6
+	moveq	#AGA_DEPTH-1,d5
+
+.capture_bit:
+	move.b	-(a6),d1 ; Plane 7 first.
+	add.b	d1,d1
+	move.b	d1,(a6) ; (MOVE leaves X alone.)
+	addx.b	d0,d0
+	dbf		d5,.capture_bit
+
+	move.b	d0,(a0)+
+
+	dbf		d4,.capture_pixel
+
+	addq.l	#1,a1
+
+	dbf		d6,.capture_byte
+
+	add.l	plane_row_bytes,a3
+
+	dbf		d7,.capture_row
+
+	move.l	screen_height,d0
+
+	bra		.done
+
 .from_buffer:
 	lea		render_buffer+GUARD*RENDER_STRIDE+GUARD,a1
 	move	#PICTURE_HEIGHT-1,d1
@@ -581,6 +1004,172 @@ capture_screen:
 	movem.l	(sp)+,d2-d7/a2-a6
 
 	rts
+
+; ------------------------------------------------------------------------------
+;
+; Chunky to planar, 8 planes: a0 = chunky pixels (rows RENDER_STRIDE apart,
+; PICTURE_WIDTH wide), a1 = first byte in plane 0, a2 = distance between
+; planes, d0 = rows, d1 = bytes per plane row.
+;
+; 32 pixels at a time: the eight longs (four pixels each) go through five
+; merge stages, a transposition of the 32 x 8 bit matrix:
+;   shift 16, then 2: register pairs (n, n + 4)
+;   shift 8, then 1: pairs (n, n + 2)
+;   shift 4: pairs (n, n + 1)
+; after which planes 0-7 are in d7, d5, d3, d1, d6, d4, d2, d0 (checked
+; against a model of the sequence on random data). A merge needs a spare
+; data register: the one waiting for a later pair is parked in a6.
+
+; MERGE a, b, shift, mask, spare: swaps the mask bits of a with the bits of b
+; shifted right by shift.
+
+MERGE macro
+	move.l	\2,\5
+	lsr.l	#\3,\5
+	eor.l	\1,\5
+	and.l	#\4,\5
+	eor.l	\5,\1
+	lsl.l	#\3,\5
+	eor.l	\5,\2
+	endm
+
+MERGE16 macro ; MERGE a, b, 16, $0000ffff, spare
+	move.l	\2,\3
+	swap	\3
+	eor.l	\1,\3
+	and.l	#$0000ffff,\3
+	eor.l	\3,\1
+	swap	\3
+	eor.l	\3,\2
+	endm
+
+c2p:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	move.l	d0,c2p_rows
+	move.l	d1,c2p_row_bytes
+	move.l	a1,a3
+
+.row:
+	move.l	a3,a1
+	lea		PICTURE_WIDTH(a0),a5
+
+.block:
+	movem.l	(a0)+,d0-d7
+
+	move.l	d7,a6
+	MERGE16	d0,d4,d7
+	MERGE	d0,d4,2,$33333333,d7
+	MERGE16	d1,d5,d7
+	MERGE	d1,d5,2,$33333333,d7
+	MERGE16	d2,d6,d7
+	MERGE	d2,d6,2,$33333333,d7
+	move.l	a6,d7
+	move.l	d0,a6
+	MERGE16	d3,d7,d0
+	MERGE	d3,d7,2,$33333333,d0
+	move.l	a6,d0
+
+	move.l	d7,a6
+	MERGE	d0,d2,8,$00ff00ff,d7
+	MERGE	d0,d2,1,$55555555,d7
+	MERGE	d1,d3,8,$00ff00ff,d7
+	MERGE	d1,d3,1,$55555555,d7
+	MERGE	d4,d6,8,$00ff00ff,d7
+	MERGE	d4,d6,1,$55555555,d7
+	move.l	a6,d7
+	move.l	d0,a6
+	MERGE	d5,d7,8,$00ff00ff,d0
+	MERGE	d5,d7,1,$55555555,d0
+	move.l	a6,d0
+
+	move.l	d7,a6
+	MERGE	d0,d1,4,$0f0f0f0f,d7
+	MERGE	d2,d3,4,$0f0f0f0f,d7
+	MERGE	d4,d5,4,$0f0f0f0f,d7
+	move.l	a6,d7
+	move.l	d0,a6
+	MERGE	d6,d7,4,$0f0f0f0f,d0
+	move.l	a6,d0
+
+	move.l	a1,a4
+	move.l	d7,(a4) ; Plane 0.
+	add.l	a2,a4
+	move.l	d5,(a4)
+	add.l	a2,a4
+	move.l	d3,(a4)
+	add.l	a2,a4
+	move.l	d1,(a4)
+	add.l	a2,a4
+	move.l	d6,(a4)
+	add.l	a2,a4
+	move.l	d4,(a4)
+	add.l	a2,a4
+	move.l	d2,(a4)
+	add.l	a2,a4
+	move.l	d0,(a4) ; Plane 7.
+
+	addq.l	#4,a1
+	cmp.l	a5,a0
+	bne		.block
+
+	lea		RENDER_STRIDE-PICTURE_WIDTH(a0),a0
+	add.l	c2p_row_bytes,a3
+	subq.l	#1,c2p_rows
+	bne		.row
+
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+	ifd __C2PLIB__
+
+; The same conversion through c2plib (Aminet dev/misc/c2plib.lha, MIT
+; licence, sources in c2plib/), for comparison (-D__C2PLIB__). Its routines
+; take contiguous chunky rows, so each picture row is converted on its own:
+; 68020/68030 in two passes through a scrambled buffer, 68040/68060 in one.
+; Same arguments as c2p.
+
+c2p_c2plib:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	move.l	d0,d6 ; Rows.
+	move.l	d1,d7 ; Bytes per plane row.
+	move.l	a2,d5 ; Plane spacing.
+	move.l	a0,a3
+	move.l	a1,a4
+
+.row:
+	move.l	a3,a0
+	move.l	a4,a1
+	move.l	#PICTURE_WIDTH,d0
+	move.l	d5,d1
+	moveq	#PICTURE_WIDTH/8,d2
+	moveq	#0,d3 ; One row, as a non-interleaved block.
+
+	cmp.l	#40,machine_cpu
+	bcc		.one_pass
+
+	lea		c2plib_scrambled,a2
+	jsr		_c2p_8x8_mexg
+
+	bra		.next_row
+
+.one_pass:
+	jsr		_c2p_8x8_mexg_040
+
+.next_row:
+	lea		RENDER_STRIDE(a3),a3
+	add.l	d7,a4
+
+	subq.l	#1,d6
+	bne		.row
+
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+	endif
 
 ; ------------------------------------------------------------------------------
 	data
@@ -623,6 +1212,21 @@ screen_tags_mode:
 screen_tags_height:
 	dc.l	PICTURE_HEIGHT
 	dc.l	SA_Depth,8
+	dc.l	SA_Type,CUSTOMSCREEN
+	dc.l	SA_Quiet,-1
+	dc.l	SA_ShowTitle,0
+	dc.l	SA_Draggable,0
+	dc.l	SA_Exclusive,-1
+	dc.l	TAG_DONE
+
+aga_screen_tags:
+	dc.l	SA_DisplayID
+aga_screen_tags_mode:
+	dc.l	PAL_MONITOR_ID|LORES_KEY
+	dc.l	SA_Width,SCREEN_WIDTH
+	dc.l	SA_Height,PICTURE_HEIGHT
+	dc.l	SA_Depth,AGA_DEPTH
+	dc.l	SA_Interleaved,-1
 	dc.l	SA_Type,CUSTOMSCREEN
 	dc.l	SA_Quiet,-1
 	dc.l	SA_ShowTitle,0
@@ -687,6 +1291,35 @@ render_info:
 capture_info:
 	ds.b	RENDER_INFO_SIZE
 
+; AGA.
+
+safe_port:
+	ds.l	1
+screen_buffers: ; The screen's own bitmap, then the second one.
+	ds.l	2
+shown_buffer: ; 0 or 1.
+	ds.l	1
+hidden_screen_buffer:
+	ds.l	1
+plane_row_bytes:
+	ds.l	1
+plane_spacing:
+	ds.l	1
+c2p_rows:
+	ds.l	1
+c2p_row_bytes:
+	ds.l	1
+capture_bytes:
+	ds.b	AGA_DEPTH
+
+	ifd __C2PLIB__
+	cnop	0,4
+c2plib_scrambled: ; One row.
+	ds.b	PICTURE_WIDTH
+	endif
+safe_pending:
+	ds.b	1
+
 display_active:
 	ds.b	1
 
@@ -696,6 +1329,10 @@ display_active:
 profile_time:
 	ds.l	2
 load_rgb_time:
+	ds.l	1
+c2p_time: ; E clock ticks in c2p, all frames.
+	ds.l	1
+c2p_start:
 	ds.l	1
 	endif
 

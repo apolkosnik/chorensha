@@ -125,7 +125,7 @@ Game logic always runs at 55.46 Hz; rendering skips frames when the budget is ex
 | 4 | Audio: sound effects, then the music pipeline | Music and effects in game | Sound effects done (see Audio); music not started |
 | 5 | 68030 optimisation: compiled-sprite tuning, span-based overlay, Zorro II path | 68030/50 holds 55.46 Hz on Zorro III | |
 | 6 | Packaging: icon, install script, optional WHDLoad | Installable release | |
-| 7 | Native AGA output: screen, palette, C2P, frame pacing, memory budget for 8 MB machines | Playable on an A1200 with 8 MB fast RAM | Candidates: c2plib (Aminet dev/misc/c2plib.lha; check its licence) for the C2P routines, and graphics.library WriteChunkyPixels, which BlazeWCP (Aminet util/boot/BlazeWCP178.lha) speeds up on users' systems |
+| 7 | Native AGA output: screen, palette, C2P, frame pacing, memory budget for 8 MB machines | Playable on an A1200 with 8 MB fast RAM | Output done and exact (see AGA output); C2P speed is the open part: about 100 ms per frame on a 68020/14 |
 
 ## Phase 1 results (attract demo, 6,000 frames)
 
@@ -185,6 +185,16 @@ Measured on the 68030/50 RTG config (cycle-exact, `profile_summary.py`), medians
 First real-hardware run (68030, AGA, 256 MB fast RAM, Picasso96 card with its memory at $02000000; played by hand, so the checkpoints follow a different game). `vram_bench`: copy fast RAM -> card 5.8 MB/s, card long writes 8.2 MB/s, byte writes 335 ns, read-modify-write 1.1 us; fast RAM long writes 42 MB/s. Render medians: graphics 9.1 ms, upload 12.2 ms, text 1.7 ms, sprites 2.3 ms, palette 0.5 ms, total 28.2 ms. Drawing directly into the card's memory would be slower than composing in fast RAM; the upload is the largest cost.
 
 Gameplay frames have a fixed cost of about 13 ms (graphics, upload, text, palette) plus sprites (0.4 to 4 ms). The game keeps its speed throughout. The 68020/14 RTG config renders about 15 fps at full game speed. The `rtg-040` config emulates the CPU in "fastest possible" mode, not cycle-exact, so its timings say nothing about a real 68040.
+
+## AGA output (Phase 7)
+
+`display.s` opens a 320 x 256 x 8 PAL lores screen with interleaved bitplanes (the default monitor if PAL is not available) when the machine has AGA, enough fast RAM and no RTG board; `-D__FORCE_AGA__` uses it on an RTG machine too. Two ScreenBuffers double-buffer it: each frame is converted from the chunky render buffer into the hidden bitmap, `ChangeScreenBuffer()` shows it at the next vertical blank, and the bitmap is only converted into again after its safe message. The palette goes through the same `LoadRGB32` path, after the flip. Screenshots are read back from the shown bitmap's planes.
+
+- C2P (`c2p` in `display.s`): 32 pixels at a time, a five-stage merge (a transposition of the 32 x 8 bit matrix: shifts 16 and 2 on register pairs n/n+4, 8 and 1 on n/n+2, 4 on n/n+1), checked against a Python model on random data before writing it.
+- c2plib (Aminet dev/misc/c2plib.lha, version 1.9, MIT licence; `sources/amiga/c2plib/` with its LICENSE) is wired in for comparison with `-D__C2PLIB__` (not linked by default): its `c2p_8x8_mexg` (two passes through a scrambled buffer) on 68020/68030, `c2p_8x8_mexg_040` on 68040/68060, one call per picture row (the render buffer's rows are not contiguous).
+- Both produce exactly the RTG pictures: lockstep screenshots of the AGA output on the `rtg-030` machine are identical to its RTG output (59 screenshots, own C2P and c2plib). `tests/amiga/aga_compare.sh` (`C2PLIB=1` for c2plib) repeats that check.
+- C2P time per rendered frame (profile builds, average): own 99.6 ms on the 68020/14 (A1200), 33.5 ms on the 68030/50; c2plib 113.4 ms and 35.4 ms. The A1200 renders about one frame in nine (629 of 6,000 in the demo) and the game falls behind (7,603 ticks for 6,000 frames). Next: a faster C2P for the 68020 (loop size versus its 256-byte instruction cache, blitter-assisted passes in chip RAM in parallel with the CPU) and the frame pacing on slow machines.
+- Open: on the A1200 configs (68020) the rendered pictures differ from the 68030 configs in the game's gameplay frames (background graphics indices, palette), with the same checkpoints. This was already so before AGA output (the headless A1200 build shows the same pictures as its AGA output). Not yet explained.
 
 ## Testing
 

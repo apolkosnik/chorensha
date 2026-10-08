@@ -19,6 +19,7 @@
 	xdef exec_base
 	xdef dos_base
 	xdef machine_display
+	xdef machine_cpu
 	xdef machine_rtg
 
 	xref start_emulator
@@ -44,6 +45,7 @@
 	xref text_lines_converted
 	xref text_lines_drawn
 	xref text_remaps
+	xref c2p_time
 	xref palette_entry_changes
 	endif
 
@@ -606,6 +608,16 @@ print_run_summary:
 	move.l	text_lines_converted,(a3)+
 	move.l	text_lines_drawn,(a3)+
 	move.l	text_remaps,(a3)+
+	move.l	c2p_time,d0 ; Per rendered frame, 1/100 ms.
+	mulu.l	#100000,d1:d0
+	divu.l	eclock_frequency,d1:d0
+	move.l	rendered_frames,d1
+	beq		.no_c2p_frames
+
+	divul.l	d1,d1:d0
+
+.no_c2p_frames:
+	move.l	d0,(a3)+
 
 	move.l	#profile_format,d1
 	move.l	#print_arguments,d2
@@ -831,7 +843,7 @@ run_summary_format:
 
 	ifd __RENDER_PROFILE__
 profile_format:
-	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld, remapped all %ld times.',10,0
+	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld, remapped all %ld times; c2p %ld (1/100 ms per rendered frame).',10,0
 entry_format:
 	dc.b	'  palette entry %ld changed %ld times',10,0
 	endif
