@@ -1018,7 +1018,8 @@ capture_screen:
 ;   shift 4: pairs (n, n + 1)
 ; after which planes 0-7 are in d7, d5, d3, d1, d6, d4, d2, d0 (checked
 ; against a model of the sequence on random data). A merge needs a spare
-; data register: the one waiting for a later pair is parked in a6.
+; data register: the one waiting for a later pair is parked in a6 (the
+; 16-bit stage only exchanges words, through a6).
 
 ; MERGE a, b, shift, mask, spare: swaps the mask bits of a with the bits of b
 ; shifted right by shift.
@@ -1033,14 +1034,12 @@ MERGE macro
 	eor.l	\5,\2
 	endm
 
-MERGE16 macro ; MERGE a, b, 16, $0000ffff, spare
-	move.l	\2,\3
-	swap	\3
-	eor.l	\1,\3
-	and.l	#$0000ffff,\3
-	eor.l	\3,\1
-	swap	\3
-	eor.l	\3,\2
+MERGE16 macro ; MERGE a, b, 16, $0000ffff with word moves: a = a.high:b.high,
+	swap	\2 ; b = a.low:b.low. The spare can be an address register (only
+	move.w	\1,\3 ; its low word is used).
+	move.w	\2,\1
+	move.w	\3,\2
+	swap	\2
 	endm
 
 c2p:
@@ -1057,16 +1056,17 @@ c2p:
 .block:
 	movem.l	(a0)+,d0-d7
 
+	MERGE16	d0,d4,a6
+	MERGE16	d1,d5,a6
+	MERGE16	d2,d6,a6
+	MERGE16	d3,d7,a6
+
 	move.l	d7,a6
-	MERGE16	d0,d4,d7
 	MERGE	d0,d4,2,$33333333,d7
-	MERGE16	d1,d5,d7
 	MERGE	d1,d5,2,$33333333,d7
-	MERGE16	d2,d6,d7
 	MERGE	d2,d6,2,$33333333,d7
 	move.l	a6,d7
 	move.l	d0,a6
-	MERGE16	d3,d7,d0
 	MERGE	d3,d7,2,$33333333,d0
 	move.l	a6,d0
 

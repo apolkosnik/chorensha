@@ -1153,7 +1153,11 @@ amiga_wait_vbl:
 ; schedule is reset instead, e.g. after loading). Otherwise the call waits
 ; for the scheduled tick and then renders the finished frame.
 
-MAXIMUM_FRAME_DEBT=8
+; 32 ticks (0.58 s): a single slow picture (an AGA frame on a 68020 takes up
+; to about 9 ticks) is caught up by skipping pictures; only real pauses such
+; as loading reset the schedule.
+
+MAXIMUM_FRAME_DEBT=32
 
 amiga_xsp_vsync:
 	movem.l	d1-d7/a0-a6,-(sp)
