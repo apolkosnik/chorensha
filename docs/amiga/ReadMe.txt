@@ -26,7 +26,7 @@ Requirements
 Speed: the game itself runs at full speed (55 frames per second) on every
 supported machine; how many of those frames are shown depends on the
 machine. A 68030 at 50 MHz with a graphics card shows about 40 per second;
-a stock A1200 (68020 at 14 MHz, AGA) about 8 to 10.
+a stock A1200 (68020 at 14 MHz, AGA) about 5.
 
 If a graphics card is present it is used; otherwise the AGA screen.
 
