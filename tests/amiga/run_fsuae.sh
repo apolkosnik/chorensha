@@ -17,6 +17,8 @@
 # "input.bin" in the arguments to use it). Files listed in WORK_FILES are
 # copied to WORK: as well; text files the program writes there are copied to
 # RESULT_DIR.
+# With WORKBENCH set, Workbench is loaded and the program is started from
+# its icon (WORKBENCH_ICON) with WBRun; see below.
 # With RUN_FROM_RAM set, the program and data are copied to RAM: and run from
 # there (no UAE host-directory filesystem during the run).
 # With AUDIO_CAPTURE set, the emulated audio is written to that WAV file
@@ -146,7 +148,14 @@ done
 # keeps the script going when the program cannot be loaded; Why records the
 # shell's error.
 
-if [ -n "${RUN_FROM_RAM:-}" ]; then
+if [ -n "${WORKBENCH:-}" ]; then
+	# Started from Workbench like a double-click on its icon (WORKBENCH_ICON,
+	# copied as program.info, should give ARGUMENTS=<frames>): the run ends
+	# when the program has written its checkpoints. Its text goes to its own
+	# console window, not to output.txt.
+	cp "$WORKBENCH_ICON" "$drive/program.info"
+	printf 'FailAt 21\nLoadWB\nWait 5\nCD WORK:\nWBRun WORK:program >WORK:wbrun.txt\nLab wait\nWait 2\nIf NOT EXISTS WORK:checkpoints.bin\n  Skip wait BACK\nEndIf\nWait 3\nEcho "started from Workbench" >WORK:output.txt\nEcho "done" >WORK:marker.txt\n' > "$drive/Run-Test"
+elif [ -n "${RUN_FROM_RAM:-}" ]; then
 	# Everything copied to RAM: first, so the run does not use UAE's
 	# host-directory filesystem (WORK:); the files it writes are copied back.
 	printf 'FailAt 21\nCopy WORK: RAM:game ALL QUIET\nCD RAM:game\nRAM:game/program %s >RAM:game/output.txt\nWhy >>RAM:game/output.txt\nCopy RAM:game/#?.(bin|txt) WORK: QUIET\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"

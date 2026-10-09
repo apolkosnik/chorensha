@@ -88,9 +88,25 @@ _LVOOpen=-30
 _LVOClose=-36
 _LVOWrite=-48
 _LVOPutStr=-948
+_LVOSelectInput=-294
+_LVOCurrentDir=-126
+_LVOSelectOutput=-300
 _LVOVPrintf=-954
 
 MODE_NEWFILE=1006
+MODE_OLDFILE=1005
+
+; icon.library
+
+_LVOGetDiskObject=-78
+_LVOFreeDiskObject=-90
+_LVOFindToolType=-96
+
+do_ToolTypes=54
+sm_ArgList=36
+wa_Lock=0
+wa_Name=4
+ARGUMENTS_SIZE=256
 
 ; Picasso96API.library
 
@@ -150,6 +166,45 @@ start:
 	jsr		_LVOOpenLibrary(a6)
 	move.l	d0,dos_base
 	beq		.exit
+
+	; Workbench start: a console window for the game's text and its
+	; prompts (no Shell output or input then). It opens when something is
+	; written and stays until closed, so messages can be read.
+
+	tst.l	workbench_message
+	beq		.console_done
+
+	move.l	d0,a6
+	move.l	#console_name,d1
+	move.l	#MODE_OLDFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,console
+	beq		.console_done
+
+	move.l	d0,d1
+	jsr		_LVOSelectOutput(a6)
+	move.l	d0,old_output
+	move.l	console,d1
+	jsr		_LVOSelectInput(a6)
+	move.l	d0,old_input
+
+.console_done:
+	; Workbench start: the program's own directory becomes the current one
+	; (the game loads its data relative to it); Workbench does not set it.
+
+	move.l	workbench_message,d0
+	beq		.directory_done
+
+	move.l	d0,a0
+	move.l	sm_ArgList(a0),a0
+	move.l	wa_Lock(a0),d1
+	move.l	dos_base,a6
+	jsr		_LVOCurrentDir(a6)
+	move.l	d0,old_directory
+	st		directory_changed
+
+.directory_done:
+	bsr		read_tool_arguments
 
 	lea		graphics_name,a1
 	moveq	#36,d0
@@ -219,6 +274,26 @@ start:
 	jsr		_LVOCloseLibrary(a6)
 
 .close_dos:
+	tst.b	directory_changed
+	beq		.directory_restored
+
+	move.l	dos_base,a6
+	move.l	old_directory,d1
+	jsr		_LVOCurrentDir(a6)
+
+.directory_restored:
+	move.l	console,d1
+	beq		.no_console
+
+	move.l	dos_base,a6
+	move.l	old_input,d1
+	jsr		_LVOSelectInput(a6)
+	move.l	old_output,d1
+	jsr		_LVOSelectOutput(a6)
+	move.l	console,d1
+	jsr		_LVOClose(a6)
+
+.no_console:
 	move.l	exec_base,a6
 	move.l	dos_base,a1
 	jsr		_LVOCloseLibrary(a6)
@@ -476,9 +551,6 @@ print_info_text:
 
 parse_frame_limit:
 	moveq	#0,d0
-
-	tst.l	workbench_message
-	bne		.done
 
 	move.l	argument_string,a0
 	move.l	argument_length,d1
@@ -798,11 +870,92 @@ select_display:
 	rts
 
 ; ------------------------------------------------------------------------------
+;
+; Workbench start: the program icon's ARGUMENTS tool type stands for the Shell
+; arguments ("ARGUMENTS=6000 input.bin"); without it there are none.
+
+read_tool_arguments:
+	movem.l	d2-d3/a2-a3/a6,-(sp)
+
+	move.l	workbench_message,d0
+	beq		.done ; Shell start: its arguments stay.
+
+	clr.l	argument_length
+
+	move.l	d0,a0
+	move.l	sm_ArgList(a0),a2 ; The program's WBArg.
+
+	move.l	exec_base,a6
+	lea		icon_name,a1
+	moveq	#36,d0
+	jsr		_LVOOpenLibrary(a6)
+	move.l	d0,d3
+	beq		.done
+
+	move.l	dos_base,a6
+	move.l	wa_Lock(a2),d1
+	jsr		_LVOCurrentDir(a6)
+	move.l	d0,d2 ; Previous directory.
+
+	move.l	d3,a6
+	move.l	wa_Name(a2),a0
+	jsr		_LVOGetDiskObject(a6)
+	move.l	d0,a3
+	tst.l	d0
+	beq		.restore_directory
+
+	move.l	do_ToolTypes(a3),a0
+	lea		arguments_tool_type,a1
+	jsr		_LVOFindToolType(a6)
+	tst.l	d0
+	beq		.free_icon
+
+	move.l	d0,a0
+	lea		tool_arguments,a1
+	move.l	a1,argument_string
+	move	#ARGUMENTS_SIZE-2,d0
+
+.copy:
+	move.b	(a0)+,(a1)+
+	dbeq	d0,.copy
+
+	clr.b	-(a1)
+	move.l	a1,d0
+	sub.l	argument_string,d0
+	move.l	d0,argument_length
+
+.free_icon:
+	move.l	a3,a0
+	jsr		_LVOFreeDiskObject(a6)
+
+.restore_directory:
+	move.l	dos_base,a6
+	move.l	d2,d1
+	jsr		_LVOCurrentDir(a6)
+
+	move.l	exec_base,a6
+	move.l	d3,a1
+	jsr		_LVOCloseLibrary(a6)
+
+.done:
+	movem.l	(sp)+,d2-d3/a2-a3/a6
+
+	rts
+
+; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
 
+icon_name:
+	dc.b	'icon.library',0
+arguments_tool_type:
+	dc.b	'ARGUMENTS',0
+
 dos_name:
 	dc.b	'dos.library',0
+
+console_name:
+	dc.b	'CON:20/20/600/180/Cho Ren Sha 68k/AUTO/CLOSE/WAIT',0
 
 graphics_name:
 	dc.b	'graphics.library',0
@@ -923,6 +1076,20 @@ fpu_text_table:
 ; ------------------------------------------------------------------------------
 	bss
 ; ------------------------------------------------------------------------------
+
+console:
+	ds.l	1
+tool_arguments:
+	ds.b	ARGUMENTS_SIZE
+old_directory:
+	ds.l	1
+directory_changed:
+	ds.b	1
+	even
+old_input:
+	ds.l	1
+old_output:
+	ds.l	1
 
 	ifd __NO_CPU_CACHES__
 saved_cache_bits:
