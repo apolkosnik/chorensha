@@ -1,0 +1,78 @@
+Cho Ren Sha 68k - Amiga port
+============================
+
+Cho Ren Sha 68k is a vertical shoot 'em up for the Sharp X68000, (c) 1995
+by Famibe No Yosshin. This is a port of the original game code to the
+Commodore Amiga: the X68000 program runs on the 68020+ with the X68000's
+hardware emulated in software, and its picture is shown on a graphics
+card (RTG) or on the AGA chipset.
+
+Work in progress: sound effects are in, music is not yet.
+
+
+Requirements
+------------
+
+  - AmigaOS 3.x, a 68020 or better.
+  - Either a graphics card with Picasso96 or CyberGraphX (8-bit screen,
+    320 x 256 or 320 x 240), or an AGA Amiga (A1200, A4000, CD32 with
+    expansion) with at least 8 MB of fast RAM.
+  - About 3 MB of free fast RAM and 0.5 MB of chip RAM for the sounds.
+
+Speed: the game itself runs at full speed (55 frames per second) on every
+supported machine; how many of those frames are shown depends on the
+machine. A 68030 at 50 MHz with a graphics card shows about 40 per second;
+a stock A1200 (68020 at 14 MHz, AGA) about 8 to 10.
+
+If a graphics card is present it is used; otherwise the AGA screen.
+
+
+Installation and start
+----------------------
+
+Copy the ChoRenSha drawer anywhere (hard disk or RAM:) and double-click the
+ChoRenSha icon, or start it from a Shell:
+
+  CD ChoRenSha
+  ChoRenSha
+
+The program needs its data drawers (BGM_DAT, ETC_DAT, PCM_DAT, XSP_DAT)
+next to it. Started from Workbench, its messages appear in a small window,
+which stays open after the game has ended until you close it.
+
+
+Controls
+--------
+
+  Joystick in port 2 or a CD32 pad:
+    directions             move
+    fire (red) button      shot
+    second (blue) button   second button
+
+  Keyboard:
+    cursor keys            move
+    CTRL or Z              shot
+    left SHIFT or X        second button
+    ESC, 1, TAB, RETURN, SPACE work as the same keys on the X68000.
+
+To quit, choose EXIT in the game's menu.
+
+
+Notes
+-----
+
+  - The game keeps its X68000 timing: 55.46 frames per second, from a CIA
+    timer. When a machine cannot show every frame, frames are left out,
+    the game does not slow down.
+  - Shell arguments (or the ARGUMENTS tool type of the icon) are for
+    testing: "ChoRenSha 6000" plays the attract demo for 6000 frames and
+    writes timing measurements to the current directory.
+
+
+Credits
+-------
+
+  Original game: (c) 1995 Famibe No Yosshin (X68000).
+  Atari Falcon port and the disassembly this port builds on: Sascha
+  Springer.
+  Amiga port: Adam Polkosnik.

@@ -11,7 +11,7 @@ status=0
 
 cd "$(dirname "$0")/../.."
 
-for definition in $(grep -hoE "^_LVO[A-Za-z0-9]+=-[0-9]+" sources/amiga/*.s tests/amiga/hardware/*.s | sort -u); do
+for definition in $(grep -hoE "^_LVO[A-Za-z0-9]+=-[0-9]+" sources/amiga/*.s tests/amiga/hardware/*.s tests/amiga/tools/*.s | sort -u); do
 	name=${definition%%=*}
 	value=${definition#*=}
 	function=${name#_LVO}

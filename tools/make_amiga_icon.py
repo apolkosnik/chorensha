@@ -6,9 +6,11 @@ screenshot of the Amiga build (screen_NNNNN.bin, see tests/amiga/
 screenshot_png.py), scaled down and drawn in the four standard Workbench
 colours (0 grey, 1 black, 2 white, 3 blue): the logo in white with a black
 shadow on grey. The icon is a classic OS 2.x/3.x tool icon (DiskObject,
-two-bitplane Image, optional tool types), which every Workbench shows.
+two-bitplane Image, optional tool types), which every Workbench shows; with
+--drawer a drawer icon (DrawerData with the window Workbench opens for it,
+and the OS 2.x DrawerData2 view settings).
 
-usage: make_amiga_icon.py screenshot.bin output.info [TOOLTYPE=value ...]
+usage: make_amiga_icon.py [--drawer] screenshot.bin output.info [TOOLTYPE=value ...]
 """
 
 import struct
@@ -113,7 +115,25 @@ def planes(image):
     return data
 
 
-def disk_object(image, tool_types):
+WBDRAWER = 2
+WBTOOL = 3
+
+
+def drawer_data():
+    """NewWindow for the drawer's window (pointers left 0; Workbench fills
+    them in), then CurrentX/Y of its contents."""
+    new_window = struct.pack(">hhhhBBIIIIIIIhhHHH",
+                             60, 40, 400, 150,   # Left, Top, Width, Height
+                             255, 255,           # DetailPen, BlockPen
+                             0,                  # IDCMPFlags
+                             0x0200107F,         # Flags (as Workbench saves them)
+                             0, 0, 0, 0, 0,      # FirstGadget, CheckMark, Title, Screen, BitMap
+                             96, 64, 65535, 65535,
+                             1)                  # Type: WBENCHSCREEN
+    return new_window + struct.pack(">ii", 0, 0)
+
+
+def disk_object(image, tool_types, drawer=False):
     height = len(image)
     width = len(image[0])
 
@@ -130,15 +150,19 @@ def disk_object(image, tool_types):
                          1)           # UserData: revision 1 (OS 2.x icon)
     header = struct.pack(">HH", 0xE310, 1) + gadget + struct.pack(
         ">BBIIIIIII",
-        3, 0,                        # Type WBTOOL, pad
+        WBDRAWER if drawer else WBTOOL, 0,
         0,                           # DefaultTool
         1 if tool_types else 0,      # ToolTypes (present)
         NO_ICON_POSITION, NO_ICON_POSITION,
-        0, 0,                        # DrawerData, ToolWindow
-        STACK_SIZE)
+        1 if drawer else 0,          # DrawerData (present)
+        0,                           # ToolWindow
+        0 if drawer else STACK_SIZE)
 
     image_header = struct.pack(">hhhhhIBBI", 0, 0, width, height, 2, 1, 3, 0, 0)
-    data = header + image_header + planes(image)
+    data = header + (drawer_data() if drawer else b"") + image_header + planes(image)
+
+    if drawer:
+        data += struct.pack(">IH", 0, 0)  # DrawerData2: flags, view modes (defaults).
 
     if tool_types:
         data += struct.pack(">I", (len(tool_types) + 1) * 4)
@@ -151,13 +175,20 @@ def disk_object(image, tool_types):
     return bytes(data)
 
 
-def main(screenshot, output, tool_types):
+def main(screenshot, output, tool_types, drawer):
     image = picture(scale(logo_mask(screenshot), WIDTH - 2, HEIGHT - 2))
-    open(output, "wb").write(disk_object(image, tool_types))
-    print(f"{output}: {len(image[0])} x {len(image)} icon, {len(tool_types)} tool types")
+    open(output, "wb").write(disk_object(image, tool_types, drawer))
+    kind = "drawer" if drawer else "tool"
+    print(f"{output}: {len(image[0])} x {len(image)} {kind} icon, {len(tool_types)} tool types")
 
 
-if len(sys.argv) < 3:
+arguments = sys.argv[1:]
+drawer = bool(arguments) and arguments[0] == "--drawer"
+
+if drawer:
+    arguments = arguments[1:]
+
+if len(arguments) < 2:
     raise SystemExit(__doc__)
 
-main(sys.argv[1], sys.argv[2], sys.argv[3:])
+main(arguments[0], arguments[1], arguments[2:], drawer)

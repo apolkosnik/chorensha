@@ -124,7 +124,7 @@ Game logic always runs at 55.46 Hz; rendering skips frames when the budget is ex
 | 3 | RTG renderer: chunky core, palette mapping, upload, frame skipping | Playable on a 68030/50 with RTG in emulation | Core done (see below): correct picture, game at full speed, display about 38 fps on a 68030/50; 55 fps needs rendering under about 16 ms |
 | 4 | Audio: sound effects, then the music pipeline | Music and effects in game | Sound effects done (see Audio); music not started |
 | 5 | 68030 optimisation: compiled-sprite tuning, span-based overlay, Zorro II path | 68030/50 holds 55.46 Hz on Zorro III | |
-| 6 | Packaging: icon, install script, optional WHDLoad | Installable release | |
+| 6 | Packaging: icon, install script, optional WHDLoad | Installable release | Done without WHDLoad: `tools/make_amiga_release.sh` makes `binaries/amiga/ChoRenSha-amiga.zip` (drawer with icon, program with tool icon, ReadMe, data); Workbench start supported (see Packaging) |
 | 7 | Native AGA output: screen, palette, C2P, frame pacing, memory budget for 8 MB machines | Playable on an A1200 with 8 MB fast RAM | Output done and exact (see AGA output); C2P speed is the open part: about 100 ms per frame on a 68020/14 |
 
 ## Phase 1 results (attract demo, 6,000 frames)
@@ -200,6 +200,13 @@ Gameplay frames have a fixed cost of about 13 ms (graphics, upload, text, palett
   - How it was found: the 68020 configs rendered different backgrounds from the 68030 ones, with the same checkpoints. Per-frame checksums (`-D__STATE_SUMS__`: pattern RAM, sprite and video registers, GVRAM, palettes, plus a log of the `_BGTEXTGT` calls) showed GVRAM differing from frame 644, the stage start, with identical inputs. Memory placement (`a1200-030-8mb`), CPU speed (`a1200-030-14`) and caches (`-D__NO_CPU_CACHES__`) made no difference. FS-UAE's non-cycle-exact 68020 (`a1200-8mb-nce`) matched the 68030s, and WinUAE's cycle-exact 68020 (`tests/amiga/run_winuae.sh`) gave a third result. So the input was something emulator-dependent, and a search of the game code for unrelocated addresses found the constant.
   - Since the fix, FS-UAE's 68030, FS-UAE's cycle-exact 68020 and WinUAE's cycle-exact 68020 give identical checksums, and the A1200 (68020, AGA) and 68030 (RTG) lockstep pictures are the same for the whole demo.
   - The Atari port is not affected: there `INITIALIZE_SPRITES_AND_GRAPHICS` is an `rts` (the Falcon port shows a pre-rendered background), so this code is not assembled.
+
+## Packaging (Phase 6)
+
+- Workbench start: the program waits for and replies to the startup message, opens a console window for its text and prompts (`CON:…/AUTO/CLOSE/WAIT`: it opens when something is written and stays until closed), makes its own directory the current one (Workbench does not; the game loads its data relative to it), and reads the icon's `ARGUMENTS` tool type in place of Shell arguments.
+- Icons: `tools/make_amiga_icon.py` draws the title logo (taken from a title-screen screenshot) as a classic two-plane Workbench icon, a tool icon or with `--drawer` a drawer icon; the generated icons are in `sources/amiga/icons/`. `tests/amiga/tools/icon_check.s` loads icons through icon.library and prints type, image, drawer data, stack and tool types (both icons and tool types checked under Workbench 3.2).
+- Release: `tools/make_amiga_release.sh` (after `./build.sh`) builds `binaries/amiga/release/` and `ChoRenSha-amiga.zip`; the user documentation is `docs/amiga/ReadMe.txt`. WHDLoad is not done (the game runs under the OS and needs it for RTG and file access).
+- Tests: `run_fsuae.sh` with `WORKBENCH=1 WORKBENCH_ICON=<icon with ARGUMENTS=600>` loads Workbench and starts the program with `WBRun` (600 frames from the icon's arguments, checkpoints match); the packaged program runs from the packaged data on `rtg-030` and `a1200-8mb`.
 
 ## Testing
 
