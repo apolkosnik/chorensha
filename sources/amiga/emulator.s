@@ -2036,6 +2036,21 @@ iocs_call:
 	cmp.b	#$10,d0 ; _CRTMOD
 	beq		.return_zero
 
+	cmp.b	#$92,d0 ; _VC_R1: d1.w = new R1 (layer priorities), -1 reads it.
+	bne		.not_vc_r1
+
+	moveq	#0,d0
+	move	L_00E82000+$500,d0 ; Returns the previous value.
+	cmp		#-1,d1
+	beq		.vc_r1_done
+
+	move	d1,L_00E82000+$500
+
+.vc_r1_done:
+	rte
+
+.not_vc_r1:
+
 	cmp.b	#$14,d0 ; _TPALET2
 	bne		.not_tpalet2
 
