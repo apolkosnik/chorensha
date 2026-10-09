@@ -17,7 +17,7 @@
 #              A1200 with the minimum memory: slow)
 #
 # Controls: the game's keyboard controls (cursor keys, CTRL or Z, SHIFT
-# or X, ESC). JOYPORT=joy0 (or joy1, ...) puts a host joystick in port 2
+# or X, P or ESC to pause). JOYPORT=joy0 (or joy1, ...) puts a host joystick in port 2
 # (default none: some keyboards register as joysticks too). MUSIC=0 leaves
 # the music out. Prints the process group ID of the WinUAE it starts.
 

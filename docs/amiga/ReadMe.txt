@@ -57,6 +57,7 @@ Controls
     cursor keys            move
     CTRL or Z              shot
     SHIFT or X             second button (either SHIFT)
+    P or ESC               pause (press again to continue)
     ESC, 1, TAB, RETURN, SPACE work as the same keys on the X68000.
 
 To quit, choose EXIT in the game's menu.

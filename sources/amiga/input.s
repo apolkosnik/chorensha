@@ -16,6 +16,7 @@
 ;   CTRL, Z              trigger A          (fire 1 / red button)
 ;   SHIFT (either), X    trigger B          (fire 2 / blue button)
 ;   ESC, 1, TAB, SHIFT, CTRL, RETURN, SPACE, cursor keys   X68000 key matrix
+;   P                    X68000 ESC (the game's pause, as ESC)
 
 	xdef initialize_input
 	xdef release_input
@@ -117,13 +118,16 @@ NO_BIT=$ff
 ; (Amiga raw key code, bit 7 = release) at that frame, written into
 ; input.device so it takes the same path as a real key. Kind 2: joystick
 ; state from that frame timer tick on (total_vbl_count), for input while
-; the game completes no frames. Records are sorted by time.
+; the game completes no frames. Kind 3: a raw key event at that frame timer
+; tick (processed directly, not through input.device: input_tick runs in
+; an interrupt). Records are sorted by time.
 
 SCRIPT_HEADER_SIZE=8
 SCRIPT_RECORD_SIZE=8
 SCRIPT_JOYSTICK=0
 SCRIPT_KEY=1
 SCRIPT_TICK_JOYSTICK=2
+SCRIPT_TICK_KEY=3
 
 IND_WRITEEVENT=11
 io_Length=36
@@ -402,13 +406,25 @@ input_tick:
 	bcc		.end
 
 	cmp.b	#SCRIPT_TICK_JOYSTICK,4(a0)
-	bne		.next
+	bcs		.next ; A frame record.
 
 	move.l	(a0),d0
 	cmp.l	total_vbl_count,d0
 	bhi		.end
 
+	cmp.b	#SCRIPT_TICK_KEY,4(a0)
+	beq		.key
+
 	move.b	5(a0),script_joystick_state
+
+	bra		.next
+
+.key:
+	movem.l	d1-d4/a1-a2,-(sp)
+	moveq	#0,d0
+	move.b	5(a0),d0
+	bsr		process_key
+	movem.l	(sp)+,d1-d4/a1-a2
 
 .next:
 	addq.l	#SCRIPT_RECORD_SIZE,a0
@@ -493,7 +509,7 @@ update_input:
 	bcc		.script_done
 
 	cmp.b	#SCRIPT_TICK_JOYSTICK,4(a0)
-	beq		.next_record ; input_tick's.
+	bcc		.next_record ; input_tick's.
 
 	move.l	(a0),d0
 	cmp.l	frame_count,d0
@@ -584,6 +600,23 @@ input_handler:
 	cmp		#$100,d0
 	bcc		.next_event ; Not a key code.
 
+	bsr		process_key
+
+.next_event:
+	move.l	ie_NextEvent(a0),a0
+	move.l	a0,d0
+	bne		.event_loop
+
+	movem.l	(sp)+,d2-d4/a0/a2
+	move.l	a0,d0
+
+	rts
+
+; d0.w = raw key code (bit 7: release): updates the key matrix and the
+; keyboard's joystick bits. From the input handler, and from input_tick for
+; the script's tick key records. May change d0-d4, a1 and a2.
+
+process_key:
 	moveq	#$7f,d1
 	and		d0,d1 ; Raw key.
 
@@ -601,13 +634,13 @@ input_handler:
 	bmi		.key_up
 
 	bset	d2,(a2)
-	bne		.next_event
+	bne		.done
 
 	bra		.apply
 
 .key_up:
 	bclr	d2,(a2)
-	beq		.next_event
+	beq		.done
 
 	moveq	#-1,d4
 
@@ -647,7 +680,7 @@ input_handler:
 	moveq	#0,d1
 	move.b	1(a1),d1
 	cmp.b	#NO_BIT,d1
-	beq		.next_event
+	beq		.done
 
 	lea		joystick_bit_counts,a2
 	add.b	d4,(a2,d1.w)
@@ -658,34 +691,27 @@ input_handler:
 	; The latest direction pressed on each axis (see joystick_now).
 
 	tst.l	d4
-	bmi		.next_event
+	bmi		.done
 
 	cmp.b	#X68_RIGHT,d1
-	bhi		.next_event
+	bhi		.done
 
 	cmp.b	#X68_LEFT,d1
 	bcs		.vertical
 
 	move.b	d1,latest_horizontal
 
-	bra		.next_event
+	bra		.done
 
 .vertical:
 	move.b	d1,latest_vertical
 
-	bra		.next_event
+	bra		.done
 
 .joystick_key_up:
 	bset	d1,keyboard_joystick_state
 
-.next_event:
-	move.l	ie_NextEvent(a0),a0
-	move.l	a0,d0
-	bne		.event_loop
-
-	movem.l	(sp)+,d2-d4/a0/a2
-	move.l	a0,d0
-
+.done:
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -806,7 +832,7 @@ key_map:
 	dc.b	NO_KEY,NO_BIT ; $16
 	dc.b	NO_KEY,NO_BIT ; $17
 	dc.b	NO_KEY,NO_BIT ; $18
-	dc.b	NO_KEY,NO_BIT ; $19
+	dc.b	$01,NO_BIT ; $19 P: the X68000's ESC, which the game reads as START (pause)
 	dc.b	NO_KEY,NO_BIT ; $1a
 	dc.b	NO_KEY,NO_BIT ; $1b
 	dc.b	NO_KEY,NO_BIT ; $1c

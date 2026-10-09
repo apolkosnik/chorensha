@@ -10,15 +10,17 @@ Text input, one step per line:
                                    no frames, as in its wait loops)
     <frame> key <name> press       a key event through input.device
     <frame> key <name> release
+    tick <tick> key <name> press   a key event at a frame timer tick
+    tick <tick> key <name> release
 
 Controls: up, down, left, right, a (trigger A), b (trigger B), or - for
 nothing; several can be combined with '+' (up+a). Key names: see KEYS
 (Amiga raw keys). Lines starting with '#' are comments.
 
 Output: 'CRSI', number of records, then 8-byte records: frame or tick
-(long), kind (0 joystick, 1 key, 2 joystick at a tick), value (joystick
-byte, active low X68000 bits, or raw key code with bit 7 set for a release),
-padding. All big-endian.
+(long), kind (0 joystick, 1 key, 2 joystick at a tick, 3 key at a tick),
+value (joystick byte, active low X68000 bits, or raw key code with bit 7 set
+for a release), padding. All big-endian.
 
 usage: make_input_script.py input.txt input.bin
 """
@@ -30,7 +32,7 @@ BITS = {"up": 0, "down": 1, "left": 2, "right": 3, "a": 5, "b": 6}
 
 KEYS = {"1": 0x01, "z": 0x31, "x": 0x32, "space": 0x40, "tab": 0x42, "return": 0x44,
         "esc": 0x45, "up": 0x4c, "down": 0x4d, "right": 0x4e, "left": 0x4f,
-        "lshift": 0x60, "rshift": 0x61, "ctrl": 0x63}
+        "p": 0x19, "lshift": 0x60, "rshift": 0x61, "ctrl": 0x63}
 
 
 def main(source, destination):
@@ -51,13 +53,13 @@ def main(source, destination):
 
         frame = int(words[0])
 
-        if words[1] == "key" and kind == 0:
+        if words[1] == "key":
             name, action = words[2], words[3]
 
             if name not in KEYS or action not in ("press", "release"):
                 raise SystemExit(f"{source}:{number}: bad key event '{line}'")
 
-            records.append((frame, number, 1, KEYS[name] | (0x80 if action == "release" else 0)))
+            records.append((frame, number, 3 if kind else 1, KEYS[name] | (0x80 if action == "release" else 0)))
 
             continue
 
