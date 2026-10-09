@@ -68,7 +68,7 @@
 	xref audio_status
 	xref write_samples_dump
 	xref music_call
-	xref music_tick
+	xref audio_tick
 	xref release_renderer
 	xref PLAYER_SCORE
 	xref PLAYER_INFO_STRUCT
@@ -984,7 +984,7 @@ frame_hardware_tick:
 vbl_server:
 	addq.l	#1,total_vbl_count
 
-	jsr		music_tick
+	jsr		audio_tick
 
 	ifd __HEARTBEAT__
 

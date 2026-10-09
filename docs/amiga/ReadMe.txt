@@ -75,6 +75,12 @@ Notes
     played by MCDRV 0.69 (CUL, free software) and recorded, and are
     streamed from disk in 8-bit stereo at 22 kHz on Paula's channels 2
     and 3; the sound effects use channels 0 and 1.
+  - Sound cards: with the argument AHI (Shell: "ChoRenSha AHI", or the
+    tool type ARGUMENTS=AHI) the effects and the music play through AHI,
+    in the audio mode chosen for the music unit in the AHI preferences;
+    AHI=0x<mode id> picks a mode (the IDs are listed by AHI's
+    preferences program). Without AHI, or if it cannot be opened, Paula
+    plays them. The line "Sound: AHI, ..." at the start shows the mode.
 
 
 Credits

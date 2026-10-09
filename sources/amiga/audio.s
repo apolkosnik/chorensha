@@ -36,6 +36,20 @@
 ;   lowers the level by 0.75 dB every speed ticks of the song, 64 steps
 ;   (the .crm header has the measured length per unit of speed), then the
 ;   song is silent and stops.
+;
+; AHI (argument "AHI" or "AHI=<mode id>"): instead of Paula, effects and
+; music play through ahi.device's low-level API, for sound cards (and AHI's
+; own Paula modes). Four mono channels as on Paula, hard left (even) and
+; right (odd), so modes without panning (even channels left, odd right)
+; play them the same: 0 and 1 the effects from the decoded samples (sound
+; 1, any memory), 2 and 3 the music from the left and right halves of the
+; ring's blocks (sound 0, a dynamic sample). The sound hook, called when a
+; channel starts a sound, queues that channel's next half block (or the
+; silence); a block is free once both sides have ended it, and the reader
+; makes it ready for both sides at once, so they stay together. AHI calls
+; are made from the frame software interrupt, the hook and the reader, never
+; from the trap handler: effects and stops requested there start at the
+; next frame tick. If AHI cannot be opened, Paula is used.
 
 	xdef initialize_audio
 	xdef release_audio
@@ -49,6 +63,9 @@
 	xdef amiga_music_loaded
 	xdef amiga_mcdrv_probe
 	xdef print_music_summary
+	xdef audio_tick
+	xdef audio_ahi_requested
+	xdef audio_ahi_mode
 
 	xref exec_base
 	xref dos_base
@@ -75,6 +92,7 @@ _LVOCloseDevice=-450
 _LVOCreateMsgPort=-666
 _LVODeleteMsgPort=-672
 
+MEMF_PUBLIC=1<<0
 MEMF_CHIP=1<<1
 MEMF_CLEAR=1<<16
 
@@ -104,6 +122,64 @@ MODE_NEWFILE=1006
 ACCESS_READ=-2
 OFFSET_BEGINNING=-1
 
+; ahi.device (low-level API)
+
+_LVOAHI_AllocAudioA=-42
+_LVOAHI_FreeAudio=-48
+_LVOAHI_ControlAudioA=-60
+_LVOAHI_SetVol=-66
+_LVOAHI_SetFreq=-72
+_LVOAHI_SetSound=-78
+_LVOAHI_LoadSound=-90
+_LVOAHI_UnloadSound=-96
+_LVOAHI_GetAudioAttrsA=-108
+
+AHI_TagBase=$80000000
+AHIA_AudioID=AHI_TagBase+1
+AHIA_MixFreq=AHI_TagBase+2
+AHIA_Channels=AHI_TagBase+3
+AHIA_Sounds=AHI_TagBase+4
+AHIA_SoundFunc=AHI_TagBase+5
+AHIC_Play=AHI_TagBase+80
+AHIC_MixFreq_Query=AHI_TagBase+84
+AHIDB_AudioID=AHI_TagBase+100
+AHIDB_Name=AHI_TagBase+$8000+109
+AHIDB_BufferLen=AHI_TagBase+122
+AHI_DEFAULT_ID=0
+AHI_DEFAULT_FREQ=0
+AHI_INVALID_ID=-1
+AHI_NOSOUND=$ffff
+AHI_NO_UNIT=255
+AHISF_IMM=1
+AHISF_NODELAY=2 ; Do not wait for a zero crossing.
+AHIST_M8S=0
+AHIST_S8S=2
+AHIST_SAMPLE=0
+AHIST_DYNAMICSAMPLE=1
+ahisi_Type=0
+ahisi_Address=4
+ahisi_Length=8
+AHISampleInfo_SIZEOF=12
+ahism_Channel=0
+ahir_Version=48
+AHIRequest_SIZEOF=80
+io_Device=20
+h_Entry=8
+Hook_SIZEOF=20
+
+AHI_EFFECT_LEFT=0 ; Channels: even left, odd right.
+AHI_EFFECT_RIGHT=1
+AHI_MUSIC_LEFT=2
+AHI_MUSIC_RIGHT=3
+AHI_CHANNELS=4
+AHI_MUSIC_SOUND=0
+AHI_EFFECT_SOUND=1
+AHI_SOUNDS=2
+AHI_FULL_VOLUME=$10000
+AHI_PAN_LEFT=0
+AHI_PAN_RIGHT=$10000
+AHI_NAME_SIZE=64
+
 NP_Entry=$800003eb
 NP_StackSize=$800003f3
 NP_Name=$800003f4
@@ -118,6 +194,7 @@ _LVOReadEClock=-60
 
 ln_Pri=9
 mn_ReplyPort=14
+mn_Length=18
 ioa_AllocKey=32
 ioa_Data=34
 ioa_Length=38
@@ -250,6 +327,24 @@ initialize_audio:
 
 	dbf		d3,.period_loop
 
+	; AHI if asked for; without it, or if it cannot be opened, Paula.
+
+	tst.b	audio_ahi_requested
+	beq		.paula
+
+	bsr		open_ahi
+	tst.b	using_ahi
+	beq		.paula
+
+	clr.l	effect_end_tick
+	clr.l	effects_played
+	st		audio_available
+
+	bsr		initialize_music
+
+	bra		.done
+
+.paula:
 	; Silent loop (one word of chip RAM).
 
 	move.l	exec_base,a6
@@ -322,6 +417,15 @@ release_audio:
 
 	clr.b	audio_available
 
+	tst.b	using_ahi
+	beq		.paula
+
+	bsr		close_ahi
+	move.l	exec_base,a6
+
+	bra		.no_channels
+
+.paula:
 	move	#ALL_CHANNELS,DMACON
 	moveq	#0,d0
 	move	d0,AUD0LC+ac_vol
@@ -416,6 +520,12 @@ decode_samples:
 	move.l	d2,sample_memory_size
 	move.l	d2,d0
 	moveq	#MEMF_CHIP,d1
+	tst.b	using_ahi
+	beq		.memory_type_set
+
+	moveq	#MEMF_PUBLIC,d1 ; AHI: any memory.
+
+.memory_type_set:
 	move.l	exec_base,a6
 	jsr		_LVOAllocMem(a6)
 	move.l	d0,sample_memory
@@ -462,6 +572,24 @@ decode_samples:
 	cmp.l	#SAMPLE_ENTRIES,d3
 	bne		.decode_loop
 
+	tst.b	using_ahi
+	beq		.decoded
+
+	; AHI: all samples as one sound; effects play parts of it.
+
+	lea		effect_sample_info,a0
+	move.l	#AHIST_M8S,ahisi_Type(a0)
+	move.l	sample_memory,ahisi_Address(a0)
+	move.l	sample_memory_size,ahisi_Length(a0)
+	moveq	#AHI_EFFECT_SOUND,d0
+	moveq	#AHIST_SAMPLE,d1
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	jsr		_LVOAHI_LoadSound(a6)
+	tst.l	d0
+	bne		.done
+
+.decoded:
 	st		samples_decoded
 
 .done:
@@ -659,6 +787,9 @@ audio_play:
 	add.l	total_vbl_count,d1
 	move.l	d1,effect_end_tick
 
+	tst.b	using_ahi
+	bne		.ahi
+
 	lea		adpcm_periods,a0
 	move	(a0,d4.w*2),d4
 
@@ -707,6 +838,32 @@ audio_play:
 	move.l	a0,AUD1LC
 	move	#1,AUD1LC+ac_len
 
+	bra		.done
+
+.ahi:
+	; AHI: the effect starts at the next frame tick (audio_tick). The
+	; request is written with interrupts masked, so the tick never sees
+	; half of it.
+
+	move	sr,-(sp)
+	or		#$0700,sr
+
+	move.l	a1,d1
+	sub.l	sample_memory,d1
+	move.l	d1,effect_offset
+	add.l	d0,d0 ; Bytes (samples).
+	move.l	d0,effect_length
+	lea		adpcm_rates_hz100,a0
+	move.l	(a0,d4.w*4),d1
+	divu.l	#100,d1
+	move.l	d1,effect_rate
+
+	move.l	d3,effect_sides ; Output bits: 1 left, 2 right.
+	st		effect_pending
+
+	move	(sp)+,sr
+	addq.l	#1,effects_played
+
 .done:
 	movem.l	(sp)+,d0-d4/a0-a1
 
@@ -735,10 +892,223 @@ audio_stop:
 	tst.b	audio_available
 	beq		.done
 
-	move	#EFFECT_CHANNELS,DMACON
 	clr.l	effect_end_tick
+	tst.b	using_ahi
+	bne		.ahi
+
+	move	#EFFECT_CHANNELS,DMACON
+
+	rts
+
+.ahi:
+	sf		effect_pending
+	st		effect_stop_pending
 
 .done:
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; From the frame software interrupt: with AHI, starts or stops the effect
+; the game asked for since the last tick; then the music's tick. Preserves
+; all registers.
+
+audio_tick:
+	tst.b	using_ahi
+	beq		music_tick
+
+	movem.l	d0-d4/a0-a2/a6,-(sp)
+
+	move.l	ahi_base,a6
+	move.l	ahi_control,a2
+
+	tst.b	effect_stop_pending
+	beq		.no_stop
+
+	sf		effect_stop_pending
+	moveq	#AHI_EFFECT_LEFT,d0
+	bsr		.channel_off
+	moveq	#AHI_EFFECT_RIGHT,d0
+	bsr		.channel_off
+
+.no_stop:
+	tst.b	effect_pending
+	beq		.done
+
+	sf		effect_pending
+	moveq	#AHI_EFFECT_LEFT,d0
+	moveq	#AHI_PAN_LEFT,d1
+	bsr		.channel_effect
+	moveq	#AHI_EFFECT_RIGHT,d0
+	move.l	#AHI_PAN_RIGHT,d1
+	bsr		.channel_effect
+
+	bra		.done
+
+; d0 = channel, d1 = its pan: the requested effect, at full volume if the
+; output bits select this side, else silent; then off when it ends.
+
+.channel_effect:
+	movem.l	d0-d1,-(sp)
+	move.l	effect_rate,d1
+	moveq	#AHISF_IMM,d2
+	jsr		_LVOAHI_SetFreq(a6)
+
+	movem.l	(sp),d0/d2
+	moveq	#0,d1
+	moveq	#1,d3
+	lsl.l	d0,d3
+	and.l	effect_sides,d3 ; Channel 0 is bit 0 (left), channel 1 bit 1.
+	beq		.volume_set
+
+	move.l	#AHI_FULL_VOLUME,d1
+
+.volume_set:
+	moveq	#AHISF_IMM,d3
+	jsr		_LVOAHI_SetVol(a6)
+
+	move.l	(sp),d0
+	moveq	#AHI_EFFECT_SOUND,d1
+	move.l	effect_offset,d2
+	move.l	effect_length,d3
+	moveq	#AHISF_IMM|AHISF_NODELAY,d4 ; At once, as the X68000's ADPCM.
+	jsr		_LVOAHI_SetSound(a6)
+
+	movem.l	(sp)+,d0-d1
+	moveq	#0,d4 ; Queued: off when the effect ends.
+	bra		.set_off
+
+.channel_off:
+	moveq	#AHISF_IMM,d4
+
+.set_off:
+	move.l	#AHI_NOSOUND,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	jmp		_LVOAHI_SetSound(a6)
+
+.done:
+	movem.l	(sp)+,d0-d4/a0-a2/a6
+
+	bra		music_tick
+
+; ------------------------------------------------------------------------------
+;
+; Opens ahi.device and allocates two channels in the mode asked for
+; (audio_ahi_mode, 0: the preferences' mode), and starts playback. Prints
+; the mode, or that Paula is used. Task context.
+
+open_ahi:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	sf		using_ahi
+
+	move.l	#ahi_step_device,ahi_failed_step
+	move.l	exec_base,a6
+	jsr		_LVOCreateMsgPort(a6)
+	move.l	d0,ahi_port
+	beq		.failed
+
+	lea		ahi_request,a1
+	move.l	d0,mn_ReplyPort(a1)
+	move	#AHIRequest_SIZEOF,mn_Length(a1) ; ahi.device checks it.
+	move	#4,ahir_Version(a1)
+	lea		ahi_device_name,a0
+	move.l	#AHI_NO_UNIT,d0
+	moveq	#0,d1
+	jsr		_LVOOpenDevice(a6)
+	tst.b	d0
+	bne		.delete_port
+
+	move.l	ahi_request+io_Device,ahi_base
+
+	lea		ahi_sound_hook,a0
+	move.l	#ahi_sound_function,h_Entry(a0)
+
+	move.l	#ahi_step_allocate,ahi_failed_step
+	lea		ahi_allocation_tags,a1
+	move.l	audio_ahi_mode,4(a1) ; AHIA_AudioID
+	move.l	ahi_base,a6
+	jsr		_LVOAHI_AllocAudioA(a6)
+	move.l	d0,ahi_control
+	beq		.close_device
+
+	move.l	#ahi_step_play,ahi_failed_step
+	move.l	d0,a2
+	lea		ahi_play_tags,a1
+	jsr		_LVOAHI_ControlAudioA(a6)
+	tst.l	d0
+	bne		.free_audio
+
+	; The mode in use, for the message.
+
+	lea		ahi_frequency_tags,a1
+	jsr		_LVOAHI_ControlAudioA(a6)
+
+	move.l	#AHI_INVALID_ID,d0
+	lea		ahi_attribute_tags,a1
+	jsr		_LVOAHI_GetAudioAttrsA(a6)
+
+	st		using_ahi
+
+	move.l	dos_base,a6
+	move.l	#ahi_format,d1
+	move.l	#ahi_print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	bra		.done
+
+.free_audio:
+	move.l	ahi_control,a2
+	jsr		_LVOAHI_FreeAudio(a6)
+	clr.l	ahi_control
+
+.close_device:
+	move.l	exec_base,a6
+	lea		ahi_request,a1
+	jsr		_LVOCloseDevice(a6)
+
+.delete_port:
+	move.l	exec_base,a6
+	move.l	ahi_port,a0
+	jsr		_LVODeleteMsgPort(a6)
+	clr.l	ahi_port
+
+.failed:
+	move.l	dos_base,a6
+	move.l	#no_ahi_format,d1
+	move.l	#ahi_failed_step,d2
+	jsr		_LVOVPrintf(a6)
+
+.done:
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+close_ahi:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	move.l	ahi_base,a6
+	move.l	ahi_control,a2
+	lea		ahi_stop_tags,a1
+	jsr		_LVOAHI_ControlAudioA(a6)
+
+	move.l	ahi_control,a2
+	jsr		_LVOAHI_FreeAudio(a6)
+	clr.l	ahi_control
+
+	move.l	exec_base,a6
+	lea		ahi_request,a1
+	jsr		_LVOCloseDevice(a6)
+
+	move.l	ahi_port,a0
+	jsr		_LVODeleteMsgPort(a6)
+	clr.l	ahi_port
+
+	sf		using_ahi
+
+	movem.l	(sp)+,d2-d7/a2-a6
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -780,9 +1150,18 @@ initialize_music:
 
 	jsr		_LVOUnLock(a6)
 
-	move.l	exec_base,a6
+	; The ring: chip RAM for Paula, any memory for AHI.
+
 	move.l	#RING_BYTES,d0
 	move.l	#MEMF_CHIP|MEMF_CLEAR,d1
+	tst.b	using_ahi
+	beq		.ring_memory_type_set
+
+	move.l	#MEMF_PUBLIC|MEMF_CLEAR,d1
+
+.ring_memory_type_set:
+	move.l	d0,ring_size
+	move.l	exec_base,a6
 	jsr		_LVOAllocMem(a6)
 	move.l	d0,ring_memory
 	beq		.done
@@ -791,6 +1170,27 @@ initialize_music:
 	move.l	d0,ring_silence
 
 	bsr		reset_ring
+
+	tst.b	using_ahi
+	beq		.ring_ready
+
+	; AHI: the ring is one dynamic 8-bit sound (mono: each channel plays
+	; one half of a block).
+
+	lea		music_sample_info,a0
+	move.l	#AHIST_M8S,ahisi_Type(a0)
+	move.l	ring_memory,ahisi_Address(a0)
+	move.l	#RING_BYTES,ahisi_Length(a0)
+	moveq	#AHI_MUSIC_SOUND,d0
+	moveq	#AHIST_DYNAMICSAMPLE,d1
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	jsr		_LVOAHI_LoadSound(a6)
+	move.l	exec_base,a6
+	tst.l	d0
+	bne		.free_ring
+
+.ring_ready:
 
 	; Signal for the reader process's start and end.
 
@@ -804,7 +1204,10 @@ initialize_music:
 	move.l	d0,music_parent
 
 	; Channel 2 audio interrupt (exclusive: audio.device gave us the
-	; channels).
+	; channels). AHI calls the sound hook instead.
+
+	tst.b	using_ahi
+	bne		.interrupt_set
 
 	move	#INTF_AUD2,INTENA
 	move	#INTF_AUD2,INTREQ
@@ -818,6 +1221,7 @@ initialize_music:
 	jsr		_LVOSetIntVector(a6)
 	move.l	d0,old_audio_vector
 
+.interrupt_set:
 	; The reader process. It signals once it is set up (music_process is
 	; then its task, or 0 if it could not start).
 
@@ -846,18 +1250,23 @@ initialize_music:
 
 .restore_vector:
 	move.l	exec_base,a6
+	tst.b	using_ahi
+	bne		.vector_restored
+
 	moveq	#INTB_AUD2,d0
 	move.l	old_audio_vector,a1
 	jsr		_LVOSetIntVector(a6)
 
+.vector_restored:
 	moveq	#0,d0
 	move.b	handshake_signal,d0
 	jsr		_LVOFreeSignal(a6)
 
 .free_ring:
+	bsr		unload_music_sound
 	move.l	exec_base,a6
 	move.l	ring_memory,a1
-	move.l	#RING_BYTES,d0
+	move.l	ring_size,d0
 	jsr		_LVOFreeMem(a6)
 	clr.l	ring_memory
 
@@ -893,22 +1302,42 @@ release_music:
 
 	bsr		stop_playback
 
+	tst.b	using_ahi
+	bne		.vector_restored
+
 	moveq	#INTB_AUD2,d0
 	move.l	old_audio_vector,a1
 	jsr		_LVOSetIntVector(a6)
 
+.vector_restored:
 	moveq	#0,d0
 	move.b	handshake_signal,d0
 	jsr		_LVOFreeSignal(a6)
 
+	bsr		unload_music_sound
+	move.l	exec_base,a6
 	move.l	ring_memory,a1
-	move.l	#RING_BYTES,d0
+	move.l	ring_size,d0
 	jsr		_LVOFreeMem(a6)
 	clr.l	ring_memory
 
 .done:
 	movem.l	(sp)+,d2-d7/a2-a6
 
+	rts
+
+; AHI: the ring is no longer a sound (before it is freed).
+
+unload_music_sound:
+	tst.b	using_ahi
+	beq		.done
+
+	moveq	#AHI_MUSIC_SOUND,d0
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	jsr		_LVOAHI_UnloadSound(a6)
+
+.done:
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -1054,13 +1483,13 @@ music_call:
 	bra		.return
 
 .play:
-	bsr		stop_playback
+	bsr		stop_from_trap
 	move.l	music_transferred,d2
 
 	bra		.request
 
 .stop:
-	bsr		stop_playback
+	bsr		stop_from_trap
 	moveq	#-1,d2
 
 .request:
@@ -1100,6 +1529,15 @@ music_tick:
 
 	movem.l	d0-d2/a0-a1/a6,-(sp)
 
+	; AHI: a stop from the trap handler (before the reader hears of it).
+
+	tst.b	music_stop_pending
+	beq		.no_stop
+
+	sf		music_stop_pending
+	bsr		stop_playback
+
+.no_stop:
 	tst.b	music_wake_pending
 	beq		.no_wake
 
@@ -1152,8 +1590,7 @@ music_tick:
 	lea		fade_volumes,a0
 	moveq	#0,d0
 	move.b	(a0,d1.l),d0
-	move	d0,AUD2LC+ac_vol
-	move	d0,AUD3LC+ac_vol
+	bsr		set_music_volume
 
 	bra		.done
 
@@ -1183,14 +1620,90 @@ wake_reader:
 ; registers.
 
 stop_playback:
+	sf		music_playing
+	sf		fade_active
+	sf		fade_requested
+
+	tst.b	using_ahi
+	bne		.ahi
+
 	move	#INTF_AUD2,INTENA
 	move	#MUSIC_CHANNELS,DMACON
 	move	#INTF_AUD2,INTREQ
 	clr		AUD2LC+ac_vol
 	clr		AUD3LC+ac_vol
+
+	rts
+
+.ahi:
+	movem.l	d0-d4/a0-a2/a6,-(sp)
+
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	moveq	#AHI_MUSIC_LEFT,d0
+	move.l	#AHI_NOSOUND,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	moveq	#AHISF_IMM,d4
+	jsr		_LVOAHI_SetSound(a6)
+
+	moveq	#AHI_MUSIC_RIGHT,d0
+	move.l	#AHI_NOSOUND,d1
+	moveq	#0,d2
+	moveq	#0,d3
+	moveq	#AHISF_IMM,d4
+	jsr		_LVOAHI_SetSound(a6)
+
+	movem.l	(sp)+,d0-d4/a0-a2/a6
+
+	rts
+
+; From the trap handler: Paula stops at once; AHI at the next frame tick
+; (music_tick), and the sound hook does nothing meanwhile.
+
+stop_from_trap:
+	tst.b	using_ahi
+	beq		stop_playback
+
 	sf		music_playing
 	sf		fade_active
 	sf		fade_requested
+	st		music_stop_pending
+
+	rts
+
+; d0.l = volume (0-64). Preserves all registers.
+
+set_music_volume:
+	tst.b	using_ahi
+	bne		.ahi
+
+	move	d0,AUD2LC+ac_vol
+	move	d0,AUD3LC+ac_vol
+
+	rts
+
+.ahi:
+	movem.l	d0-d4/a0-a2/a6,-(sp)
+
+	move.l	d0,d4
+	moveq	#10,d2
+	lsl.l	d2,d4 ; 64 -> $10000
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	moveq	#AHI_MUSIC_LEFT,d0
+	move.l	d4,d1
+	moveq	#AHI_PAN_LEFT,d2
+	moveq	#AHISF_IMM,d3
+	jsr		_LVOAHI_SetVol(a6)
+
+	moveq	#AHI_MUSIC_RIGHT,d0
+	move.l	d4,d1
+	move.l	#AHI_PAN_RIGHT,d2
+	moveq	#AHISF_IMM,d3
+	jsr		_LVOAHI_SetVol(a6)
+
+	movem.l	(sp)+,d0-d4/a0-a2/a6
 
 	rts
 
@@ -1204,6 +1717,10 @@ stop_playback:
 music_block_started:
 	move	#INTF_AUD2,INTREQ
 
+; A block (or the silence) has started: the one before has ended.
+
+block_started:
+	addq.l	#1,block_starts
 	move.l	playing_slot,d0
 	move.l	queued_slot,playing_slot
 	tst.l	d0
@@ -1211,6 +1728,7 @@ music_block_started:
 
 	addq.l	#1,ring_free
 	addq.l	#1,blocks_played
+	move.l	exec_base,a6
 	move.l	music_process,a1
 	move.l	music_wake_mask,d0
 	jsr		_LVOSignal(a6)
@@ -1266,6 +1784,119 @@ queue_next_block:
 .done:
 	rts
 
+; AHI sound hook (a0 = hook, a1 = AHISoundMessage, a2 = AHIAudioCtrl): a
+; channel has started a sound. For a music channel, the half block it
+; played before has ended: once both sides have ended a block, it is free
+; (the reader is woken). Then that channel's next half block is queued.
+; Returns d0 = 0; preserves d2-d7 and a2-a6.
+
+ahi_sound_function:
+	moveq	#0,d0
+	move	ahism_Channel(a1),d0
+	subq.l	#AHI_MUSIC_LEFT,d0
+	bcs		.done ; An effect channel.
+
+	cmp.l	#1,d0
+	bhi		.done
+
+	tst.b	music_playing
+	beq		.done ; Stopped: the next tick turns the channels off.
+
+	movem.l	d2-d4/a2/a6,-(sp)
+
+	move.l	d0,d2 ; Side: 0 left, 1 right.
+	addq.l	#1,block_starts
+	lea		side_playing,a0
+	lea		side_queued,a1
+	move.l	(a0,d2.l*4),d1 ; Ended.
+	move.l	(a1,d2.l*4),(a0,d2.l*4)
+	tst.l	d1
+	bmi		.queue ; Silence, or nothing.
+
+	lea		slot_sides_ended,a0
+	addq.b	#1,(a0,d1.l)
+	cmp.b	#2,(a0,d1.l)
+	bne		.queue
+
+	clr.b	(a0,d1.l)
+	addq.l	#1,ring_free
+	addq.l	#1,blocks_played
+	move.l	exec_base,a6
+	move.l	music_process,a1
+	move.l	music_wake_mask,d0
+	jsr		_LVOSignal(a6)
+
+.queue:
+	bsr		queue_side
+
+	movem.l	(sp)+,d2-d4/a2/a6
+
+.done:
+	moveq	#0,d0
+
+	rts
+
+; d2.l = side (0 left, 1 right): queues its next ready half block on its
+; music channel, or the silence (after the current sound; at once with
+; AHISF_IMM in ahi_queue_flags). May change d0-d1, d3-d4, a0-a2 and a6.
+
+queue_side:
+	lea		side_ready,a0
+	tst.l	(a0,d2.l*4)
+	beq		.silence
+
+	subq.l	#1,(a0,d2.l*4)
+	lea		side_read,a0
+	move.l	(a0,d2.l*4),d1 ; Slot.
+	lea		side_queued,a1
+	move.l	d1,(a1,d2.l*4)
+	addq.l	#1,(a0,d2.l*4)
+	and.l	#RING_SLOTS-1,(a0,d2.l*4)
+
+	lea		slot_frames,a0
+	moveq	#0,d3
+	move	(a0,d1.l*2),d3 ; Length.
+	lsl.l	#8,d1
+	lsl.l	#SLOT_SHIFT-8,d1
+	tst.l	d2
+	beq		.offset_set
+
+	add.l	d3,d1 ; The right half.
+
+.offset_set:
+	move.l	d1,d4
+	bra		.set
+
+.silence:
+	lea		side_queued,a1
+	move.l	#-1,(a1,d2.l*4)
+
+	tst.l	d2
+	bne		.counted
+
+	tst.b	stream_ended
+	bne		.counted
+
+	addq.l	#1,music_underruns ; Counted once, on the left.
+
+.counted:
+	move.l	#RING_SLOTS<<SLOT_SHIFT,d4
+	move.l	#SILENCE_BYTES,d3
+
+.set:
+	move.l	d2,d0
+	addq.l	#AHI_MUSIC_LEFT,d0
+	moveq	#AHI_MUSIC_SOUND,d1
+	move.l	d2,-(sp)
+	move.l	d4,d2 ; Offset.
+	move.l	ahi_queue_flags,d4
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	jsr		_LVOAHI_SetSound(a6)
+	move.l	(sp)+,d2
+
+	rts
+
 ; Empty ring: all slots free. Only while the music interrupt is off.
 
 reset_ring:
@@ -1276,6 +1907,25 @@ reset_ring:
 	move.l	#-1,playing_slot
 	move.l	#-1,queued_slot
 	sf		stream_ended
+
+	lea		side_ready,a0
+	clr.l	(a0)+
+	clr.l	(a0)
+	lea		side_read,a0
+	clr.l	(a0)+
+	clr.l	(a0)
+	lea		side_playing,a0
+	move.l	#-1,(a0)+
+	move.l	#-1,(a0)
+	lea		side_queued,a0
+	move.l	#-1,(a0)+
+	move.l	#-1,(a0)
+	lea		slot_sides_ended,a0
+	moveq	#RING_SLOTS-1,d0
+
+.clear_ended:
+	clr.b	(a0)+
+	dbf		d0,.clear_ended
 
 	rts
 
@@ -1401,6 +2051,8 @@ open_song:
 	move.l	crm_rate(a0),d1
 	beq		.bad
 
+	move.l	d1,song_rate
+
 	move.l	paula_clock,d0
 	move.l	d1,d2
 	lsr.l	#1,d2
@@ -1519,6 +2171,7 @@ fill_ring:
 	cmp.l	d1,d0
 	bne		.error
 
+
 	lea		slot_frames,a0
 	move	d4,(a0,d5.l*2)
 	addq.l	#1,d5
@@ -1528,7 +2181,21 @@ fill_ring:
 	addq.l	#1,blocks_read
 
 	subq.l	#1,ring_free ; (Single instructions: the interrupt changes
-	addq.l	#1,ring_ready ; these too.)
+	tst.b	using_ahi ; these too.)
+	bne		.ready_for_both_sides
+
+	addq.l	#1,ring_ready
+
+	bra		.loop
+
+.ready_for_both_sides:
+	; AHI: both sides at once (a hook between them would split them).
+
+	move.l	exec_base,a6
+	jsr		_LVODisable(a6)
+	addq.l	#1,side_ready
+	addq.l	#1,side_ready+4
+	jsr		_LVOEnable(a6)
 
 	bra		.loop
 
@@ -1548,13 +2215,18 @@ fill_ring:
 ; short song), unless a newer request came in meanwhile.
 
 start_if_ready:
-	movem.l	d2/a6,-(sp)
+	movem.l	d2-d4/a2/a6,-(sp)
 
 	tst.b	music_playing
 	bne		.done
 
 	tst.l	ring_ready
+	bne		.something_ready
+
+	tst.l	side_ready ; AHI.
 	beq		.done
+
+.something_ready:
 
 	tst.l	ring_free
 	beq		.start
@@ -1572,6 +2244,9 @@ start_if_ready:
 	move.l	music_request_serial,d0
 	cmp.l	handled_serial,d0
 	bne		.enable
+
+	tst.b	using_ahi
+	bne		.ahi
 
 	move	song_period,d0
 	move	d0,AUD2LC+ac_per
@@ -1591,11 +2266,44 @@ start_if_ready:
 	st		music_playing
 	addq.l	#1,songs_started
 
+	bra		.enable
+
+.ahi:
+	; The song's rate on both music channels, full volume, hard left and
+	; right, and the first block at once on both: the hook queues each
+	; side's next half when it starts.
+
+	move.l	ahi_control,a2
+	move.l	ahi_base,a6
+	moveq	#AHI_MUSIC_LEFT,d0
+	move.l	song_rate,d1
+	moveq	#AHISF_IMM,d2
+	jsr		_LVOAHI_SetFreq(a6)
+
+	moveq	#AHI_MUSIC_RIGHT,d0
+	move.l	song_rate,d1
+	moveq	#AHISF_IMM,d2
+	jsr		_LVOAHI_SetFreq(a6)
+
+	moveq	#MAXIMUM_VOLUME,d0
+	bsr		set_music_volume
+
+	st		music_playing
+	addq.l	#1,songs_started
+	move.l	#AHISF_IMM,ahi_queue_flags
+	moveq	#0,d2
+	bsr		queue_side
+	moveq	#1,d2
+	bsr		queue_side
+	clr.l	ahi_queue_flags
+
+	move.l	exec_base,a6
+
 .enable:
 	jsr		_LVOEnable(a6)
 
 .done:
-	movem.l	(sp)+,d2/a6
+	movem.l	(sp)+,d2-d4/a2/a6
 
 	rts
 
@@ -1616,6 +2324,7 @@ print_music_summary:
 	move.l	blocks_played,(a0)+
 	move.l	music_underruns,(a0)+
 	move.l	music_errors,(a0)+
+	move.l	block_starts,(a0)+
 
 	move.l	dos_base,a6
 	move.l	#music_summary_format,d1
@@ -1705,9 +2414,66 @@ music_interrupt_name:
 	dc.b	'Cho Ren Sha music',0
 
 music_summary_format:
-	dc.b	'Music: %ld songs, %ld started, %ld blocks read, %ld played, %ld underruns, %ld errors',10,0
+	dc.b	'Music: %ld songs, %ld started, %ld blocks read, %ld played, %ld underruns, %ld errors, %ld block starts',10,0
 
 	even
+
+ahi_device_name:
+	dc.b	'ahi.device',0
+
+ahi_format:
+	dc.b	'Sound: AHI, %s (mode $%lx), mixing at %ld Hz.',10,0
+
+no_ahi_format:
+	dc.b	'AHI could not be opened (%s): the sound plays on Paula.',10,0
+
+ahi_step_device:
+	dc.b	'ahi.device version 4',0
+
+ahi_step_allocate:
+	dc.b	'no such audio mode, or it is in use',0
+
+ahi_step_play:
+	dc.b	'playback did not start',0
+
+	even
+
+; AHI_AllocAudioA: two channels (effects, music), two sounds.
+
+ahi_allocation_tags:
+	dc.l	AHIA_AudioID,AHI_DEFAULT_ID ; Set from audio_ahi_mode.
+	dc.l	AHIA_MixFreq,AHI_DEFAULT_FREQ
+	dc.l	AHIA_Channels,AHI_CHANNELS
+	dc.l	AHIA_Sounds,AHI_SOUNDS
+	dc.l	AHIA_SoundFunc,ahi_sound_hook
+	dc.l	TAG_DONE
+
+ahi_play_tags:
+	dc.l	AHIC_Play,1
+	dc.l	TAG_DONE
+
+ahi_stop_tags:
+	dc.l	AHIC_Play,0
+	dc.l	TAG_DONE
+
+ahi_frequency_tags:
+	dc.l	AHIC_MixFreq_Query,ahi_mix_frequency
+	dc.l	TAG_DONE
+
+ahi_attribute_tags:
+	dc.l	AHIDB_AudioID,ahi_mode_id
+	dc.l	AHIDB_BufferLen,AHI_NAME_SIZE
+	dc.l	AHIDB_Name,ahi_mode_name
+	dc.l	TAG_DONE
+
+; VPrintf arguments for ahi_format.
+
+ahi_print_arguments:
+	dc.l	ahi_mode_name
+ahi_mode_id:
+	dc.l	0
+ahi_mix_frequency:
+	dc.l	0
 
 reader_tags:
 	dc.l	NP_Entry,reader_process
@@ -1853,6 +2619,74 @@ adpcm_periods:
 paula_clock:
 	ds.l	1
 
+; AHI
+
+audio_ahi_mode:
+	ds.l	1 ; Mode ID from the arguments (0: the preferences' mode).
+
+ahi_port:
+	ds.l	1
+
+ahi_request:
+	ds.b	AHIRequest_SIZEOF
+
+ahi_base:
+	ds.l	1
+
+ahi_control:
+	ds.l	1
+
+ahi_sound_hook:
+	ds.b	Hook_SIZEOF
+
+ahi_mode_name:
+	ds.b	AHI_NAME_SIZE
+
+effect_sample_info:
+	ds.b	AHISampleInfo_SIZEOF
+
+music_sample_info:
+	ds.b	AHISampleInfo_SIZEOF
+
+ahi_queue_flags:
+	ds.l	1
+
+effect_offset:
+	ds.l	1 ; Requested effect, played by audio_tick.
+
+effect_length:
+	ds.l	1
+
+effect_rate:
+	ds.l	1
+
+effect_sides:
+	ds.l	1
+
+ring_size:
+	ds.l	1
+
+ahi_failed_step:
+	ds.l	1 ; VPrintf argument: what failed.
+
+side_ready:
+	ds.l	2 ; AHI, per side (left, right): blocks ready, not queued yet.
+
+side_read:
+	ds.l	2 ; Next slot to queue.
+
+side_playing:
+	ds.l	2 ; Slot playing (-1: silence or none).
+
+side_queued:
+	ds.l	2 ; Slot queued (-1: silence).
+
+slot_sides_ended:
+	ds.b	RING_SLOTS ; Sides that have ended each slot.
+
+song_rate:
+	ds.l	1
+
 ; Music
 
 music_songs:
@@ -1966,9 +2800,27 @@ music_errors:
 	ds.l	1
 
 music_summary_arguments:
-	ds.l	6
+	ds.l	7
+
+block_starts:
+	ds.l	1 ; Interrupts or hook calls for the music.
 
 audio_available:
+	ds.b	1
+
+audio_ahi_requested:
+	ds.b	1
+
+using_ahi:
+	ds.b	1
+
+effect_pending:
+	ds.b	1
+
+effect_stop_pending:
+	ds.b	1
+
+music_stop_pending:
 	ds.b	1
 
 samples_decoded:

@@ -23,6 +23,8 @@
 	xdef machine_rtg
 
 	xref print_music_summary
+	xref audio_ahi_requested
+	xref audio_ahi_mode
 	xref start_emulator
 	xref heap_used
 	xref frame_count
@@ -220,6 +222,7 @@ start:
 	tst.l	machine_display
 	beq		.close_graphics
 
+	jsr		parse_audio_options
 	jsr		parse_frame_limit
 
 	ifd __NO_CPU_CACHES__
@@ -541,6 +544,176 @@ print_info_text:
 	rts
 
 .supported:
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Audio options among the arguments: "AHI" plays the sound through AHI in
+; the mode selected in the AHI preferences, "AHI=<mode id>" (hex, e.g.
+; AHI=$20001 or AHI=0x20001) in that mode. The arguments are copied without
+; them for parse_frame_limit.
+
+parse_audio_options:
+	movem.l	d2-d3/a2,-(sp)
+
+	move.l	argument_string,a0
+	move.l	argument_length,d1
+	beq		.done
+
+	lea		filtered_arguments,a1
+	move.l	a1,a2
+	move.l	#ARGUMENTS_SIZE-1,d3
+
+.token:
+	tst.l	d1
+	beq		.end
+
+	; At a token start (beginning, or after a space): "AHI", then the end,
+	; a space or "=".
+
+	move.b	(a0),d0
+	cmp.b	#' ',d0
+	bls		.copy
+
+	moveq	#~$20,d2 ; Upper case.
+	and.b	(a0),d2
+	cmp.b	#'A',d2
+	bne		.copy_word
+
+	cmp.l	#3,d1
+	bcs		.copy_word
+
+	moveq	#~$20,d2 ; Upper case.
+	and.b	1(a0),d2
+	cmp.b	#'H',d2
+	bne		.copy_word
+
+	moveq	#~$20,d2 ; Upper case.
+	and.b	2(a0),d2
+	cmp.b	#'I',d2
+	bne		.copy_word
+
+	cmp.l	#3,d1
+	beq		.ahi
+
+	move.b	3(a0),d2
+	cmp.b	#' ',d2
+	bls		.ahi
+
+	cmp.b	#'=',d2
+	bne		.copy_word
+
+	; AHI=<hex>
+
+	addq.l	#4,a0
+	subq.l	#4,d1
+	moveq	#0,d2
+	beq		.skip_prefix
+
+.ahi:
+	addq.l	#3,a0
+	subq.l	#3,d1
+	st		audio_ahi_requested
+
+	bra		.token
+
+.skip_prefix:
+	st		audio_ahi_requested
+	tst.l	d1
+	beq		.end
+
+	cmp.b	#'$',(a0)
+	bne		.not_dollar
+
+	addq.l	#1,a0
+	subq.l	#1,d1
+	bra		.hex
+
+.not_dollar:
+	cmp.l	#2,d1
+	bcs		.hex
+
+	cmp.b	#'0',(a0)
+	bne		.hex
+
+	moveq	#~$20,d0 ; Upper case.
+	and.b	1(a0),d0
+	cmp.b	#'X',d0
+	bne		.hex
+
+	addq.l	#2,a0
+	subq.l	#2,d1
+
+.hex:
+	tst.l	d1
+	beq		.hex_done
+
+	moveq	#0,d0
+	move.b	(a0),d0
+	sub.b	#'0',d0
+	cmp.b	#9,d0
+	bls		.digit
+
+	moveq	#~$20,d0 ; Upper case.
+	and.b	(a0),d0
+	sub.b	#'A',d0
+	cmp.b	#5,d0
+	bhi		.hex_done
+
+	add.b	#10,d0
+
+.digit:
+	lsl.l	#4,d2
+	or.b	d0,d2
+	addq.l	#1,a0
+	subq.l	#1,d1
+	bra		.hex
+
+.hex_done:
+	move.l	d2,audio_ahi_mode
+
+	bra		.token
+
+.copy_word:
+	; Copy up to the next space.
+
+	move.b	(a0)+,d0
+	subq.l	#1,d1
+	tst.l	d3
+	beq		.word_next
+
+	move.b	d0,(a1)+
+	subq.l	#1,d3
+
+.word_next:
+	tst.l	d1
+	beq		.end
+
+	cmp.b	#' ',(a0)
+	bhi		.copy_word
+
+	bra		.token
+
+.copy:
+	move.b	(a0)+,d0
+	subq.l	#1,d1
+	tst.l	d3
+	beq		.token
+
+	move.b	d0,(a1)+
+	subq.l	#1,d3
+
+	bra		.token
+
+.end:
+	clr.b	(a1)
+	move.l	a2,argument_string
+	sub.l	a2,a1
+	move.l	a1,argument_length
+
+.done:
+	movem.l	(sp)+,d2-d3/a2
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -1084,6 +1257,9 @@ fpu_text_table:
 console:
 	ds.l	1
 tool_arguments:
+	ds.b	ARGUMENTS_SIZE
+
+filtered_arguments:
 	ds.b	ARGUMENTS_SIZE
 old_directory:
 	ds.l	1

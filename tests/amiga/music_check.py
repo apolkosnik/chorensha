@@ -34,7 +34,17 @@ period the player computes, as audio.s does):
    within FADE_TOLERANCE of the fade length after the fade began (where the
    slope line crosses 0 dB).
 
-usage: music_check.py capture.wav music_dir [--song NAME] [--fade SPEED]
+With --ahi the streams are taken as played at their own rate (AHI plays
+them at the rate in the header; Paula at PAL clock / period).
+
+With --sides the left and right channels are checked against the stream's
+left and right separately, in place of left minus right, and the two sides
+must stay within SIDE_SYNC of each other. For captures without effects (the
+BGM test of the CONFIG menu) through a mixer: AHI mixes into 8 or 14 bits,
+and its rounding, different on each side, drowns left minus right of
+nearly-mono music (direct Paula plays each side's samples exactly).
+
+usage: music_check.py capture.wav music_dir [--song NAME] [--fade SPEED] [--ahi] [--sides]
 Prints the result per window and exits with status 1 on any failure.
 """
 
@@ -54,6 +64,11 @@ SEARCH = 0.03  # Seconds around the previous window's lag.
 # bring it down to about 0.6 while they play. A wrong or missing block
 # matches at about 0.05.
 MATCH = 0.5
+# Windows more than FADED dB down (a fade): an 8-bit mixer (AHI's 8-bit
+# modes) leaves the music a few bits there, so they match at 0.25 to 0.5;
+# a wrong block still matches at about 0.05.
+FADED = -12
+FADED_MATCH = 0.2
 FIND = 0.5  # Onsets: other songs score below 0.35.
 REPEAT = 0.05
 # Lag change allowed between consecutive windows: FS-UAE's real-time audio
@@ -68,6 +83,7 @@ SOUND = 0.02  # The first sound: left minus right above this.
 # volume, 1 of 64, is -36 dB).
 SILENT = 0.001
 FADE_TOLERANCE = 0.2
+SIDE_SYNC = 0.0005  # Seconds between left and right (--sides).
 
 
 def read_wav(path):
@@ -142,16 +158,20 @@ def paula_rate(rate):
     return PAL_PAULA_CLOCK / period
 
 
-def stream_difference(intro, loop, seconds, rate):
-    """Left minus right of the song as played for at least seconds."""
-    difference = [intro[0] - intro[1]]
+def stream_signal(intro, loop, seconds, rate, side=None):
+    """The song as played for at least seconds: left minus right, or one
+    side (0 left, 1 right)."""
+    def part(p):
+        return p[0] - p[1] if side is None else p[side]
+
+    signal = [part(intro)]
     total = len(intro[0])
 
     while len(loop[0]) and total < seconds * rate:
-        difference.append(loop[0] - loop[1])
+        signal.append(part(loop))
         total += len(loop[0])
 
-    return np.concatenate(difference)
+    return np.concatenate(signal)
 
 
 def resample(signal, from_rate, to_rate):
@@ -172,9 +192,10 @@ def correlate(capture, template):
     return raw / norm
 
 
-def main(capture_path, music_dir, only_song=None, fade_speed=None):
+def main(capture_path, music_dir, only_song=None, fade_speed=None, ahi=False, sides=False):
     rate, left, right = read_wav(capture_path)
-    capture = left - right
+    capture = left if sides else left - right
+    primary_side = 0 if sides else None
     seconds = len(capture) / rate
     print(f"{capture_path}: {seconds:.1f} s at {rate} Hz")
 
@@ -183,14 +204,14 @@ def main(capture_path, music_dir, only_song=None, fade_speed=None):
     for name in sorted(os.listdir(music_dir)):
         if name.endswith(".crm") and (only_song is None or name[:-4] == only_song):
             crm_rate, intro, loop, fade_unit = read_crm(os.path.join(music_dir, name))
-            songs[name[:-4]] = (paula_rate(crm_rate), intro, loop, fade_unit)
+            songs[name[:-4]] = (crm_rate if ahi else paula_rate(crm_rate), intro, loop, fade_unit)
 
     # 1. The song and its start.
 
     best = None
 
     for name, (played_rate, intro, loop, _) in songs.items():
-        difference = stream_difference(intro, loop, 30, played_rate)
+        difference = stream_signal(intro, loop, 30, played_rate, primary_side)
         sound = int(np.argmax(np.abs(difference) > SOUND))
         template = resample(difference[sound:sound + int(ONSET * played_rate)], played_rate, rate)
 
@@ -217,7 +238,8 @@ def main(capture_path, music_dir, only_song=None, fade_speed=None):
 
     # 2. Window by window.
 
-    expected = resample(stream_difference(intro, loop, seconds, played_rate), played_rate, rate)
+    expected = resample(stream_signal(intro, loop, seconds, played_rate, primary_side), played_rate, rate)
+    expected_right = resample(stream_signal(intro, loop, seconds, played_rate, 1), played_rate, rate) if sides else None
     window = int(WINDOW * rate)
     stream_levels = [np.sqrt(np.mean(expected[i:i + window] ** 2)) for i in range(0, len(expected) - window, window)]
     quiet_level = QUIET * float(np.median(stream_levels))
@@ -265,10 +287,22 @@ def main(capture_path, music_dir, only_song=None, fade_speed=None):
         level = 20 * np.log10(gain / reference_gain)
         checked += 1
         levels.append(((position + window / 2) / rate, level))
-        ok = scores[lag] >= MATCH
+        match = MATCH if level > FADED else FADED_MATCH
+        ok = scores[lag] >= match
 
         if previous_lag is not None and abs(lag_seconds - previous_lag) > JUMP:
             ok = False
+
+        right_text = ""
+
+        if sides:
+            right_scores = correlate(expected_right[low:centre + window + search], right[position:position + window])
+            right_lag = int(np.argmax(right_scores))
+            right_seconds = (low + right_lag - stream_position) / rate
+            right_text = f", right {right_scores[right_lag]:.3f} at {(right_seconds - lag_seconds) * 1000:+.2f} ms"
+
+            if right_scores[right_lag] < match or abs(right_seconds - lag_seconds) > SIDE_SYNC:
+                ok = False
 
         if first is None:
             first = (position, lag_seconds)
@@ -292,7 +326,7 @@ def main(capture_path, music_dir, only_song=None, fade_speed=None):
             failures += 1
 
         print(f"  {position / rate:7.2f} s (song {stream_position / rate:7.2f} s): "
-              f"correlation {scores[lag]:.3f}, lag {lag_seconds * 1000:+.2f} ms, "
+              f"correlation {scores[lag]:.3f}, lag {lag_seconds * 1000:+.2f} ms{right_text}, "
               f"level {level:+6.1f} dB{'' if ok else '  FAIL'}")
         position += window
 
@@ -345,5 +379,8 @@ parser.add_argument("capture")
 parser.add_argument("music_dir")
 parser.add_argument("--song")
 parser.add_argument("--fade", type=int, metavar="SPEED")
+parser.add_argument("--ahi", action="store_true")
+parser.add_argument("--sides", action="store_true")
 arguments = parser.parse_args()
-sys.exit(main(arguments.capture, arguments.music_dir, arguments.song, arguments.fade))
+sys.exit(main(arguments.capture, arguments.music_dir, arguments.song, arguments.fade, arguments.ahi,
+              arguments.sides))

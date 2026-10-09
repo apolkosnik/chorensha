@@ -21,6 +21,7 @@ THRESHOLD = 0.02  # Of full scale.
 SILENCE_GAP = 0.05  # Seconds below the threshold that end an event.
 WINDOW = 0.03  # Seconds compared at the start of an event.
 MATCH = 0.9
+LATE = 0.0002  # Seconds (10 samples at 48 kHz).
 
 
 def read_wav(path):
@@ -133,19 +134,23 @@ def resample(sample, rate, count):
 
 def best_match(rate, signal, start, samples):
     window = int(WINDOW * rate)
-    captured = signal[start:start + window]
     best = (0.0, None, 0)
 
-    # The threshold crossing can be a little after the sample's first byte.
+    # The threshold crossing can be a little after the sample's first byte
+    # (up to 10 ms), or, through a mixer that interpolates (AHI), up to LATE
+    # seconds before it (the interpolation rings ahead of the sound).
 
     for number, sample in samples:
         reference = resample(sample, rate, window + int(0.01 * rate))
 
-        for shift in range(0, int(0.01 * rate)):
-            value = correlate(captured, reference[shift:shift + window])
+        for late in range(0, int(LATE * rate) + 1):
+            captured = signal[start + late:start + late + window]
 
-            if value > best[0]:
-                best = (value, number, shift)
+            for shift in range(0, int(0.01 * rate) if late == 0 else 1):
+                value = correlate(captured, reference[shift:shift + window])
+
+                if value > best[0]:
+                    best = (value, number, shift - late)
 
     return best
 
