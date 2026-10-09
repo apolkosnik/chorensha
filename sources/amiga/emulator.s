@@ -2135,7 +2135,7 @@ iocs_call:
 
 	jsr		joystick_now ; The current state: the game polls it in loops.
 
-	rte
+	bra		poll_render_check
 
 .not_joyget:
 	cmp.b	#$60,d0 ; _ADPCMOUT
@@ -2296,6 +2296,91 @@ iocs_call:
 	moveq	#0,d0
 
 	rte
+
+; ------------------------------------------------------------------------------
+;
+; _JOYGET's return (trap handler, frame at (sp)): the game also polls the
+; joystick in loops that complete no frame (the pause, the name entry's wait
+; for the buttons' release) and draws in them ("pause"), which the X68000
+; shows at once. So once no frame has ended for POLL_RENDER_TICKS, the call
+; returns through poll_render, which shows the screen as it is, at most once
+; per frame timer tick. (Lockstep builds count ticks only in frame waits:
+; there it never happens.) d0 is the call's result.
+
+POLL_RENDER_TICKS=3
+
+poll_render_check:
+	movem.l	d1/a0-a1,-(sp) ; Frame: SR at 12(sp), PC at 14(sp).
+
+	btst	#5,12(sp) ; From user mode only (it changes the user stack).
+	bne		.done
+
+	tst.b	os_stack_active
+	bne		.done
+
+	move.l	total_vbl_count,d1
+	cmp.l	poll_render_tick,d1
+	beq		.done
+
+	sub.l	vbl_count_at_wake,d1
+	cmp.l	#POLL_RENDER_TICKS,d1
+	bcs		.done
+
+	move.l	total_vbl_count,poll_render_tick
+
+	; Return into poll_render, which returns to the caller: as line_f_call.
+
+	move.l	14(sp),a0
+	move	usp,a1
+	move.l	a0,-(a1)
+	move	a1,usp
+	move.l	#poll_render,14(sp)
+
+.done:
+	movem.l	(sp)+,d1/a0-a1
+
+	rte
+
+; User mode, from poll_render_check: draws and shows the screen (not
+; counted as a rendered frame). Measurement runs also take one screenshot
+; per stall, at its POLL_SCREENSHOT_RENDER'th picture, named after 900000 +
+; the frame (screen_9NNNNN.bin). Preserves all registers.
+
+POLL_SCREENSHOT_RENDER=10
+POLL_SCREENSHOT_BASE=900000
+
+poll_render:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	OS_STACK_ENTER
+
+	jsr		render_frame
+	jsr		present_frame
+
+	tst.l	frame_records
+	beq		.no_screenshot
+
+	move.l	frame_count,d0
+	cmp.l	poll_stall_frame,d0
+	beq		.same_stall
+
+	move.l	d0,poll_stall_frame
+	clr.l	poll_stall_renders
+
+.same_stall:
+	addq.l	#1,poll_stall_renders
+	cmp.l	#POLL_SCREENSHOT_RENDER,poll_stall_renders
+	bne		.no_screenshot
+
+	add.l	#POLL_SCREENSHOT_BASE,d0
+	bsr		write_screenshot
+
+.no_screenshot:
+	OS_STACK_LEAVE
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
 
 ; ------------------------------------------------------------------------------
 ;
@@ -3330,6 +3415,15 @@ render_start_time:
 	ds.l	2
 total_vbl_count:
 	ds.l	1
+poll_render_tick:
+	ds.l	1 ; Frame timer tick of the last poll_render.
+
+poll_stall_frame:
+	ds.l	1 ; Frame at which the game stalled (poll_render's screenshot).
+
+poll_stall_renders:
+	ds.l	1
+
 vbl_count_at_wake:
 	ds.l	1
 

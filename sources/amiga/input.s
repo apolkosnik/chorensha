@@ -147,6 +147,9 @@ initialize_input:
 	move.b	#-1,script_joystick_state
 	move.l	#-1,iocs_joystick_data
 
+	move.b	#X68_LEFT,latest_horizontal
+	move.b	#X68_UP,latest_vertical
+
 	lea		keyboard_matrix,a0 ; And the key counts after it.
 	moveq	#KEY_STATE_SIZE/4-1,d0
 
@@ -425,12 +428,41 @@ input_tick:
 ; _JOYGET (trap handler): d0.l = the current joystick bits (X68000, active
 ; low): a bit is pressed if the joystick, the keyboard or the script presses
 ; it.
+;
+; The keyboard's cursor keys can hold opposite directions at once, which a
+; joystick cannot: of left and right (and of up and down) only the one
+; pressed last counts. The game reads left + right as START and up + down
+; as SELECT of an X68000 pad (CONFIG: START SELECT): START pauses, START +
+; SELECT leaves the game. (ESC is START from the keyboard.)
 
 joystick_now:
+	move.l	d1,-(sp)
+
+	move.b	keyboard_joystick_state,d1
+	moveq	#1<<X68_LEFT|1<<X68_RIGHT,d0
+	and.b	d1,d0
+	bne		.horizontal_done ; Not both pressed (active low).
+
+	moveq	#X68_LEFT+X68_RIGHT,d0
+	sub.b	latest_horizontal,d0 ; The other one.
+	bset	d0,d1
+
+.horizontal_done:
+	moveq	#1<<X68_UP|1<<X68_DOWN,d0
+	and.b	d1,d0
+	bne		.vertical_done
+
+	moveq	#X68_UP+X68_DOWN,d0
+	sub.b	latest_vertical,d0
+	bset	d0,d1
+
+.vertical_done:
 	moveq	#-1,d0
 	move.b	joystick_state,d0
-	and.b	keyboard_joystick_state,d0
+	and.b	d1,d0
 	and.b	script_joystick_state,d0
+
+	move.l	(sp)+,d1
 
 	rts
 
@@ -622,6 +654,24 @@ input_handler:
 	beq		.joystick_key_up
 
 	bclr	d1,keyboard_joystick_state
+
+	; The latest direction pressed on each axis (see joystick_now).
+
+	tst.l	d4
+	bmi		.next_event
+
+	cmp.b	#X68_RIGHT,d1
+	bhi		.next_event
+
+	cmp.b	#X68_LEFT,d1
+	bcs		.vertical
+
+	move.b	d1,latest_horizontal
+
+	bra		.next_event
+
+.vertical:
+	move.b	d1,latest_vertical
 
 	bra		.next_event
 
@@ -911,7 +961,11 @@ keyboard_joystick_state:
 script_joystick_state:
 	ds.b	1
 joystick_ready:
-	ds.b	1 ; ReadJoyPort has its resources (may be called from interrupts).
+	ds.b	1
+latest_horizontal:
+	ds.b	1 ; X68_LEFT or X68_RIGHT, pressed last on the keyboard.
+latest_vertical:
+	ds.b	1 ; X68_UP or X68_DOWN. ; ReadJoyPort has its resources (may be called from interrupts).
 input_device_open:
 	ds.b	1
 input_handler_added:

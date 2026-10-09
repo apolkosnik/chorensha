@@ -1,0 +1,12 @@
+# The cursor keys left and right held together must not pause the game:
+# the game reads left + right as START of an X68000 pad, and only the key
+# pressed last counts. Main menu: START (trigger A), then left and right
+# held from frame 700 to 800. Run with "1500 input.bin": the run reaches
+# the frame limit (with both directions passed on, the game paused at frame
+# 705 and waited there for ever: no frames pass while paused).
+300 a
+310 -
+700 key left press
+705 key right press
+800 key right release
+805 key left release
