@@ -29,6 +29,8 @@
 	xref update_input
 	xref input_tick
 	xref joystick_now
+	xref mouse_frame_hook
+	xref update_mouse_pointer
 
 	xdef exit_reason
 	xdef rendered_frames
@@ -1268,7 +1270,11 @@ amiga_wait_vbl:
 
 	move	d1,d7
 
+	jsr		mouse_frame_hook ; The game's context: may draw text.
+
 	OS_STACK_ENTER
+
+	jsr		update_mouse_pointer
 
 	jsr		frame_wait_begin
 
@@ -1360,7 +1366,11 @@ amiga_xsp_vsync:
 	moveq	#0,d7
 	move	d0,d7
 
+	jsr		mouse_frame_hook ; The game's context: may draw text.
+
 	OS_STACK_ENTER
+
+	jsr		update_mouse_pointer
 
 	jsr		frame_wait_begin
 

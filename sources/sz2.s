@@ -29,6 +29,8 @@ __PORT__ equ 1
 	xdef PLAYER_INFO_STRUCT
 	xdef WORD_00088E6C ; Random table index.
 	xdef PCM_SAMPLE_INFO_TABLE
+	xdef WORD_00098864 ; The player's ship: x, y (1/64 pixel, sprite coordinates).
+	xdef DRAW_TEXT
 
 	endif
 
@@ -19235,6 +19237,12 @@ L_0002A8A4:
 
 JOYSTICK_DIRECTIONS_HANDLER:
 	link    A6,#-128                                ; 0002A90A 4E56 FF80                ; S($00026FBA) 
+
+	ifd __AMIGA__
+
+	st		amiga_stage_frame ; The ship is controlled this frame (mouse steering).
+
+	endif
 
 	movem.l D3-D4/A3-A4,-(A7)                       ; 0002A90E 48E7 1818
 

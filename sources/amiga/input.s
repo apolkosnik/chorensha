@@ -17,10 +17,23 @@
 ;   SHIFT (either), X    trigger B          (fire 2 / blue button)
 ;   ESC, 1, TAB, SHIFT, CTRL, RETURN, SPACE, cursor keys   X68000 key matrix
 ;   P                    X68000 ESC (the game's pause, as ESC)
+;   M                    mouse control on / off
+;
+; Mouse control (M): in a stage the ship steers toward the mouse pointer
+; (shown on the game's screen while mouse control is on): each frame the
+; joystick directions point from the ship to the pointer, outside a dead
+; zone of MOUSE_DEAD_ZONE pixels, so the ship moves at its normal speed and
+; stops at the pointer. The left mouse button is trigger A, the right one
+; trigger B. Outside a stage (menus) only the buttons count. "mouse on" /
+; "mouse off" is shown for MOUSE_MESSAGE_TICKS where the game shows "pause"
+; (DRAW_TEXT, from the frame end: mouse_frame_hook).
 
 	xdef initialize_input
 	xdef release_input
 	xdef update_input
+	xdef mouse_frame_hook
+	xdef mouse_mode
+	xdef amiga_stage_frame
 	xdef input_tick
 	xdef joystick_now
 
@@ -31,6 +44,9 @@
 	xref dos_base
 	xref frame_count
 	xref total_vbl_count
+	xref WORD_00098864
+	xref DRAW_TEXT
+	xref mouse_picture_position
 
 ; exec.library
 
@@ -128,6 +144,20 @@ SCRIPT_JOYSTICK=0
 SCRIPT_KEY=1
 SCRIPT_TICK_JOYSTICK=2
 SCRIPT_TICK_KEY=3
+SCRIPT_MOUSE=4 ; Value: x, then y in the padding byte (picture pixels).
+SCRIPT_MOUSE_BUTTON=5 ; Value: IECODE_LBUTTON / IECODE_RBUTTON, bit 7 = release.
+
+; Mouse
+
+IECLASS_RAWMOUSE=2
+IECODE_LBUTTON=$68
+IECODE_RBUTTON=$69
+RAW_KEY_M=$37
+MOUSE_DEAD_ZONE=3 ; Pixels.
+MOUSE_MESSAGE_TICKS=110 ; 2 s.
+MOUSE_MESSAGE_X=11 ; Text cells: "mouse off" centred where "pause" is.
+MOUSE_MESSAGE_Y=16
+SHIP_ORIGIN=16 ; Sprite coordinates of the picture's top left.
 
 IND_WRITEEVENT=11
 io_Length=36
@@ -151,6 +181,7 @@ initialize_input:
 	move.b	#-1,script_joystick_state
 	move.l	#-1,iocs_joystick_data
 
+	move.b	#-1,mouse_button_state
 	move.b	#X68_LEFT,latest_horizontal
 	move.b	#X68_UP,latest_vertical
 
@@ -408,6 +439,9 @@ input_tick:
 	cmp.b	#SCRIPT_TICK_JOYSTICK,4(a0)
 	bcs		.next ; A frame record.
 
+	cmp.b	#SCRIPT_TICK_KEY,4(a0)
+	bhi		.next
+
 	move.l	(a0),d0
 	cmp.l	total_vbl_count,d0
 	bhi		.end
@@ -473,12 +507,149 @@ joystick_now:
 	bset	d0,d1
 
 .vertical_done:
+	tst.b	mouse_mode
+	beq		.combine
+
+	; Mouse control: the buttons; in a stage, the directions toward the
+	; pointer.
+
+	and.b	mouse_button_state,d1
+	tst.b	amiga_stage_frame
+	beq		.combine
+
+	bsr		mouse_directions
+	and.b	d0,d1
+
+.combine:
 	moveq	#-1,d0
 	move.b	joystick_state,d0
 	and.b	d1,d0
 	and.b	script_joystick_state,d0
 
 	move.l	(sp)+,d1
+
+	rts
+
+; Returns d0.b = joystick directions (active low) from the ship toward the
+; mouse pointer (all released if the pointer is not available). Preserves
+; the other registers.
+
+mouse_directions:
+	movem.l	d1-d3,-(sp)
+
+	moveq	#-1,d3 ; Directions.
+	tst.b	script_mouse_active
+	beq		.pointer
+
+	move	script_mouse_x,d0
+	move	script_mouse_y,d1
+
+	bra		.position
+
+.pointer:
+	jsr		mouse_picture_position
+	tst.l	d0
+	bmi		.done
+
+.position:
+	; Picture pixels -> the ship's units (sprite coordinates * 64).
+
+	add		#SHIP_ORIGIN,d0
+	lsl		#6,d0
+	add		#SHIP_ORIGIN,d1
+	lsl		#6,d1
+
+	sub		WORD_00098864,d0 ; Horizontal distance.
+	cmp		#MOUSE_DEAD_ZONE<<6,d0
+	ble		.not_right
+
+	bclr	#X68_RIGHT,d3
+
+.not_right:
+	cmp		#-MOUSE_DEAD_ZONE<<6,d0
+	bge		.not_left
+
+	bclr	#X68_LEFT,d3
+
+.not_left:
+	sub		WORD_00098864+2,d1 ; Vertical distance.
+	cmp		#MOUSE_DEAD_ZONE<<6,d1
+	ble		.not_down
+
+	bclr	#X68_DOWN,d3
+
+.not_down:
+	cmp		#-MOUSE_DEAD_ZONE<<6,d1
+	bge		.done
+
+	bclr	#X68_UP,d3
+
+.done:
+	move.l	d3,d0
+	movem.l	(sp)+,d1-d3
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; At each frame end (amiga_wait_vbl, amiga_xsp_vsync: the game's task, its
+; stack, user mode): shows "mouse on" / "mouse off" after M, as the game
+; shows "pause" (DRAW_TEXT), and erases it MOUSE_MESSAGE_TICKS later.
+; Preserves all registers.
+
+mouse_frame_hook:
+	movem.l	d0-d1/a0-a1,-(sp)
+
+	tst.b	mouse_mode_changed
+	beq		.no_change
+
+	sf		mouse_mode_changed
+	lea		mouse_on_text,a0
+	tst.b	mouse_mode
+	bne		.text_set
+
+	lea		mouse_off_text,a0
+
+.text_set:
+	bsr		draw_mouse_message
+	move.l	total_vbl_count,d0
+	add.l	#MOUSE_MESSAGE_TICKS,d0
+	move.l	d0,mouse_message_end
+	st		mouse_message_shown
+
+	bra		.done
+
+.no_change:
+	tst.b	mouse_message_shown
+	beq		.done
+
+	move.l	total_vbl_count,d0
+	cmp.l	mouse_message_end,d0
+	bcs		.done
+
+	sf		mouse_message_shown
+	lea		mouse_erase_text,a0
+	bsr		draw_mouse_message
+
+.done:
+	sf		amiga_stage_frame ; Set again by the next stage frame.
+
+	movem.l	(sp)+,d0-d1/a0-a1
+
+	rts
+
+; a0 = text: DRAW_TEXT(x, y, text) as the game calls it (C arguments).
+
+draw_mouse_message:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	move.l	a0,-(sp)
+	pea		MOUSE_MESSAGE_Y.w
+	pea		MOUSE_MESSAGE_X.w
+	jsr		DRAW_TEXT
+	lea		12(sp),sp
+
+	movem.l	(sp)+,d2-d7/a2-a6
 
 	rts
 
@@ -509,7 +680,12 @@ update_input:
 	bcc		.script_done
 
 	cmp.b	#SCRIPT_TICK_JOYSTICK,4(a0)
-	bcc		.next_record ; input_tick's.
+	bcs		.frame_record
+
+	cmp.b	#SCRIPT_TICK_KEY,4(a0)
+	bls		.next_record ; input_tick's.
+
+.frame_record:
 
 	move.l	(a0),d0
 	cmp.l	frame_count,d0
@@ -517,6 +693,12 @@ update_input:
 
 	cmp.b	#SCRIPT_KEY,4(a0)
 	beq		.script_key
+
+	cmp.b	#SCRIPT_MOUSE,4(a0)
+	beq		.script_mouse
+
+	cmp.b	#SCRIPT_MOUSE_BUTTON,4(a0)
+	beq		.script_mouse_button
 
 	move.b	5(a0),script_joystick_state
 
@@ -526,7 +708,25 @@ update_input:
 	movem.l	a0-a1,-(sp)
 	moveq	#0,d0
 	move.b	5(a0),d0
-	jsr		write_key_event
+	moveq	#IECLASS_RAWKEY,d1
+	jsr		write_input_event
+	movem.l	(sp)+,a0-a1
+
+	bra		.next_record
+
+.script_mouse:
+	move.b	5(a0),script_mouse_x+1
+	move.b	6(a0),script_mouse_y+1
+	st		script_mouse_active
+
+	bra		.next_record
+
+.script_mouse_button:
+	movem.l	a0-a1,-(sp)
+	moveq	#0,d0
+	move.b	5(a0),d0
+	moveq	#IECLASS_RAWMOUSE,d1
+	jsr		write_input_event
 	movem.l	(sp)+,a0-a1
 
 .next_record:
@@ -553,9 +753,11 @@ update_input:
 ;
 ; d0.b = Amiga raw key code (bit 7 = release): written into input.device.
 
-write_key_event:
+write_input_event:
 	tst.b	input_handler_added
 	beq		.done
+
+	move.b	d1,-(sp)
 
 	lea		key_event,a0
 	moveq	#IE_SIZE/2-1,d1
@@ -565,7 +767,7 @@ write_key_event:
 	dbf		d1,.clear
 
 	lea		key_event,a0
-	move.b	#IECLASS_RAWKEY,ie_Class(a0)
+	move.b	(sp)+,ie_Class(a0)
 	move	d0,ie_Code(a0)
 
 	move.l	exec_base,a6
@@ -593,6 +795,15 @@ input_handler:
 	movem.l	d2-d4/a0/a2,-(sp)
 
 .event_loop:
+	cmp.b	#IECLASS_RAWMOUSE,ie_Class(a0)
+	bne		.not_mouse
+
+	move	ie_Code(a0),d0
+	bsr		process_mouse_button
+
+	bra		.next_event
+
+.not_mouse:
 	cmp.b	#IECLASS_RAWKEY,ie_Class(a0)
 	bne		.next_event
 
@@ -610,6 +821,38 @@ input_handler:
 	movem.l	(sp)+,d2-d4/a0/a2
 	move.l	a0,d0
 
+	rts
+
+; d0.w = mouse event code: the left and right buttons (bit 7: release) are
+; triggers A and B while mouse control is on (mouse_button_state, active
+; low). Other codes (movement) are ignored.
+
+process_mouse_button:
+	moveq	#$7f,d1
+	and		d0,d1
+	moveq	#X68_TRIGGER_A,d2
+	cmp		#IECODE_LBUTTON,d1
+	beq		.button
+
+	moveq	#X68_TRIGGER_B,d2
+	cmp		#IECODE_RBUTTON,d1
+	bne		.done
+
+.button:
+	cmp		#$100,d0
+	bcc		.done ; Not a button code.
+
+	tst.b	d0
+	bmi		.up
+
+	bclr	d2,mouse_button_state
+
+	rts
+
+.up:
+	bset	d2,mouse_button_state
+
+.done:
 	rts
 
 ; d0.w = raw key code (bit 7: release): updates the key matrix and the
@@ -645,6 +888,18 @@ process_key:
 	moveq	#-1,d4
 
 .apply:
+	cmp.b	#RAW_KEY_M,d1
+	bne		.not_m
+
+	tst.l	d4
+	bmi		.done ; Released.
+
+	not.b	mouse_mode
+	st		mouse_mode_changed
+
+	bra		.done
+
+.not_m:
 	lea		key_map,a1
 	add		d1,d1
 	add		d1,a1
@@ -805,6 +1060,15 @@ input_handler_name:
 	even
 
 ; Per Amiga raw key ($00-$7f): X68000 scancode, X68000 joystick bit.
+
+mouse_on_text:
+	dc.b	'mouse on ',0
+mouse_off_text:
+	dc.b	'mouse off',0
+mouse_erase_text:
+	dc.b	'         ',0
+
+	even
 
 key_map:
 	dc.b	NO_KEY,NO_BIT ; $00
@@ -985,6 +1249,24 @@ joystick_state:
 keyboard_joystick_state:
 	ds.b	1
 script_joystick_state:
+	ds.b	1
+mouse_message_end:
+	ds.l	1 ; Frame timer tick to erase the message at.
+script_mouse_x:
+	ds.w	1 ; Scripted pointer (picture pixels).
+script_mouse_y:
+	ds.w	1
+mouse_mode:
+	ds.b	1 ; Mouse control on (M).
+mouse_mode_changed:
+	ds.b	1
+mouse_message_shown:
+	ds.b	1
+mouse_button_state:
+	ds.b	1 ; Triggers from the mouse buttons (active low).
+amiga_stage_frame:
+	ds.b	1 ; The game has run its ship control this frame.
+script_mouse_active:
 	ds.b	1
 joystick_ready:
 	ds.b	1

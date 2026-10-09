@@ -58,6 +58,12 @@ Controls
     CTRL or Z              shot
     SHIFT or X             second button (either SHIFT)
     P or ESC               pause (press again to continue)
+    M                      mouse control on / off
+
+  Mouse control (M): in a stage the ship flies toward the mouse pointer
+  at its normal speed and stops there; the left mouse button shoots, the
+  right one is the second button. The game shows "mouse on" or "mouse
+  off" for two seconds.
     ESC, 1, TAB, RETURN, SPACE work as the same keys on the X68000.
 
 To quit, choose EXIT in the game's menu.
