@@ -14,9 +14,9 @@
 # FSUAE_OPTIONS adds FS-UAE options (e.g. --uae_mmu_model=68030).
 # FS-UAE runs without a window (SDL offscreen video); SHOW_WINDOW=1 shows it.
 # With INPUT_SCRIPT set, that file is copied to WORK:input.bin (pass
-# "input.bin" in the arguments to use it). Files listed in WORK_FILES are
-# copied to WORK: as well; text files the program writes there are copied to
-# RESULT_DIR.
+# "input.bin" in the arguments to use it). Files (and directories) listed in
+# WORK_FILES are copied to WORK: as well; text files the program writes
+# there are copied to RESULT_DIR, and so are the files named in COPY_BACK.
 # With WORKBENCH set, Workbench is loaded and the program is started from
 # its icon (WORKBENCH_ICON) with WBRun; see below.
 # With RUN_FROM_RAM set, the program and data are copied to RAM: and run from
@@ -139,6 +139,8 @@ mkdir -p "$drive"
 
 cp "$executable" "$drive/program"
 for data in "$game_data_dir"/*_DAT; do
+	[ -d "$data" ] || continue
+
 	if [ "$(basename "$data")" != MUSIC_DAT ]; then
 		cp -r "$data" "$drive/"
 	fi
@@ -158,7 +160,7 @@ if [ -n "${INPUT_SCRIPT:-}" ]; then
 fi
 
 for file in ${WORK_FILES:-}; do
-	cp "$file" "$drive/"
+	cp -r "$file" "$drive/"
 done
 
 # The marker is written after the program's output file is closed. FailAt 21
@@ -266,6 +268,14 @@ if [ $status -eq 0 ]; then
 			name=$(basename "$text")
 			case $name in output.txt|marker.txt) continue;; esac
 			[ -f "$text" ] && cp "$text" "$RESULT_DIR/${name%.txt}-$config.txt"
+		done
+
+		for name in ${COPY_BACK:-}; do
+			if [ -f "$drive/$name" ]; then
+				cp "$drive/$name" "$RESULT_DIR/"
+			else
+				echo "not written: $name" >&2
+			fi
 		done
 	fi
 
