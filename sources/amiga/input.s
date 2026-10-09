@@ -27,10 +27,12 @@
 ;
 ; Mouse control (M), relative: in a stage the mouse's movement (raw counts,
 ; one pixel each) moves an invisible target, which starts at the ship and
-; stays within the ship's area; each frame the joystick directions point
-; from the ship to the target, outside a dead zone of MOUSE_DEAD_ZONE
-; pixels, so the ship follows the mouse at its normal speed and stops when
-; the mouse stops. The left mouse button is trigger A, the right one trigger
+; stays within the ship's area. At the start of the game's ship control
+; (amiga_ship_control) the ship is moved straight toward the target, up to
+; MOUSE_MAX_STEP pixels a frame, so it follows the mouse at once; while the
+; game moves or holds the ship itself (respawn, held still, slowed), the
+; joystick directions point to the target instead (dead zone of
+; MOUSE_DEAD_ZONE pixels), at the game's speed. The left mouse button is trigger A, the right one trigger
 ; B. Outside a stage (menus) only the buttons count. "mouse on" /
 ; "mouse off" is shown for MOUSE_MESSAGE_TICKS where the game shows "pause"
 ; (DRAW_TEXT, from the frame end: mouse_frame_hook).
@@ -41,6 +43,7 @@
 	xdef mouse_frame_hook
 	xdef mouse_mode
 	xdef amiga_stage_frame
+	xdef amiga_ship_control
 	xdef input_tick
 	xdef joystick_now
 
@@ -53,6 +56,9 @@
 	xref total_vbl_count
 	xref WORD_00098864
 	xref DRAW_TEXT
+	xref WORD_000A8EFC
+	xref WORD_0008D8FA
+	xref WORD_000A8EFE
 
 ; exec.library
 
@@ -162,6 +168,8 @@ IECODE_LBUTTON=$68
 IECODE_RBUTTON=$69
 RAW_KEY_M=$37
 MOUSE_DEAD_ZONE=2 ; Pixels.
+MOUSE_MAX_STEP=8 ; Pixels a frame (about 440 per second).
+RESPAWN_MOVING=$80 ; WORD_000A8EFC above this: the game flies the ship in.
 SHIP_LEFT=$400 ; The ship's area (the game's limits, 1/64 pixel).
 SHIP_RIGHT=$4000
 SHIP_TOP=$400
@@ -563,6 +571,9 @@ mouse_directions:
 	movem.l	d1-d3,-(sp)
 
 	moveq	#-1,d3 ; Directions.
+	tst.b	mouse_moved_ship
+	bne		.done ; Moved directly this frame.
+
 	tst.b	mouse_target_set
 	beq		.done
 
@@ -599,10 +610,77 @@ mouse_directions:
 
 	rts
 
-; At the frame end: the mouse's movement since the last frame moves the
-; target (in a stage, with mouse control on; it starts at the ship).
-; Otherwise the movement is dropped and the target is set again next time.
-; May change d0-d1.
+; At the start of the game's ship control (JOYSTICK_DIRECTIONS_HANDLER, the
+; game's context): marks the stage frame; with mouse control on, the mouse's
+; movement moves the target, and the ship is moved toward it (unless the
+; game moves or holds it itself). Preserves all registers.
+
+amiga_ship_control:
+	st		amiga_stage_frame
+	sf		mouse_moved_ship
+
+	tst.b	mouse_mode
+	beq		.return
+
+	movem.l	d0-d1,-(sp)
+
+	cmp		#RESPAWN_MOVING,WORD_000A8EFC
+	bgt		.not_controlled
+
+	bsr		move_mouse_target
+
+	tst		WORD_0008D8FA
+	bne		.done
+
+	tst		WORD_000A8EFE
+	bne		.done
+
+	; Toward the target, at most MOUSE_MAX_STEP pixels on each axis.
+
+	move	mouse_target_x,d0
+	sub		WORD_00098864,d0
+	bsr		.limit
+	add		d0,WORD_00098864
+
+	move	mouse_target_y,d0
+	sub		WORD_00098864+2,d0
+	bsr		.limit
+	add		d0,WORD_00098864+2
+
+	st		mouse_moved_ship
+
+	bra		.done
+
+.not_controlled:
+	; The game flies the ship in: the target starts at the ship afterwards.
+
+	sf		mouse_target_set
+	clr.l	mouse_dx
+	clr.l	mouse_dy
+
+.done:
+	movem.l	(sp)+,d0-d1
+
+.return:
+	rts
+
+.limit:
+	cmp		#MOUSE_MAX_STEP<<6,d0
+	ble		.not_above
+
+	move	#MOUSE_MAX_STEP<<6,d0
+
+.not_above:
+	cmp		#-MOUSE_MAX_STEP<<6,d0
+	bge		.not_below
+
+	move	#-MOUSE_MAX_STEP<<6,d0
+
+.not_below:
+	rts
+
+; The mouse's movement since the last call moves the target (which starts
+; at the ship). May change d0-d1.
 
 move_mouse_target:
 	; Take the movement (single instructions: the input handler adds to it).
@@ -611,12 +689,6 @@ move_mouse_target:
 	sub.l	d0,mouse_dx
 	move.l	mouse_dy,d1
 	sub.l	d1,mouse_dy
-
-	tst.b	mouse_mode
-	beq		.reset
-
-	tst.b	amiga_stage_frame
-	beq		.reset
 
 	tst.b	mouse_target_set
 	bne		.move
@@ -670,9 +742,23 @@ move_mouse_target:
 
 	rts
 
+; At the frame end: outside a stage, or without mouse control, the mouse's
+; movement is dropped and the target starts at the ship next time. May
+; change d0.
+
+reset_mouse_target:
+	tst.b	mouse_mode
+	beq		.reset
+
+	tst.b	amiga_stage_frame
+	bne		.done
+
 .reset:
 	sf		mouse_target_set
+	clr.l	mouse_dx
+	clr.l	mouse_dy
 
+.done:
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -738,7 +824,7 @@ mouse_frame_hook:
 	sf		autofire_released
 
 .autofire_done:
-	bsr		move_mouse_target
+	bsr		reset_mouse_target
 	sf		amiga_stage_frame ; Set again by the next stage frame.
 
 	movem.l	(sp)+,d0-d1/a0-a1
@@ -1400,6 +1486,8 @@ amiga_stage_frame:
 	ds.b	1 ; The game has run its ship control this frame.
 mouse_target_set:
 	ds.b	1
+mouse_moved_ship:
+	ds.b	1 ; amiga_ship_control moved the ship this frame.
 joystick_ready:
 	ds.b	1
 latest_horizontal:

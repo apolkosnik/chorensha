@@ -31,6 +31,9 @@ __PORT__ equ 1
 	xdef PCM_SAMPLE_INFO_TABLE
 	xdef WORD_00098864 ; The player's ship: x, y (1/64 pixel, sprite coordinates).
 	xdef DRAW_TEXT
+	xdef WORD_000A8EFC ; Ship states: respawn countdown,
+	xdef WORD_0008D8FA ; held still,
+	xdef WORD_000A8EFE ; slowed.
 
 	endif
 
@@ -19240,7 +19243,7 @@ JOYSTICK_DIRECTIONS_HANDLER:
 
 	ifd __AMIGA__
 
-	st		amiga_stage_frame ; The ship is controlled this frame (mouse steering).
+	jsr		amiga_ship_control ; Mouse control moves the ship (input.s).
 
 	endif
 
