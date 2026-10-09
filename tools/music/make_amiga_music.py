@@ -19,7 +19,16 @@ For each song NAME (NAME.log with the loop times, NAME_full.wav, 62500 Hz):
                 a block is its left samples followed by its right samples
                 (signed 8-bit), so Paula's two channels play straight from it.
                 All frame counts are even (Paula plays words).
-  NAME_intro.mp3, NAME_loop.mp3   for MHI (MP3 decoder cards).
+  NAME_intro.mp3, NAME_loop.mp3   for MHI (MP3 decoder cards): 44100 Hz,
+                160 kbit/s CBR, no LAME tag, no bit reservoir. Played as the
+                intro file, then the loop file again and again, the frames
+                join without a gap: the loop is resampled (by FFT, as the
+                periodic signal it is) to a whole number of MP3 frames (1152
+                samples), the intro is padded at its start to whole frames,
+                and intro + loop x 3 is encoded as one stream; the intro file
+                is its frames up to the end of the first loop pass, the loop
+                file one loop period of frames from the second pass, which
+                follows itself as it follows the first pass.
 
 The intro is the song's first pass up to its loop command, the loop its
 second pass (which starts with the tails the loop will have on every repeat).
@@ -134,11 +143,68 @@ def blocks(stereo8):
     return out
 
 
-def mp3(samples, rate, path, work):
+MP3_FRAME = 1152
+
+
+def mp3_frames(data):
+    """Split MPEG-1 layer III data (no tags) into frames."""
+    frames = []
+    position = 0
+    rates = (44100, 48000, 32000)
+    bitrates = (0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320)
+
+    while position + 4 <= len(data):
+        header = int.from_bytes(data[position:position + 4], "big")
+        assert header >> 21 == 0x7ff and (header >> 19) & 3 == 3 and (header >> 17) & 3 == 1, hex(header)
+        bitrate = bitrates[(header >> 12) & 15] * 1000
+        rate = rates[(header >> 10) & 3]
+        padding = (header >> 9) & 1
+        length = 144 * bitrate // rate + padding
+        frames.append(data[position:position + length])
+        position += length
+
+    assert position == len(data)
+    return frames
+
+
+def mp3_intro_loop(intro, loop, gain, intro_path, loop_path, work):
+    """Gapless MP3 intro and loop files (see the module documentation).
+    intro, loop: interleaved int16 stereo at 44100 Hz."""
+    import numpy as np
+    from scipy.signal import resample as fft_resample
+
+    def frames_of(samples, multiple):
+        return np.asarray(samples, dtype=np.float64).reshape(-1, 2) * gain
+
+    intro_s = frames_of(intro, 1)
+    pad = (-len(intro_s)) % MP3_FRAME
+    intro_s = np.concatenate([np.zeros((pad, 2)), intro_s])
+    parts = [intro_s]
+    loop_frames = 0
+
+    if len(loop):
+        loop_s = frames_of(loop, 1)
+        loop_frames = max(1, int(round(len(loop_s) / MP3_FRAME)))
+        loop_s = fft_resample(loop_s, loop_frames * MP3_FRAME, axis=0)
+        parts += [loop_s] * 3
+
+    stream = np.clip(np.round(np.concatenate(parts)), -32768, 32767).astype("<i2")
     raw = os.path.join(work, "mp3.raw")
-    samples.tofile(open(raw, "wb"))
-    subprocess.run(["lame", "--quiet", "-r", "-s", str(rate / 1000), "--bitwidth", "16",
-                    "--signed", "--little-endian", "-m", "j", "-b", "160", raw, path], check=True)
+    encoded = os.path.join(work, "mp3.mp3")
+    stream.tofile(raw)
+    subprocess.run(["lame", "--quiet", "-r", "-s", "44.1", "--bitwidth", "16", "--signed", "--little-endian",
+                    "-m", "j", "--cbr", "-b", "160", "-t", "--nores", raw, encoded], check=True)
+    frames = mp3_frames(open(encoded, "rb").read())
+    intro_end = len(intro_s) // MP3_FRAME + loop_frames
+
+    with open(intro_path, "wb") as out:
+        out.write(b"".join(frames[:intro_end if loop_frames else len(frames)]))
+
+    if loop_frames:
+        with open(loop_path, "wb") as out:
+            out.write(b"".join(frames[intro_end:intro_end + loop_frames]))
+
+    return pad, loop_frames
 
 
 def song_parts(music_dir, name):
@@ -195,13 +261,13 @@ def main(music_dir, output_dir, rate):
 
         mp3_rate = 44100
         intro_m = resample(intro, mp3_rate, work)
-        mp3(array.array("h", (max(-32768, min(32767, int(s * gain))) for s in intro_m)),
-            mp3_rate, os.path.join(output_dir, name + "_intro.mp3"), work)
+        loop_m = resample(loop, mp3_rate, work) if len(loop) else array.array("h")
+        loop_path = os.path.join(output_dir, name + "_loop.mp3")
 
-        if len(loop):
-            loop_m = resample(loop, mp3_rate, work)
-            mp3(array.array("h", (max(-32768, min(32767, int(s * gain))) for s in loop_m)),
-                mp3_rate, os.path.join(output_dir, name + "_loop.mp3"), work)
+        if os.path.exists(loop_path):
+            os.remove(loop_path)
+
+        mp3_intro_loop(intro_m, loop_m, gain, os.path.join(output_dir, name + "_intro.mp3"), loop_path, work)
 
         print(f"{name}: intro {len(intro_r) // 2 / rate:.2f} s, loop {len(loop_r) // 2 / rate:.2f} s, "
               f"gain {gain:.2f}, level {level}, fade {unit / 10000:.3f} s per speed unit, {os.path.getsize(os.path.join(output_dir, name + '.crm')) // 1024} KB")

@@ -27,6 +27,8 @@
 	xref audio_ahi_mode
 	xref audio_music_volume
 	xref audio_effect_volume
+	xref audio_mhi_requested
+	xref audio_mhi_driver
 	xref start_emulator
 	xref heap_used
 	xref frame_count
@@ -112,6 +114,7 @@ sm_ArgList=36
 wa_Lock=0
 wa_Name=4
 ARGUMENTS_SIZE=256
+MHI_DRIVER_NAME_SIZE=64 ; audio_mhi_driver (audio.s).
 
 ; Picasso96API.library
 
@@ -553,7 +556,9 @@ print_info_text:
 ; Audio options among the arguments: "AHI" plays the sound through AHI in
 ; the mode selected in the AHI preferences, "AHI=<mode id>" (hex, e.g.
 ; AHI=$20001 or AHI=0x20001) in that mode; "MUSICVOL=<0-64>" and
-; "SFXVOL=<0-64>" set the music's and the effects' volume (default 64).
+; "SFXVOL=<0-64>" set the music's and the effects' volume (default 64);
+; "MHI" plays the music on an MHI decoder (LIBS:MHI/mhiz3660.library),
+; "MHI=<driver>" with that driver (e.g. MHI=mhizz9000.library).
 ; The arguments are copied without them for parse_frame_limit.
 
 parse_audio_options:
@@ -629,6 +634,57 @@ parse_audio_options:
 	bra		.token
 
 .not_volume:
+	; MHI, MHI=<driver>.
+
+	lea		mhi_keyword,a3
+	bsr		match_keyword
+	beq		.not_mhi
+
+	cmp.l	d0,d1
+	beq		.mhi ; "MHI" at the end.
+
+	move.b	(a0,d0.l),d2
+	cmp.b	#' ',d2
+	bls		.mhi
+
+	cmp.b	#'=',d2
+	bne		.not_mhi ; Another word.
+
+	; The driver's name, after "MHI/".
+
+	addq.l	#1,d0
+	add.l	d0,a0
+	sub.l	d0,d1
+	st		audio_mhi_requested
+	lea		audio_mhi_driver+4,a3 ; After "MHI/".
+	moveq	#MHI_DRIVER_NAME_SIZE-4-2,d0
+
+.mhi_name:
+	tst.l	d1
+	beq		.mhi_name_end
+
+	move.b	(a0),d2
+	cmp.b	#' ',d2
+	bls		.mhi_name_end
+
+	move.b	d2,(a3)+
+	addq.l	#1,a0
+	subq.l	#1,d1
+	dbf		d0,.mhi_name
+
+.mhi_name_end:
+	clr.b	(a3)
+
+	bra		.token
+
+.mhi:
+	add.l	d0,a0
+	sub.l	d0,d1
+	st		audio_mhi_requested
+
+	bra		.token
+
+.not_mhi:
 	moveq	#~$20,d2 ; Upper case.
 	and.b	(a0),d2
 	cmp.b	#'A',d2
@@ -1234,6 +1290,8 @@ music_volume_keyword:
 	dc.b	'MUSICVOL=',0
 effect_volume_keyword:
 	dc.b	'SFXVOL=',0
+mhi_keyword:
+	dc.b	'MHI',0
 
 	even
 ; ------------------------------------------------------------------------------

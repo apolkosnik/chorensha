@@ -18,8 +18,10 @@ Requirements
     320 x 256 or 320 x 240), or an AGA Amiga (A1200, A4000, CD32 with
     expansion) with at least 8 MB of fast RAM.
   - About 3 MB of free fast RAM and 0.6 MB of chip RAM for the sounds.
-  - For the music, 66 MB of disk space (MUSIC_DAT) and a hard disk or
-    other storage that reads 44 KB per second while the game runs.
+  - For the music, 100 MB of disk space (MUSIC_DAT: 66 MB of streams, and
+    34 MB of MP3 files for MHI, which may be deleted without MHI) and a
+    hard disk or other storage that reads 44 KB per second while the game
+    runs.
 
 Speed: the game itself runs at full speed (55 frames per second) on every
 supported machine; how many of those frames are shown depends on the
@@ -92,6 +94,11 @@ Notes
     AHI=0x<mode id> picks a mode (the IDs are listed by AHI's
     preferences program). Without AHI, or if it cannot be opened, Paula
     plays them. The line "Sound: AHI, ..." at the start shows the mode.
+  - MP3 decoder cards: with the argument MHI the music plays from the MP3
+    files in MUSIC_DAT on an MHI decoder (LIBS:MHI/mhiz3660.library), or
+    MHI=<driver> with another MHI driver (e.g. MHI=mhizz9000.library). If
+    the driver cannot be opened or has no decoder, the game says so and
+    plays the music as usual. Effects stay on Paula (or AHI with AHI).
   - Volume: MUSICVOL=<0-64> and SFXVOL=<0-64> (arguments or ARGUMENTS
     tool type, e.g. "ChoRenSha MUSICVOL=40") set the music's and the
     effects' volume; both default to 64 (full). The songs keep their

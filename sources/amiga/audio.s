@@ -50,6 +50,15 @@
 ; are made from the frame software interrupt, the hook and the reader, never
 ; from the trap handler: effects and stops requested there start at the
 ; next frame tick. If AHI cannot be opened, Paula is used.
+;
+; MHI (argument "MHI" or "MHI=<driver>"): the music plays from MP3 files on
+; an MHI decoder (LIBS:MHI/mhiz3660.library by default; effects stay on
+; Paula or AHI): MUSIC_DAT/NAME_intro.mp3, then NAME_loop.mp3 again and
+; again, which join without a gap (tools/music/make_amiga_music.py). The
+; reader process allocates the decoder (MHI signals the allocating task),
+; keeps MHI_BUFFERS buffers of MHI_BUFFER_SIZE bytes queued, and sets the
+; volume (MHIP_VOLUME 0-100) for fades and MUSICVOL; MHI is only called by
+; the process. Without the driver or a decoder, the music streams as above.
 
 	xdef initialize_audio
 	xdef release_audio
@@ -67,6 +76,8 @@
 	xdef audio_ahi_requested
 	xdef audio_ahi_mode
 	xdef audio_music_volume
+	xdef audio_mhi_requested
+	xdef audio_mhi_driver
 	xdef audio_effect_volume
 
 	xref exec_base
@@ -181,6 +192,29 @@ AHI_FULL_VOLUME=$10000
 AHI_PAN_LEFT=0
 AHI_PAN_RIGHT=$10000
 AHI_NAME_SIZE=64
+
+; MHI driver library
+
+_LVOMHIAllocDecoder=-30
+_LVOMHIFreeDecoder=-36
+_LVOMHIQueueBuffer=-42
+_LVOMHIGetEmpty=-48
+_LVOMHIGetStatus=-54
+_LVOMHIPlay=-60
+_LVOMHIStop=-66
+_LVOMHIQuery=-78
+_LVOMHISetParam=-84
+_LVOOpenLibrary=-552
+_LVOCloseLibrary=-414
+
+MHIF_OUT_OF_DATA=2
+MHIQ_DECODER_NAME=1000
+MHIP_VOLUME=0
+MHI_BUFFERS=8
+MHI_BUFFER_SIZE=16384
+MHI_DRIVER_NAME_SIZE=64 ; As main.s.
+MHI_PATH_SIZE=64
+MHI_MAXIMUM_VOLUME=100
 
 NP_Entry=$800003eb
 NP_StackSize=$800003f3
@@ -1155,6 +1189,39 @@ initialize_music:
 
 	jsr		_LVOUnLock(a6)
 
+	; MHI: the driver library and the buffers (the process allocates the
+	; decoder).
+
+	clr.l	mhi_base
+	clr.l	mhi_buffers
+	tst.b	audio_mhi_requested
+	beq		.no_mhi
+
+	move.l	exec_base,a6
+	lea		audio_mhi_driver,a1
+	moveq	#0,d0
+	jsr		_LVOOpenLibrary(a6)
+	move.l	d0,mhi_base
+	beq		.mhi_failed
+
+	move.l	#MHI_BUFFERS*MHI_BUFFER_SIZE,d0
+	moveq	#MEMF_PUBLIC,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,mhi_buffers
+	bne		.no_mhi
+
+	move.l	mhi_base,a1
+	jsr		_LVOCloseLibrary(a6)
+	clr.l	mhi_base
+
+.mhi_failed:
+	move.l	dos_base,a6
+	move.l	#no_mhi_format,d1
+	move.l	#mhi_print_arguments,d2
+	move.l	#audio_mhi_driver,mhi_print_arguments
+	jsr		_LVOVPrintf(a6)
+
+.no_mhi:
 	; The ring: chip RAM for Paula, any memory for AHI.
 
 	move.l	#RING_BYTES,d0
@@ -1251,6 +1318,29 @@ initialize_music:
 	st		music_available
 	st		music_enabled
 
+	tst.l	mhi_base
+	beq		.done
+
+	; The process allocated the decoder, or could not (then closed).
+
+	tst.b	using_mhi
+	beq		.mhi_no_decoder
+
+	move.l	dos_base,a6
+	move.l	#mhi_format,d1
+	move.l	#mhi_print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	bra		.done
+
+.mhi_no_decoder:
+	move.l	dos_base,a6
+	move.l	#mhi_print_arguments,d2
+	move.l	#audio_mhi_driver,mhi_print_arguments
+	move.l	#no_mhi_decoder_format,d1
+	jsr		_LVOVPrintf(a6)
+	bsr		free_mhi
+
 	bra		.done
 
 .restore_vector:
@@ -1326,8 +1416,37 @@ release_music:
 	jsr		_LVOFreeMem(a6)
 	clr.l	ring_memory
 
+	bsr		free_mhi
+
 .done:
 	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+; The MHI driver and buffers (after the process has freed its decoder).
+
+free_mhi:
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+
+	move.l	exec_base,a6
+	move.l	mhi_buffers,d0
+	beq		.no_buffers
+
+	move.l	d0,a1
+	move.l	#MHI_BUFFERS*MHI_BUFFER_SIZE,d0
+	jsr		_LVOFreeMem(a6)
+	clr.l	mhi_buffers
+
+.no_buffers:
+	move.l	mhi_base,d0
+	beq		.done
+
+	move.l	d0,a1
+	jsr		_LVOCloseLibrary(a6)
+	clr.l	mhi_base
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a1/a6
 
 	rts
 
@@ -1629,6 +1748,9 @@ stop_playback:
 	sf		fade_active
 	sf		fade_requested
 
+	tst.b	using_mhi
+	bne		.mhi ; The reader process stops the decoder (a request follows).
+
 	tst.b	using_ahi
 	bne		.ahi
 
@@ -1638,6 +1760,9 @@ stop_playback:
 	clr		AUD2LC+ac_vol
 	clr		AUD3LC+ac_vol
 
+	rts
+
+.mhi:
 	rts
 
 .ahi:
@@ -1667,6 +1792,9 @@ stop_playback:
 ; (music_tick), and the sound hook does nothing meanwhile.
 
 stop_from_trap:
+	tst.b	using_mhi
+	bne		stop_playback ; Flags only; the process stops the decoder.
+
 	tst.b	using_ahi
 	beq		stop_playback
 
@@ -1697,6 +1825,23 @@ set_music_volume:
 .scaled:
 	move.l	(sp)+,d1
 
+	tst.b	using_mhi
+	beq		.not_mhi
+
+	; MHI: 0-100, set by the reader process.
+
+	movem.l	d0-d1,-(sp)
+	mulu	#MHI_MAXIMUM_VOLUME,d0
+	add.l	#MAXIMUM_VOLUME/2,d0
+	divu	#MAXIMUM_VOLUME,d0
+	and.l	#$ffff,d0
+	move.l	d0,mhi_volume
+	st		music_wake_pending
+	movem.l	(sp)+,d0-d1
+
+	rts
+
+.not_mhi:
 	tst.b	using_ahi
 	bne		.ahi
 
@@ -1971,12 +2116,23 @@ reader_process:
 	jsr		_LVOFindTask(a6)
 	move.l	d0,music_process
 
+	move.l	music_wake_mask,reader_wait_mask
+	sf		using_mhi
+	tst.l	mhi_base
+	beq		.decoder_done
+
+	bsr		allocate_mhi_decoder
+
+.decoder_done:
 	bsr		signal_parent
 
 .wait:
 	move.l	exec_base,a6
-	move.l	music_wake_mask,d0
+	move.l	reader_wait_mask,d0
 	jsr		_LVOWait(a6)
+
+	tst.b	using_mhi
+	bne		.mhi
 
 	tst.b	music_quit
 	bne		.quit
@@ -2001,7 +2157,46 @@ reader_process:
 
 	bra		.wait
 
+.mhi:
+	; MHI: requests, buffers, volume.
+
+	tst.b	music_quit
+	bne		.quit
+
+	move.l	music_request_serial,d0
+	cmp.l	handled_serial,d0
+	beq		.mhi_service
+
+	move.l	d0,handled_serial
+	bsr		mhi_stop
+
+	move.l	music_request_song,d0
+	bmi		.mhi_service
+
+	bsr		mhi_start
+
+.mhi_service:
+	bsr		mhi_refill
+	bsr		mhi_apply_volume
+
+	bra		.wait
+
 .quit:
+	tst.b	using_mhi
+	beq		.no_decoder
+
+	bsr		mhi_stop
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+	jsr		_LVOMHIFreeDecoder(a6)
+	sf		using_mhi
+
+	move.l	exec_base,a6
+	moveq	#0,d0
+	move.b	mhi_signal,d0
+	jsr		_LVOFreeSignal(a6)
+
+.no_decoder:
 	bsr		close_song
 
 	move.l	exec_base,a6
@@ -2019,6 +2214,338 @@ reader_process:
 
 	moveq	#0,d0
 
+	rts
+
+; MHI (reader process). Allocates the decoder for this process: using_mhi,
+; and its signal joins reader_wait_mask. Without one, the driver is left
+; for initialize_music to close.
+
+allocate_mhi_decoder:
+	move.l	exec_base,a6
+	moveq	#-1,d0
+	jsr		_LVOAllocSignal(a6)
+	move.b	d0,mhi_signal
+	bmi		.done
+
+	moveq	#0,d1
+	bset	d0,d1
+	move.l	d1,mhi_mask
+
+	move.l	mhi_base,a6
+	move.l	music_process,a0
+	move.l	d1,d0
+	jsr		_LVOMHIAllocDecoder(a6)
+	move.l	d0,mhi_handle
+	beq		.no_decoder
+
+	move.l	mhi_mask,d0
+	or.l	d0,reader_wait_mask
+
+	moveq	#0,d1
+	move.l	#MHIQ_DECODER_NAME,d1
+	jsr		_LVOMHIQuery(a6)
+	move.l	d0,mhi_print_arguments
+
+	; All buffers free.
+
+	lea		mhi_free_buffers,a0
+	move.l	mhi_buffers,d0
+	moveq	#MHI_BUFFERS-1,d1
+
+.buffer_loop:
+	move.l	d0,(a0)+
+	add.l	#MHI_BUFFER_SIZE,d0
+	dbf		d1,.buffer_loop
+
+	move.l	#MHI_BUFFERS,mhi_free_count
+	st		using_mhi
+
+	bra		.done
+
+.no_decoder:
+	move.l	exec_base,a6
+	moveq	#0,d0
+	move.b	mhi_signal,d0
+	jsr		_LVOFreeSignal(a6)
+
+.done:
+	rts
+
+; Stops the decoder, takes back all buffers, closes the files.
+
+mhi_stop:
+	movem.l	d2-d3/a2-a3/a6,-(sp)
+
+	sf		music_playing
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+	jsr		_LVOMHIStop(a6)
+	bsr		mhi_take_back
+
+	lea		mhi_files,a2
+	moveq	#2-1,d2
+
+.close_loop:
+	move.l	(a2),d1
+	beq		.next
+
+	move.l	dos_base,a6
+	jsr		_LVOClose(a6)
+	clr.l	(a2)
+
+.next:
+	addq.l	#4,a2
+	dbf		d2,.close_loop
+
+	clr.l	mhi_current_file
+	sf		stream_ended
+
+	movem.l	(sp)+,d2-d3/a2-a3/a6
+
+	rts
+
+; Empty buffers back on the free list.
+
+mhi_take_back:
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+
+.loop:
+	jsr		_LVOMHIGetEmpty(a6)
+	tst.l	d0
+	beq		.done
+
+	move.l	mhi_free_count,d1
+	lea		mhi_free_buffers,a0
+	move.l	d0,(a0,d1.l*4)
+	addq.l	#1,mhi_free_count
+
+	bra		.loop
+
+.done:
+	rts
+
+; d0.l = song entry: opens NAME_intro.mp3 and NAME_loop.mp3 (named after
+; the song's stream, MUSIC_DAT/NAME.crm), queues the buffers and plays.
+
+mhi_start:
+	movem.l	d2-d4/a2-a3/a6,-(sp)
+
+	move.l	d0,d4 ; Song entry.
+	mulu	#SONG_ENTRY_SIZE,d0
+	lea		music_songs+4,a2
+	add.l	d0,a2
+
+	lea		mhi_intro_suffix,a1
+	lea		mhi_intro_path,a0
+	bsr		mhi_path
+	lea		mhi_loop_suffix,a1
+	lea		mhi_loop_path,a0
+	bsr		mhi_path
+
+	move.l	dos_base,a6
+	move.l	#mhi_intro_path,d1
+	move.l	#MODE_OLDFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,mhi_files
+	beq		.failed
+
+	move.l	d0,mhi_current_file
+	move.l	#mhi_loop_path,d1
+	move.l	#MODE_OLDFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,mhi_files+4 ; 0: no loop.
+
+	; The song's level and fade length from its stream's header (the MP3
+	; files are normalised as the streams are).
+
+	move.l	d4,d0
+	bsr		open_song
+	bsr		close_song
+
+	moveq	#-1,d0
+	move.l	d0,mhi_volume_set ; Set it in any case.
+	moveq	#MAXIMUM_VOLUME,d0
+	bsr		set_music_volume
+
+	bsr		mhi_refill
+
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+	jsr		_LVOMHIPlay(a6)
+	st		music_playing
+	addq.l	#1,songs_started
+
+	bsr		mhi_apply_volume
+
+	bra		.done
+
+.failed:
+	addq.l	#1,music_errors
+
+.done:
+	movem.l	(sp)+,d2-d4/a2-a3/a6
+
+	rts
+
+; a2 = the stream's name ("MUSIC_DAT/NAME.crm"), a0 = destination, a1 =
+; suffix: the name up to ".crm", then the suffix.
+
+mhi_path:
+	moveq	#MHI_PATH_SIZE-12,d0
+	move.l	a2,a3
+
+.copy:
+	move.b	(a3)+,d1
+	beq		.suffix
+
+	cmp.b	#'.',d1
+	beq		.suffix
+
+	move.b	d1,(a0)+
+	dbf		d0,.copy
+
+.suffix:
+	move.b	(a1)+,(a0)+
+	bne		.suffix
+
+	rts
+
+; Takes back the empty buffers, fills them (the intro, then the loop again
+; and again) and queues them; restarts the decoder if it ran out of data.
+
+mhi_refill:
+	movem.l	d2-d4/a2-a3/a6,-(sp)
+
+	bsr		mhi_take_back
+
+.fill:
+	tst.l	mhi_current_file
+	beq		.check
+
+	move.l	mhi_free_count,d0
+	beq		.check
+
+	subq.l	#1,d0
+	lea		mhi_free_buffers,a0
+	move.l	(a0,d0.l*4),a2 ; Buffer.
+	move.l	a2,d2
+	move.l	#MHI_BUFFER_SIZE,d3
+	bsr		mhi_read
+	tst.l	d0
+	beq		.check ; No more data.
+
+	subq.l	#1,mhi_free_count
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+	move.l	a2,a0
+	jsr		_LVOMHIQueueBuffer(a6)
+	addq.l	#1,blocks_read
+
+	bra		.fill
+
+.check:
+	tst.b	music_playing
+	beq		.done
+
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+	jsr		_LVOMHIGetStatus(a6)
+	cmp.b	#MHIF_OUT_OF_DATA,d0
+	bne		.done
+
+	tst.l	mhi_current_file
+	beq		.done ; The song has ended.
+
+	addq.l	#1,music_underruns
+	jsr		_LVOMHIPlay(a6)
+
+.done:
+	movem.l	(sp)+,d2-d4/a2-a3/a6
+
+	rts
+
+; d2 = buffer, d3 = size: reads the stream's next bytes, from the intro into
+; the loop, which starts over at its end. Returns d0 = bytes read (0 at the
+; end of a song without loop, or on an error).
+
+mhi_read:
+	movem.l	d2-d6/a6,-(sp)
+
+	move.l	d2,d5 ; Next byte to fill.
+	move.l	d3,d6 ; Bytes still to read.
+	moveq	#0,d4 ; End-of-file reads in a row (a loop file without data).
+
+.loop:
+	tst.l	d6
+	beq		.done
+
+	move.l	mhi_current_file,d1
+	beq		.done
+
+	move.l	dos_base,a6
+	move.l	d5,d2
+	move.l	d6,d3
+	jsr		_LVORead(a6)
+	tst.l	d0
+	bmi		.error
+
+	beq		.end_of_file
+
+	add.l	d0,d5
+	sub.l	d0,d6
+	moveq	#0,d4
+
+	bra		.loop
+
+.end_of_file:
+	; On to the loop file, from its start (again).
+
+	addq.l	#1,d4
+	cmp.l	#2,d4
+	bcc		.error
+
+	move.l	mhi_files+4,d1
+	beq		.no_loop
+
+	move.l	d1,mhi_current_file
+	moveq	#0,d2
+	moveq	#OFFSET_BEGINNING,d3
+	jsr		_LVOSeek(a6)
+	tst.l	d0
+	bmi		.error
+
+	bra		.loop
+
+.error:
+	addq.l	#1,music_errors
+
+.no_loop:
+	clr.l	mhi_current_file
+
+.done:
+	move.l	d5,d0
+	movem.l	(sp)+,d2-d6/a6
+	sub.l	d2,d0 ; Bytes read.
+
+	rts
+
+; Sets the decoder's volume if it changed (fades, MUSICVOL).
+
+mhi_apply_volume:
+	move.l	mhi_volume,d1
+	cmp.l	mhi_volume_set,d1
+	beq		.done
+
+	move.l	d1,mhi_volume_set
+	movem.l	a3/a6,-(sp)
+	move.l	mhi_base,a6
+	move.l	mhi_handle,a3
+	moveq	#MHIP_VOLUME,d0
+	jsr		_LVOMHISetParam(a6)
+	movem.l	(sp)+,a3/a6
+
+.done:
 	rts
 
 signal_parent:
@@ -2460,6 +2987,29 @@ music_summary_format:
 ahi_device_name:
 	dc.b	'ahi.device',0
 
+mhi_format:
+	dc.b	'Music: MHI, %s.',10,0
+
+no_mhi_format:
+	dc.b	'The MHI driver %s could not be opened: the music plays without it.',10,0
+
+no_mhi_decoder_format:
+	dc.b	'The MHI driver %s has no free decoder: the music plays without it.',10,0
+
+mhi_intro_suffix:
+	dc.b	'_intro.mp3',0
+
+mhi_loop_suffix:
+	dc.b	'_loop.mp3',0
+
+	even
+
+audio_mhi_driver: ; main.s writes the name after "MHI/".
+	dc.b	'MHI/mhiz3660.library',0
+	ds.b	MHI_DRIVER_NAME_SIZE-21
+
+	even
+
 ahi_format:
 	dc.b	'Sound: AHI, %s (mode $%lx), mixing at %ld Hz.',10,0
 
@@ -2708,6 +3258,37 @@ ring_size:
 ahi_failed_step:
 	ds.l	1 ; VPrintf argument: what failed.
 
+; MHI
+
+mhi_base:
+	ds.l	1
+mhi_buffers:
+	ds.l	1
+mhi_handle:
+	ds.l	1
+mhi_mask:
+	ds.l	1
+reader_wait_mask:
+	ds.l	1 ; The reader's signals: wake, and MHI's.
+mhi_free_buffers:
+	ds.l	MHI_BUFFERS
+mhi_free_count:
+	ds.l	1
+mhi_files:
+	ds.l	2 ; The intro's and the loop's file (0: none).
+mhi_current_file:
+	ds.l	1 ; The file read from (0: the song's data has ended).
+mhi_volume:
+	ds.l	1 ; Wanted (0-100).
+mhi_volume_set:
+	ds.l	1
+mhi_print_arguments:
+	ds.l	1
+mhi_intro_path:
+	ds.b	MHI_PATH_SIZE
+mhi_loop_path:
+	ds.b	MHI_PATH_SIZE
+
 side_ready:
 	ds.l	2 ; AHI, per side (left, right): blocks ready, not queued yet.
 
@@ -2854,6 +3435,15 @@ audio_ahi_requested:
 	ds.b	1
 
 using_ahi:
+	ds.b	1
+
+audio_mhi_requested:
+	ds.b	1
+
+using_mhi:
+	ds.b	1 ; The reader process has an MHI decoder.
+
+mhi_signal:
 	ds.b	1
 
 effect_pending:

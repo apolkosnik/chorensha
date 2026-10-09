@@ -24,10 +24,11 @@ cp sources/amiga/icons/drawer.info "$release/ChoRenSha.info"
 cp docs/amiga/ReadMe.txt "$drawer/ReadMe.txt"
 cp -r binaries/amiga/BGM_DAT binaries/amiga/ETC_DAT binaries/amiga/PCM_DAT binaries/amiga/XSP_DAT "$drawer/"
 
-# The music streams (tools/music/build_music.sh), without the MP3 files.
+# The music (tools/music/build_music.sh): the streams, and the MP3 files for
+# MHI.
 [ -d binaries/amiga/MUSIC_DAT ] || { echo "binaries/amiga/MUSIC_DAT missing: run tools/music/build_music.sh" >&2; exit 1; }
 mkdir "$drawer/MUSIC_DAT"
-cp binaries/amiga/MUSIC_DAT/*.crm "$drawer/MUSIC_DAT/"
+cp binaries/amiga/MUSIC_DAT/*.crm binaries/amiga/MUSIC_DAT/*.mp3 "$drawer/MUSIC_DAT/"
 
 # A zip (UnZip on the Amiga keeps the file names); the lha here (Lhasa)
 # cannot create archives.

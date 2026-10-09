@@ -79,6 +79,10 @@ done
 if [ "${MUSIC:-1}" != 0 ] && [ -d "$game_data_dir/MUSIC_DAT" ]; then
 	mkdir "$drive/MUSIC_DAT"
 	cp "$game_data_dir"/MUSIC_DAT/*.crm "$drive/MUSIC_DAT/"
+
+	if [ "${MUSIC_MP3:-0}" != 0 ]; then
+		cp "$game_data_dir"/MUSIC_DAT/*.mp3 "$drive/MUSIC_DAT/"
+	fi
 fi
 
 printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output.txt\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"
