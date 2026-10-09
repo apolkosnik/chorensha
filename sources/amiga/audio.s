@@ -66,6 +66,8 @@
 	xdef audio_tick
 	xdef audio_ahi_requested
 	xdef audio_ahi_mode
+	xdef audio_music_volume
+	xdef audio_effect_volume
 
 	xref exec_base
 	xref dos_base
@@ -254,6 +256,7 @@ crm_loop_frames=16
 crm_block_frames=20
 crm_peak=24
 crm_fade_unit=26 ; 1/10000 s per unit of _FADEOUT speed.
+crm_level=28 ; The song's original level relative to the loudest, 1-64 (0: 64).
 CRM_HEADER_SIZE=32
 
 ; MCDRV functions the game uses
@@ -810,7 +813,7 @@ audio_play:
 	btst	#0,d3
 	beq		.left_set
 
-	moveq	#MAXIMUM_VOLUME,d2
+	move.b	audio_effect_volume,d2
 
 .left_set:
 	move	d2,AUD0LC+ac_vol
@@ -818,7 +821,7 @@ audio_play:
 	btst	#1,d3
 	beq		.right_set
 
-	moveq	#MAXIMUM_VOLUME,d2
+	move.b	audio_effect_volume,d2
 
 .right_set:
 	move	d2,AUD1LC+ac_vol
@@ -961,7 +964,9 @@ audio_tick:
 	and.l	effect_sides,d3 ; Channel 0 is bit 0 (left), channel 1 bit 1.
 	beq		.volume_set
 
-	move.l	#AHI_FULL_VOLUME,d1
+	move.b	audio_effect_volume,d1 ; 0-64 -> 0-$10000.
+	moveq	#10,d3
+	lsl.l	d3,d1
 
 .volume_set:
 	moveq	#AHISF_IMM,d3
@@ -1672,9 +1677,26 @@ stop_from_trap:
 
 	rts
 
-; d0.l = volume (0-64). Preserves all registers.
+; d0.l = volume (0-64): the fade's. Scaled by the music volume (MUSICVOL)
+; and the song's level. Preserves all registers.
 
 set_music_volume:
+	move.l	d1,-(sp)
+	moveq	#0,d1
+	move.b	audio_music_volume,d1
+	mulu	song_level,d1
+	mulu	d1,d0
+	beq		.scaled
+
+	; Rounded up: an audible fade step stays audible (at least 1).
+
+	add.l	#MAXIMUM_VOLUME*MAXIMUM_VOLUME-1,d0
+	divu	#MAXIMUM_VOLUME*MAXIMUM_VOLUME,d0
+	and.l	#$ffff,d0
+
+.scaled:
+	move.l	(sp)+,d1
+
 	tst.b	using_ahi
 	bne		.ahi
 
@@ -2073,6 +2095,17 @@ open_song:
 	move.l	d0,loop_offset
 	move.l	crm_loop_frames(a0),loop_frames
 	move	crm_fade_unit(a0),song_fade_unit
+	move	crm_level(a0),d0
+	beq		.full_level ; Older files.
+
+	cmp		#MAXIMUM_VOLUME,d0
+	bls		.level_set
+
+.full_level:
+	moveq	#MAXIMUM_VOLUME,d0
+
+.level_set:
+	move	d0,song_level
 	sf		in_loop
 
 	bra		.done
@@ -2252,8 +2285,7 @@ start_if_ready:
 	move	d0,AUD2LC+ac_per
 	move	d0,AUD3LC+ac_per
 	moveq	#MAXIMUM_VOLUME,d0
-	move	d0,AUD2LC+ac_vol
-	move	d0,AUD3LC+ac_vol
+	bsr		set_music_volume
 
 	move.l	#-1,playing_slot
 	bsr		queue_next_block
@@ -2394,6 +2426,13 @@ write_samples_dump:
 ; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
+
+audio_music_volume:
+	dc.b	MAXIMUM_VOLUME ; MUSICVOL (main.s).
+audio_effect_volume:
+	dc.b	MAXIMUM_VOLUME ; SFXVOL.
+
+	even
 
 samples_file_name:
 	dc.b	'samples.bin',0
@@ -2770,6 +2809,9 @@ song_period:
 	ds.w	1
 
 song_fade_unit:
+	ds.w	1
+
+song_level:
 	ds.w	1
 
 fade_speed:

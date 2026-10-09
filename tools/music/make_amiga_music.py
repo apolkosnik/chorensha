@@ -9,7 +9,11 @@ For each song NAME (NAME.log with the loop times, NAME_full.wav, 62500 Hz):
                   intro_frames.l, loop_frames.l (0: no loop), block_frames.l,
                   peak.w (before normalising, for information),
                   fade_unit.w (MCDRV _FADEOUT length per unit of speed, in
-                  1/10000 s: the fade lasts speed * fade_unit), reserved
+                  1/10000 s: the fade lasts speed * fade_unit),
+                  level.w (the song's original peak relative to the loudest
+                  song's, 1-64: every file is normalised, the player plays
+                  it at this volume to restore the songs' relative levels),
+                  reserved
                 then the intro, then the loop, each cut into blocks of
                 block_frames (the last block of each part may be shorter):
                 a block is its left samples followed by its right samples
@@ -137,26 +141,43 @@ def mp3(samples, rate, path, work):
                     "--signed", "--little-endian", "-m", "j", "-b", "160", raw, path], check=True)
 
 
+def song_parts(music_dir, name):
+    """The song's intro and loop at SOURCE_RATE (interleaved int16)."""
+    loops, last = loop_times(os.path.join(music_dir, name + ".log"))
+    full = read_wav(os.path.join(music_dir, name + "_full.wav"))
+
+    if len(loops) >= 2:
+        intro_end = loops[0]
+        loop_end = loops[1]
+    else:
+        intro_end = (loops[0] if loops else last) + 2.0
+        loop_end = None
+
+    a = int(round(intro_end * SOURCE_RATE))
+    intro = full[:2 * a]
+    loop = full[2 * a:2 * int(round(loop_end * SOURCE_RATE))] if loop_end else array.array("h")
+    return intro, loop
+
+
 def main(music_dir, output_dir, rate):
     os.makedirs(output_dir, exist_ok=True)
     work = os.path.join(output_dir, ".work")
     os.makedirs(work, exist_ok=True)
+    names = [f[:-4] for f in sorted(os.listdir(music_dir)) if f.endswith(".log") and not f.endswith(".fade.log")]
 
-    for log in sorted(f for f in os.listdir(music_dir) if f.endswith(".log") and not f.endswith(".fade.log")):
-        name = log[:-4]
-        loops, last = loop_times(os.path.join(music_dir, log))
-        full = read_wav(os.path.join(music_dir, name + "_full.wav"))
+    # The songs' original peaks, for their levels relative to the loudest.
 
-        if len(loops) >= 2:
-            intro_end = loops[0]
-            loop_end = loops[1]
-        else:
-            intro_end = (loops[0] if loops else last) + 2.0
-            loop_end = None
+    peaks = {}
 
-        a = int(round(intro_end * SOURCE_RATE))
-        intro = full[:2 * a]
-        loop = full[2 * a:2 * int(round(loop_end * SOURCE_RATE))] if loop_end else array.array("h")
+    for name in names:
+        intro, loop = song_parts(music_dir, name)
+        peaks[name] = max(max(intro), -min(intro), max(loop, default=0), -min(loop, default=0))
+
+    loudest = max(peaks.values())
+
+    for name in names:
+        intro, loop = song_parts(music_dir, name)
+        level = max(1, int(round(64 * peaks[name] / loudest)))
 
         intro_r = resample(intro, rate, work)
         loop_r = resample(loop, rate, work) if len(loop) else array.array("h")
@@ -167,8 +188,8 @@ def main(music_dir, output_dir, rate):
         gain = 32000.0 / peak if peak else 1.0
 
         with open(os.path.join(output_dir, name + ".crm"), "wb") as out:
-            out.write(b"CRSM" + struct.pack(">HHIIIIHH", 1, 2, rate, len(intro_r) // 2, len(loop_r) // 2,
-                                            BLOCK_FRAMES, min(peak, 65535), unit) + bytes(4))
+            out.write(b"CRSM" + struct.pack(">HHIIIIHHH", 1, 2, rate, len(intro_r) // 2, len(loop_r) // 2,
+                                            BLOCK_FRAMES, min(peak, 65535), unit, level) + bytes(2))
             out.write(blocks(to_8bit(intro_r, gain)))
             out.write(blocks(to_8bit(loop_r, gain)))
 
@@ -183,7 +204,7 @@ def main(music_dir, output_dir, rate):
                 mp3_rate, os.path.join(output_dir, name + "_loop.mp3"), work)
 
         print(f"{name}: intro {len(intro_r) // 2 / rate:.2f} s, loop {len(loop_r) // 2 / rate:.2f} s, "
-              f"gain {gain:.2f}, fade {unit / 10000:.3f} s per speed unit, {os.path.getsize(os.path.join(output_dir, name + '.crm')) // 1024} KB")
+              f"gain {gain:.2f}, level {level}, fade {unit / 10000:.3f} s per speed unit, {os.path.getsize(os.path.join(output_dir, name + '.crm')) // 1024} KB")
 
     for f in os.listdir(work):
         os.remove(os.path.join(work, f))

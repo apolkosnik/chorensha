@@ -92,6 +92,10 @@ Notes
     AHI=0x<mode id> picks a mode (the IDs are listed by AHI's
     preferences program). Without AHI, or if it cannot be opened, Paula
     plays them. The line "Sound: AHI, ..." at the start shows the mode.
+  - Volume: MUSICVOL=<0-64> and SFXVOL=<0-64> (arguments or ARGUMENTS
+    tool type, e.g. "ChoRenSha MUSICVOL=40") set the music's and the
+    effects' volume; both default to 64 (full). The songs keep their
+    original levels relative to each other.
 
 
 Credits

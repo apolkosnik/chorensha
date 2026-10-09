@@ -25,6 +25,8 @@
 	xref print_music_summary
 	xref audio_ahi_requested
 	xref audio_ahi_mode
+	xref audio_music_volume
+	xref audio_effect_volume
 	xref start_emulator
 	xref heap_used
 	xref frame_count
@@ -550,11 +552,12 @@ print_info_text:
 ;
 ; Audio options among the arguments: "AHI" plays the sound through AHI in
 ; the mode selected in the AHI preferences, "AHI=<mode id>" (hex, e.g.
-; AHI=$20001 or AHI=0x20001) in that mode. The arguments are copied without
-; them for parse_frame_limit.
+; AHI=$20001 or AHI=0x20001) in that mode; "MUSICVOL=<0-64>" and
+; "SFXVOL=<0-64>" set the music's and the effects' volume (default 64).
+; The arguments are copied without them for parse_frame_limit.
 
 parse_audio_options:
-	movem.l	d2-d3/a2,-(sp)
+	movem.l	d2-d3/a2-a3,-(sp)
 
 	move.l	argument_string,a0
 	move.l	argument_length,d1
@@ -575,6 +578,57 @@ parse_audio_options:
 	cmp.b	#' ',d0
 	bls		.copy
 
+	; MUSICVOL=<n>, SFXVOL=<n>: decimal, 0-64.
+
+	lea		music_volume_keyword,a3
+	bsr		match_keyword
+	beq		.not_music_volume
+
+	lea		audio_music_volume,a3
+
+	bra		.volume
+
+.not_music_volume:
+	lea		effect_volume_keyword,a3
+	bsr		match_keyword
+	beq		.not_volume
+
+	lea		audio_effect_volume,a3
+
+.volume:
+	add.l	d0,a0
+	sub.l	d0,d1
+	moveq	#0,d2
+
+.volume_digit:
+	tst.l	d1
+	beq		.volume_end
+
+	moveq	#0,d0
+	move.b	(a0),d0
+	sub.b	#'0',d0
+	cmp.b	#9,d0
+	bhi		.volume_end
+
+	mulu	#10,d2
+	add		d0,d2
+	addq.l	#1,a0
+	subq.l	#1,d1
+	cmp		#1000,d2
+	bcs		.volume_digit
+
+.volume_end:
+	cmp		#64,d2
+	bls		.volume_set
+
+	moveq	#64,d2
+
+.volume_set:
+	move.b	d2,(a3)
+
+	bra		.token
+
+.not_volume:
 	moveq	#~$20,d2 ; Upper case.
 	and.b	(a0),d2
 	cmp.b	#'A',d2
@@ -712,7 +766,61 @@ parse_audio_options:
 	move.l	a1,argument_length
 
 .done:
-	movem.l	(sp)+,d2-d3/a2
+	movem.l	(sp)+,d2-d3/a2-a3
+
+	rts
+
+; a0 = argument text, d1.l = characters left, a3 = keyword (upper case,
+; zero-terminated). Returns d0.l = the keyword's length if the text starts
+; with it (letters in either case), else 0 (and the Z flag).
+
+match_keyword:
+	movem.l	d2/a0/a3,-(sp)
+
+	moveq	#0,d0
+
+.loop:
+	move.b	(a3)+,d2
+	beq		.matched
+
+	cmp.l	d1,d0
+	bcc		.no ; The text ends first.
+
+	cmp.b	(a0),d2
+	beq		.next
+
+	; A lower-case letter matches its upper case.
+
+	move.b	(a0),-(sp)
+	cmp.b	#'a',(sp)
+	bcs		.different
+
+	cmp.b	#'z',(sp)
+	bhi		.different
+
+	sub.b	#'a'-'A',(sp)
+	cmp.b	(sp)+,d2
+	beq		.next
+
+	bra		.no
+
+.different:
+	addq.l	#2,sp
+
+	bra		.no
+
+.next:
+	addq.l	#1,a0
+	addq.l	#1,d0
+
+	bra		.loop
+
+.no:
+	moveq	#0,d0
+
+.matched:
+	movem.l	(sp)+,d2/a0/a3
+	tst.l	d0
 
 	rts
 
@@ -1121,6 +1229,13 @@ read_tool_arguments:
 
 ; ------------------------------------------------------------------------------
 	data
+
+music_volume_keyword:
+	dc.b	'MUSICVOL=',0
+effect_volume_keyword:
+	dc.b	'SFXVOL=',0
+
+	even
 ; ------------------------------------------------------------------------------
 
 icon_name:
