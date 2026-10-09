@@ -16,7 +16,7 @@
 #   a1200-8mb  A1200, AGA, 68020 14 MHz cycle-exact, 8 MB fast (a stock
 #              A1200 with the minimum memory: slow)
 #
-# Controls: the game's keyboard controls (cursor keys, CTRL or Z, left SHIFT
+# Controls: the game's keyboard controls (cursor keys, CTRL or Z, SHIFT
 # or X, ESC). JOYPORT=joy0 (or joy1, ...) puts a host joystick in port 2
 # (default none: some keyboards register as joysticks too). MUSIC=0 leaves
 # the music out. Prints the process group ID of the WinUAE it starts.

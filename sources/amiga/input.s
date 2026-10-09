@@ -9,7 +9,7 @@
 ;
 ;   cursor keys          joystick directions
 ;   CTRL, Z              trigger A          (fire 1 / red button)
-;   left SHIFT, X        trigger B          (fire 2 / blue button)
+;   SHIFT (either), X    trigger B          (fire 2 / blue button)
 ;   ESC, 1, TAB, SHIFT, CTRL, RETURN, SPACE, cursor keys   X68000 key matrix
 
 	xdef initialize_input
@@ -99,6 +99,7 @@ X68_TRIGGER_A=5
 X68_TRIGGER_B=6
 
 NO_KEY=$ff
+KEY_STATE_SIZE=16+128/8+128+8 ; keyboard_matrix ... joystick_bit_counts
 NO_BIT=$ff
 
 ; Input script (tests): 'CRSI', number of records, then 8-byte records:
@@ -134,8 +135,8 @@ initialize_input:
 	move.b	#-1,script_joystick_state
 	move.l	#-1,iocs_joystick_data
 
-	lea		keyboard_matrix,a0
-	moveq	#16/4-1,d0
+	lea		keyboard_matrix,a0 ; And the key counts after it.
+	moveq	#KEY_STATE_SIZE/4-1,d0
 
 .clear_matrix:
 	clr.l	(a0)+
@@ -425,11 +426,14 @@ write_key_event:
 ; input.device handler (input.device task): a0 = event list, a1 = is_Data.
 ; Updates the X68000 key matrix and the keyboard's joystick bits; the events
 ; are passed on unchanged. Returns d0 = event list.
+;
+; Several keys can drive one bit (Z and CTRL trigger A, X and both SHIFTs
+; trigger B, both SHIFTs the X68000 SHIFT key): each bit counts the keys
+; holding it and is released with the last one. The keys held are kept
+; per raw key, so auto-repeated presses are not counted again.
 
 input_handler:
-	move.l	a0,-(sp)
-
-	lea		key_map,a1
+	movem.l	d2-d4/a0/a2,-(sp)
 
 .event_loop:
 	cmp.b	#IECLASS_RAWKEY,ie_Class(a0)
@@ -441,8 +445,35 @@ input_handler:
 
 	moveq	#$7f,d1
 	and		d0,d1 ; Raw key.
+
+	; Held keys: a press of a held key is a repeat, a release of a key not
+	; held is ignored.
+
+	move	d1,d2
+	lsr		#3,d2
+	lea		raw_keys_held,a2
+	add		d2,a2
+	moveq	#7,d2
+	and		d1,d2
+	moveq	#1,d4 ; Count change.
+	tst.b	d0
+	bmi		.key_up
+
+	bset	d2,(a2)
+	bne		.next_event
+
+	bra		.apply
+
+.key_up:
+	bclr	d2,(a2)
+	beq		.next_event
+
+	moveq	#-1,d4
+
+.apply:
+	lea		key_map,a1
 	add		d1,d1
-	lea		(a1,d1.w),a1
+	add		d1,a1
 
 	; X68000 scancode -> key matrix bit.
 
@@ -451,36 +482,35 @@ input_handler:
 	cmp.b	#NO_KEY,d1
 	beq		.no_matrix_key
 
-	move	d1,-(sp)
-	lsr		#3,d1
-	lea		keyboard_matrix,a1
-	add		d1,a1 ; Group byte.
-	move	(sp)+,d1
+	lea		matrix_key_counts,a2
+	add.b	d4,(a2,d1.w)
+	sne		d3 ; Held by some key.
+	move	d1,d2
+	lsr		#3,d2
+	lea		keyboard_matrix,a2
+	add		d2,a2 ; Group byte.
 	and		#7,d1
+	tst.b	d3
+	beq		.matrix_key_up
 
-	tst.b	d0
-	bmi		.matrix_key_up
-
-	bset	d1,(a1)
+	bset	d1,(a2)
 
 	bra		.no_matrix_key
 
 .matrix_key_up:
-	bclr	d1,(a1)
+	bclr	d1,(a2)
 
 .no_matrix_key:
 	; Joystick bit (active low).
 
-	lea		key_map,a1
-	moveq	#$7f,d1
-	and		d0,d1
-	add		d1,d1
-	move.b	1(a1,d1.w),d1
+	moveq	#0,d1
+	move.b	1(a1),d1
 	cmp.b	#NO_BIT,d1
 	beq		.next_event
 
-	tst.b	d0
-	bmi		.joystick_key_up
+	lea		joystick_bit_counts,a2
+	add.b	d4,(a2,d1.w)
+	beq		.joystick_key_up
 
 	bclr	d1,keyboard_joystick_state
 
@@ -490,12 +520,12 @@ input_handler:
 	bset	d1,keyboard_joystick_state
 
 .next_event:
-	lea		key_map,a1
 	move.l	ie_NextEvent(a0),a0
 	move.l	a0,d0
 	bne		.event_loop
 
-	move.l	(sp)+,d0
+	movem.l	(sp)+,d2-d4/a0/a2
+	move.l	a0,d0
 
 	rts
 
@@ -688,7 +718,7 @@ key_map:
 	dc.b	NO_KEY,NO_BIT ; $5e
 	dc.b	NO_KEY,NO_BIT ; $5f
 	dc.b	$70,X68_TRIGGER_B ; $60 left SHIFT
-	dc.b	$70,NO_BIT ; $61 right SHIFT
+	dc.b	$70,X68_TRIGGER_B ; $61 right SHIFT
 	dc.b	NO_KEY,NO_BIT ; $62
 	dc.b	$71,X68_TRIGGER_A ; $63 CTRL
 	dc.b	NO_KEY,NO_BIT ; $64
@@ -752,6 +782,15 @@ key_event:
 
 keyboard_matrix:
 	ds.b	16
+
+raw_keys_held:
+	ds.b	128/8 ; Bit per Amiga raw key.
+
+matrix_key_counts:
+	ds.b	128 ; Keys holding each X68000 scancode.
+
+joystick_bit_counts:
+	ds.b	8 ; Keys holding each joystick bit.
 
 joystick_state:
 	ds.b	1
