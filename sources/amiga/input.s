@@ -19,12 +19,19 @@
 ;   P                    X68000 ESC (the game's pause, as ESC)
 ;   M                    mouse control on / off
 ;
-; Mouse control (M): in a stage the ship steers toward the mouse pointer
-; (shown on the game's screen while mouse control is on): each frame the
-; joystick directions point from the ship to the pointer, outside a dead
-; zone of MOUSE_DEAD_ZONE pixels, so the ship moves at its normal speed and
-; stops at the pointer. The left mouse button is trigger A, the right one
-; trigger B. Outside a stage (menus) only the buttons count. "mouse on" /
+; Auto fire: the game fires a volley when trigger A goes down (from one
+; frame to the next), so holding it fires once. In a stage, a held trigger
+; A is released and pressed again every AUTOFIRE_FRAMES game frames (about
+; 14 presses per second), whatever holds it (joystick, keys, mouse, script);
+; menus see it held as it is.
+;
+; Mouse control (M), relative: in a stage the mouse's movement (raw counts,
+; one pixel each) moves an invisible target, which starts at the ship and
+; stays within the ship's area; each frame the joystick directions point
+; from the ship to the target, outside a dead zone of MOUSE_DEAD_ZONE
+; pixels, so the ship follows the mouse at its normal speed and stops when
+; the mouse stops. The left mouse button is trigger A, the right one trigger
+; B. Outside a stage (menus) only the buttons count. "mouse on" /
 ; "mouse off" is shown for MOUSE_MESSAGE_TICKS where the game shows "pause"
 ; (DRAW_TEXT, from the frame end: mouse_frame_hook).
 
@@ -46,7 +53,6 @@
 	xref total_vbl_count
 	xref WORD_00098864
 	xref DRAW_TEXT
-	xref mouse_picture_position
 
 ; exec.library
 
@@ -85,6 +91,8 @@ INPUT_HANDLER_PRIORITY=51 ; Before Intuition (50).
 ie_NextEvent=0
 ie_Class=4
 ie_Code=6
+ie_X=10
+ie_Y=12
 IECLASS_RAWKEY=1
 IECODE_UP_PREFIX=$80
 
@@ -144,7 +152,7 @@ SCRIPT_JOYSTICK=0
 SCRIPT_KEY=1
 SCRIPT_TICK_JOYSTICK=2
 SCRIPT_TICK_KEY=3
-SCRIPT_MOUSE=4 ; Value: x, then y in the padding byte (picture pixels).
+SCRIPT_MOUSE=4 ; Value: x, then y in the padding byte (signed movement, pixels).
 SCRIPT_MOUSE_BUTTON=5 ; Value: IECODE_LBUTTON / IECODE_RBUTTON, bit 7 = release.
 
 ; Mouse
@@ -153,11 +161,16 @@ IECLASS_RAWMOUSE=2
 IECODE_LBUTTON=$68
 IECODE_RBUTTON=$69
 RAW_KEY_M=$37
-MOUSE_DEAD_ZONE=3 ; Pixels.
+MOUSE_DEAD_ZONE=2 ; Pixels.
+SHIP_LEFT=$400 ; The ship's area (the game's limits, 1/64 pixel).
+SHIP_RIGHT=$4000
+SHIP_TOP=$400
+SHIP_BOTTOM=$3F00
+AUTOFIRE_SHIFT=1
+AUTOFIRE_FRAMES=1<<AUTOFIRE_SHIFT ; Pressed for 2 frames, released for 2.
 MOUSE_MESSAGE_TICKS=110 ; 2 s.
 MOUSE_MESSAGE_X=11 ; Text cells: "mouse off" centred where "pause" is.
 MOUSE_MESSAGE_Y=16
-SHIP_ORIGIN=16 ; Sprite coordinates of the picture's top left.
 
 IND_WRITEEVENT=11
 io_Length=36
@@ -525,40 +538,35 @@ joystick_now:
 	move.b	joystick_state,d0
 	and.b	d1,d0
 	and.b	script_joystick_state,d0
+	move.b	d0,last_joystick_state ; For the auto fire at the frame end.
 
+	; Auto fire: released in its off phase.
+
+	tst.b	amiga_stage_frame
+	beq		.done
+
+	tst.b	autofire_released
+	beq		.done
+
+	bset	#X68_TRIGGER_A,d0
+
+.done:
 	move.l	(sp)+,d1
 
 	rts
 
 ; Returns d0.b = joystick directions (active low) from the ship toward the
-; mouse pointer (all released if the pointer is not available). Preserves
+; mouse control's target (all released before the target is set). Preserves
 ; the other registers.
 
 mouse_directions:
 	movem.l	d1-d3,-(sp)
 
 	moveq	#-1,d3 ; Directions.
-	tst.b	script_mouse_active
-	beq		.pointer
+	tst.b	mouse_target_set
+	beq		.done
 
-	move	script_mouse_x,d0
-	move	script_mouse_y,d1
-
-	bra		.position
-
-.pointer:
-	jsr		mouse_picture_position
-	tst.l	d0
-	bmi		.done
-
-.position:
-	; Picture pixels -> the ship's units (sprite coordinates * 64).
-
-	add		#SHIP_ORIGIN,d0
-	lsl		#6,d0
-	add		#SHIP_ORIGIN,d1
-	lsl		#6,d1
-
+	move	mouse_target_x,d0
 	sub		WORD_00098864,d0 ; Horizontal distance.
 	cmp		#MOUSE_DEAD_ZONE<<6,d0
 	ble		.not_right
@@ -572,6 +580,7 @@ mouse_directions:
 	bclr	#X68_LEFT,d3
 
 .not_left:
+	move	mouse_target_y,d1
 	sub		WORD_00098864+2,d1 ; Vertical distance.
 	cmp		#MOUSE_DEAD_ZONE<<6,d1
 	ble		.not_down
@@ -587,6 +596,82 @@ mouse_directions:
 .done:
 	move.l	d3,d0
 	movem.l	(sp)+,d1-d3
+
+	rts
+
+; At the frame end: the mouse's movement since the last frame moves the
+; target (in a stage, with mouse control on; it starts at the ship).
+; Otherwise the movement is dropped and the target is set again next time.
+; May change d0-d1.
+
+move_mouse_target:
+	; Take the movement (single instructions: the input handler adds to it).
+
+	move.l	mouse_dx,d0
+	sub.l	d0,mouse_dx
+	move.l	mouse_dy,d1
+	sub.l	d1,mouse_dy
+
+	tst.b	mouse_mode
+	beq		.reset
+
+	tst.b	amiga_stage_frame
+	beq		.reset
+
+	tst.b	mouse_target_set
+	bne		.move
+
+	move	WORD_00098864,mouse_target_x
+	move	WORD_00098864+2,mouse_target_y
+	st		mouse_target_set
+
+.move:
+	; Pixels -> 1/64 pixel, clamped (also against huge movements).
+
+	cmp.l	#$100,d0
+	ble		.x_below
+	move.l	#$100,d0
+.x_below:
+	cmp.l	#-$100,d0
+	bge		.x_above
+	move.l	#-$100,d0
+.x_above:
+	lsl.l	#6,d0
+	add		mouse_target_x,d0
+	cmp		#SHIP_LEFT,d0
+	bge		.x_left_ok
+	move	#SHIP_LEFT,d0
+.x_left_ok:
+	cmp		#SHIP_RIGHT,d0
+	ble		.x_right_ok
+	move	#SHIP_RIGHT,d0
+.x_right_ok:
+	move	d0,mouse_target_x
+
+	cmp.l	#$100,d1
+	ble		.y_below
+	move.l	#$100,d1
+.y_below:
+	cmp.l	#-$100,d1
+	bge		.y_above
+	move.l	#-$100,d1
+.y_above:
+	lsl.l	#6,d1
+	add		mouse_target_y,d1
+	cmp		#SHIP_TOP,d1
+	bge		.y_top_ok
+	move	#SHIP_TOP,d1
+.y_top_ok:
+	cmp		#SHIP_BOTTOM,d1
+	ble		.y_bottom_ok
+	move	#SHIP_BOTTOM,d1
+.y_bottom_ok:
+	move	d1,mouse_target_y
+
+	rts
+
+.reset:
+	sf		mouse_target_set
 
 	rts
 
@@ -632,6 +717,28 @@ mouse_frame_hook:
 	bsr		draw_mouse_message
 
 .done:
+	; Auto fire: count the frames trigger A is held in a stage; every
+	; AUTOFIRE_FRAMES the game sees it released, then pressed again.
+
+	tst.b	amiga_stage_frame
+	beq		.no_autofire
+
+	btst	#X68_TRIGGER_A,last_joystick_state
+	bne		.no_autofire ; Released.
+
+	addq.l	#1,autofire_frames
+	move.l	autofire_frames,d0
+	btst	#AUTOFIRE_SHIFT,d0 ; Odd periods of AUTOFIRE_FRAMES: released.
+	sne		autofire_released
+
+	bra		.autofire_done
+
+.no_autofire:
+	clr.l	autofire_frames ; A new press counts at once.
+	sf		autofire_released
+
+.autofire_done:
+	bsr		move_mouse_target
 	sf		amiga_stage_frame ; Set again by the next stage frame.
 
 	movem.l	(sp)+,d0-d1/a0-a1
@@ -715,9 +822,14 @@ update_input:
 	bra		.next_record
 
 .script_mouse:
-	move.b	5(a0),script_mouse_x+1
-	move.b	6(a0),script_mouse_y+1
-	st		script_mouse_active
+	move.b	5(a0),d0
+	ext.w	d0
+	ext.l	d0
+	add.l	d0,mouse_dx
+	move.b	6(a0),d0
+	ext.w	d0
+	ext.l	d0
+	add.l	d0,mouse_dy
 
 	bra		.next_record
 
@@ -800,6 +912,15 @@ input_handler:
 
 	move	ie_Code(a0),d0
 	bsr		process_mouse_button
+
+	; Movement (relative counts) for the mouse control's target.
+
+	move	ie_X(a0),d0
+	ext.l	d0
+	add.l	d0,mouse_dx
+	move	ie_Y(a0),d0
+	ext.l	d0
+	add.l	d0,mouse_dy
 
 	bra		.next_event
 
@@ -896,6 +1017,7 @@ process_key:
 
 	not.b	mouse_mode
 	st		mouse_mode_changed
+	sf		mouse_target_set ; Starts at the ship again.
 
 	bra		.done
 
@@ -1252,9 +1374,19 @@ script_joystick_state:
 	ds.b	1
 mouse_message_end:
 	ds.l	1 ; Frame timer tick to erase the message at.
-script_mouse_x:
-	ds.w	1 ; Scripted pointer (picture pixels).
-script_mouse_y:
+autofire_frames:
+	ds.l	1 ; Stage frames trigger A has been held.
+last_joystick_state:
+	ds.b	1 ; joystick_now's last result before the auto fire.
+autofire_released:
+	ds.b	1 ; Auto fire's off phase: trigger A reads released.
+mouse_dx:
+	ds.l	1 ; Mouse movement since the last frame end (counts).
+mouse_dy:
+	ds.l	1
+mouse_target_x:
+	ds.w	1 ; Mouse control's target (the ship's units).
+mouse_target_y:
 	ds.w	1
 mouse_mode:
 	ds.b	1 ; Mouse control on (M).
@@ -1266,7 +1398,7 @@ mouse_button_state:
 	ds.b	1 ; Triggers from the mouse buttons (active low).
 amiga_stage_frame:
 	ds.b	1 ; The game has run its ship control this frame.
-script_mouse_active:
+mouse_target_set:
 	ds.b	1
 joystick_ready:
 	ds.b	1

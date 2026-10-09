@@ -1,15 +1,25 @@
-# Mouse control: M switches it on (the game shows "mouse on" where it shows
-# "pause"), and in a stage the ship steers toward the pointer; the left
-# button is trigger A. Main menu: START (trigger A); M at frame 950, the
-# pointer at (40, 200) in the picture from frame 950 (scripted: used in
-# place of the real pointer), left button tapped from frame 1000. Run with
-# "1600 input.bin": screen_01000 shows "MOUSE ON", screen_01500 shows the
-# ship at the pointer (bottom left).
+# Mouse control (relative): M switches it on (the game shows "mouse on"
+# where it shows "pause"); in a stage the mouse's movement moves a target
+# that starts at the ship, and the ship follows it at its normal speed. The
+# left button is trigger A. Main menu: START (trigger A); M at frame 950;
+# from frame 960 the mouse moves 108 pixels left and 40 up (scripted
+# movement, added to the real mouse's); left button tapped from frame
+# 1000. Run with "1600 input.bin": screen_01000 shows "MOUSE ON", and in
+# screen_01500 the ship is about 108 pixels left of and 40 above where it
+# started (from about (128, 200) to about (20, 160)), firing.
 300 a
 310 -
 950 key m press
 955 key m release
-950 mouse 40 200
+960 mouse -12 -5
+965 mouse -12 -5
+970 mouse -12 -5
+975 mouse -12 -5
+980 mouse -12 -5
+985 mouse -12 -5
+990 mouse -12 -5
+995 mouse -12 -5
+1000 mouse -12 0
 1000 mouse left press
 1010 mouse left release
 1100 mouse left press

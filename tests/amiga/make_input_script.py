@@ -12,9 +12,9 @@ Text input, one step per line:
     <frame> key <name> release
     tick <tick> key <name> press   a key event at a frame timer tick
     tick <tick> key <name> release
-    <frame> mouse <x> <y>          the mouse pointer at (x, y) in the
-                                   256 x 256 picture from that frame on
-                                   (used in place of the real pointer)
+    <frame> mouse <dx> <dy>        mouse movement at that frame, in counts
+                                   (pixels; -128 to 127), added to the
+                                   real mouse's
     <frame> mouse left|right press|release
                                    a mouse button event through input.device
 
@@ -24,9 +24,9 @@ nothing; several can be combined with '+' (up+a). Key names: see KEYS
 
 Output: 'CRSI', number of records, then 8-byte records: frame or tick
 (long), kind (0 joystick, 1 key, 2 joystick at a tick, 3 key at a tick,
-4 mouse position, 5 mouse button), value (joystick byte, active low X68000
+4 mouse movement, 5 mouse button), value (joystick byte, active low X68000
 bits; raw key code or mouse button code with bit 7 set for a release; the
-mouse x), extra byte (the mouse y), padding. All big-endian.
+mouse dx), extra byte (the mouse dy; both signed), padding. All big-endian.
 
 usage: make_input_script.py input.txt input.bin
 """
@@ -64,7 +64,12 @@ def main(source, destination):
                 code = (0x68 if words[2] == "left" else 0x69) | (0x80 if words[3] == "release" else 0)
                 records.append((frame, number, 5, code, 0))
             elif len(words) == 4:
-                records.append((frame, number, 4, int(words[2]), int(words[3])))
+                dx, dy = int(words[2]), int(words[3])
+
+                if not (-128 <= dx <= 127 and -128 <= dy <= 127):
+                    raise SystemExit(f"{source}:{number}: mouse movement out of range '{line}'")
+
+                records.append((frame, number, 4, dx & 0xff, dy & 0xff))
             else:
                 raise SystemExit(f"{source}:{number}: bad mouse event '{line}'")
 

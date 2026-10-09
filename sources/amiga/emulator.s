@@ -30,7 +30,6 @@
 	xref input_tick
 	xref joystick_now
 	xref mouse_frame_hook
-	xref update_mouse_pointer
 
 	xdef exit_reason
 	xdef rendered_frames
@@ -1274,8 +1273,6 @@ amiga_wait_vbl:
 
 	OS_STACK_ENTER
 
-	jsr		update_mouse_pointer
-
 	jsr		frame_wait_begin
 
 	ifd __LOCKSTEP__
@@ -1369,8 +1366,6 @@ amiga_xsp_vsync:
 	jsr		mouse_frame_hook ; The game's context: may draw text.
 
 	OS_STACK_ENTER
-
-	jsr		update_mouse_pointer
 
 	jsr		frame_wait_begin
 

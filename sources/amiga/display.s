@@ -20,10 +20,6 @@
 	xdef present_frame
 	xdef capture_screen
 	xdef display_active
-	xdef mouse_picture_position
-	xdef update_mouse_pointer
-
-	xref mouse_mode
 
 	xref exec_base
 	xref machine_display
@@ -64,7 +60,6 @@ MEMF_CLEAR=1<<16
 _LVOCloseScreen=-66
 _LVOCloseWindow=-72
 _LVOSetPointer=-270
-_LVOClearPointer=-60
 _LVOOpenWindowTagList=-606
 _LVOOpenScreenTagList=-612
 _LVOAllocScreenBuffer=-768
@@ -172,8 +167,6 @@ PICTURE_HEIGHT=256
 RENDER_STRIDE=GUARD+PICTURE_WIDTH+GUARD
 SCREEN_WIDTH=320
 POINTER_SIZE=16
-wd_MouseY=12
-wd_MouseX=14
 AGA_DEPTH=8
 AGA_X_BYTES=(SCREEN_WIDTH-PICTURE_WIDTH)/2/8 ; Picture start in a plane row.
 
@@ -1178,73 +1171,6 @@ c2p_c2plib:
 
 	endif
 
-;------------------------------------------------------------------------------
-;
-; Mouse control (input.s). Returns d0.l = x, d1.l = y of the mouse pointer
-; in picture pixels (the picture is centred on the screen; on 240-line
-; screens its middle lines are shown), or d0.l = -1 without a window. Reads
-; the window's pointer position only: any context. Preserves the other
-; registers.
-
-mouse_picture_position:
-	moveq	#-1,d0
-	move.l	window,d1
-	beq		.done
-
-	move.l	a0,-(sp)
-	move.l	d1,a0
-	move	wd_MouseX(a0),d0
-	ext.l	d0
-	sub.l	#(SCREEN_WIDTH-PICTURE_WIDTH)/2,d0
-	move	wd_MouseY(a0),d1
-	ext.l	d1
-	add.l	source_y,d1
-	sub.l	#GUARD,d1
-	move.l	(sp)+,a0
-
-.done:
-	rts
-
-; Shows the mouse pointer while mouse control is on, else the invisible
-; one. Task context (OS stack).
-
-update_mouse_pointer:
-	move.b	mouse_mode,d0
-	cmp.b	pointer_shown,d0
-	beq		.done
-
-	movem.l	d2-d3/a6,-(sp)
-
-	move.l	window,d1
-	beq		.restore
-
-	move.b	d0,pointer_shown
-	move.l	intuition_base,a6
-	move.l	d1,a0
-	tst.b	d0
-	beq		.hide
-
-	jsr		_LVOClearPointer(a6) ; The system's pointer.
-
-	bra		.restore
-
-.hide:
-	move.l	pointer_data,d0
-	beq		.restore
-
-	move.l	d0,a1
-	moveq	#1,d0
-	moveq	#16,d1
-	moveq	#0,d2
-	moveq	#0,d3
-	jsr		_LVOSetPointer(a6)
-
-.restore:
-	movem.l	(sp)+,d2-d3/a6
-
-.done:
-	rts
-
 ; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
@@ -1348,11 +1274,6 @@ screen:
 	ds.l	1
 window:
 	ds.l	1
-pointer_shown:
-	ds.b	1 ; The system's pointer is shown (mouse control).
-
-	even
-
 pointer_data:
 	ds.l	1
 screen_height:

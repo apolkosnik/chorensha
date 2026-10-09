@@ -1,0 +1,9 @@
+# Auto fire: trigger A held (here CTRL on the keyboard) keeps firing in a
+# stage. Main menu: START (trigger A); CTRL held from frame 600 to 1600.
+# Run with "1600 input.bin": screen_01000 shows the ship's shots and the
+# score has risen (without auto fire the game fired once, at the press:
+# score 0 at frame 1000).
+300 a
+310 -
+600 key ctrl press
+1600 key ctrl release

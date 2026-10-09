@@ -1,30 +1,32 @@
-# Game over with the fire button held: the name entry (after the last life)
-# first loops on _JOYGET, completing no frames, until all buttons are
-# released. Main menu: START (trigger A); then play with fire held, weaving,
-# until the lives run out (about frame 2475, frame timer tick 2830 on
-# rtg-030). At tick 4000, in the name entry's wait loop, everything is
-# released: the game must see it and go on (run with "3000 input.bin": it
-# then reaches the frame limit). When _JOYGET answered with the state of
-# the last completed frame, the game waited there for ever.
+# Game over with a button held: the name entry (after the last life) first
+# loops on _JOYGET, completing no frames, until all buttons are released.
+# Main menu: START (trigger A); then play with trigger B (the bomb: no auto
+# fire) held, weaving, until the lives run out. At frame timer tick 4000,
+# in the name entry's wait loop, everything is released: the game must see
+# it and go on (run with "3000 input.bin": it then reaches the frame limit,
+# after more than 4000 ticks; with music, the game over's song is the
+# second one started). When _JOYGET answered with the state of the last
+# completed frame, the game waited there for ever. (Trigger A would not do
+# here: auto fire keeps the ship alive.)
 300 a
 310 -
-600 a
-700 a+left
-800 a+right
-900 a+left
-1000 a+right
-1100 a+left
-1200 a+right
-1300 a+left
-1400 a+right
-1500 a+left
-1600 a+right
-1700 a+up
-1800 a+down
-1900 a+left
-2000 a+right
-2100 a+left
-2200 a+right
-2300 a+left
-2400 a
+600 b
+700 b+left
+800 b+right
+900 b+left
+1000 b+right
+1100 b+left
+1200 b+right
+1300 b+left
+1400 b+right
+1500 b+left
+1600 b+right
+1700 b+up
+1800 b+down
+1900 b+left
+2000 b+right
+2100 b+left
+2200 b+right
+2300 b+left
+2400 b
 tick 4000 -
