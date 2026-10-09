@@ -1,0 +1,83 @@
+# Music test through the CONFIG menu's BGM PLAY item.
+# Main menu: START, CONTINUE, CONFIG, EXIT. Down twice, trigger A: CONFIG.
+300 down
+310 -
+320 down
+330 -
+340 a
+350 -
+# CONFIG: first item PCM PLAY, then BGM PLAY. Down once.
+450 down
+460 -
+# BGM number 0 -> $20 (SZ2_B3: intro 41.1 s, loop 30.8 s): right 32 times.
+500 right
+510 -
+520 right
+530 -
+540 right
+550 -
+560 right
+570 -
+580 right
+590 -
+600 right
+610 -
+620 right
+630 -
+640 right
+650 -
+660 right
+670 -
+680 right
+690 -
+700 right
+710 -
+720 right
+730 -
+740 right
+750 -
+760 right
+770 -
+780 right
+790 -
+800 right
+810 -
+820 right
+830 -
+840 right
+850 -
+860 right
+870 -
+880 right
+890 -
+900 right
+910 -
+920 right
+930 -
+940 right
+950 -
+960 right
+970 -
+980 right
+990 -
+1000 right
+1010 -
+1020 right
+1030 -
+1040 right
+1050 -
+1060 right
+1070 -
+1080 right
+1090 -
+1100 right
+1110 -
+1120 right
+1130 -
+# Trigger A plays the song (MCDRV _STOPMUSIC, _TRANSMDC, _PLAYMUSIC).
+1200 a
+1210 -
+# 80 s later (past the loop start at 41.1 s and the first loop's end at
+# 71.9 s), trigger B fades it out (_FADEOUT speed $18: 24 x 0.425 s).
+5637 b
+5647 -

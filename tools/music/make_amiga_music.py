@@ -7,16 +7,25 @@ For each song NAME (NAME.log with the loop times, NAME_full.wav, 62500 Hz):
                 header (32 bytes, big-endian):
                   'CRSM', version.w (1), channels.w (2), rate.l (Hz),
                   intro_frames.l, loop_frames.l (0: no loop), block_frames.l,
-                  peak.w (before normalising, for information), reserved
+                  peak.w (before normalising, for information),
+                  fade_unit.w (MCDRV _FADEOUT length per unit of speed, in
+                  1/10000 s: the fade lasts speed * fade_unit), reserved
                 then the intro, then the loop, each cut into blocks of
                 block_frames (the last block of each part may be shorter):
                 a block is its left samples followed by its right samples
                 (signed 8-bit), so Paula's two channels play straight from it.
+                All frame counts are even (Paula plays words).
   NAME_intro.mp3, NAME_loop.mp3   for MHI (MP3 decoder cards).
 
 The intro is the song's first pass up to its loop command, the loop its
 second pass (which starts with the tails the loop will have on every repeat).
 A song without loop gets its sound until 2 s after its last note.
+
+The fade length comes from NAME.fade.log: the song with _FADEOUT (speed
+FADE_SPEED, short enough for SZ2_TMP to last; speeds 4 and 16 give the
+same length per unit within 1 %) at 1 s; MCDRV's last register write ends the fade (it then sets
+every operator to silence). MCDRV fades by one step of total level (0.75 dB)
+every speed ticks of the song's timer, 64 steps in all.
 
 usage: make_amiga_music.py music_dir output_dir [rate]
 """
@@ -32,6 +41,8 @@ import wave
 
 SOURCE_RATE = 62500
 BLOCK_FRAMES = 4096
+FADE_AT = 1.0
+FADE_SPEED = 4
 
 
 def loop_times(log_path):
@@ -40,6 +51,34 @@ def loop_times(log_path):
     writes = [l for l in text.splitlines() if l and l[0].isdigit()]
     last = int(writes[-1].split()[0]) / 4e6 if writes else 0
     return loops, last
+
+
+def fade_unit(log_path):
+    """Fade length per unit of speed, in 1/10000 s."""
+    text = open(log_path).read()
+    fade = int(re.search(r"^fade (\d+) (\d+)", text, re.M).group(1)) / 4e6
+    assert abs(fade - FADE_AT) < 0.1
+    assert not re.search(r"^end ", text, re.M), log_path + ": the song ended before the fade"
+    last = max(int(l.split()[0]) for l in text.splitlines()
+               if l and l[0].isdigit() and l.split()[1] not in ("10", "11", "14")) / 4e6	# Not the timer.
+    return int(round((last - fade) / FADE_SPEED * 10000))
+
+
+def even_parts(intro, loop):
+    """Even frame counts: an odd intro takes the loop's first frame (the loop
+    is rotated by one, so it still joins itself); an odd loop loses its last
+    frame; an odd intro without loop gets a silent frame."""
+    if len(intro) // 2 % 2:
+        if len(loop):
+            intro = intro + loop[:2]
+            loop = loop[2:] + loop[:2]
+        else:
+            intro = intro + array.array("h", [0, 0])
+
+    if len(loop) // 2 % 2:
+        loop = loop[:-2]
+
+    return intro, loop
 
 
 def read_wav(path):
@@ -103,7 +142,7 @@ def main(music_dir, output_dir, rate):
     work = os.path.join(output_dir, ".work")
     os.makedirs(work, exist_ok=True)
 
-    for log in sorted(f for f in os.listdir(music_dir) if f.endswith(".log")):
+    for log in sorted(f for f in os.listdir(music_dir) if f.endswith(".log") and not f.endswith(".fade.log")):
         name = log[:-4]
         loops, last = loop_times(os.path.join(music_dir, log))
         full = read_wav(os.path.join(music_dir, name + "_full.wav"))
@@ -121,13 +160,15 @@ def main(music_dir, output_dir, rate):
 
         intro_r = resample(intro, rate, work)
         loop_r = resample(loop, rate, work) if len(loop) else array.array("h")
+        intro_r, loop_r = even_parts(intro_r, loop_r)
+        unit = fade_unit(os.path.join(music_dir, name + ".fade.log"))
 
         peak = max(max(abs(s) for s in intro_r), max((abs(s) for s in loop_r), default=0))
         gain = 32000.0 / peak if peak else 1.0
 
         with open(os.path.join(output_dir, name + ".crm"), "wb") as out:
-            out.write(b"CRSM" + struct.pack(">HHIIIIH", 1, 2, rate, len(intro_r) // 2, len(loop_r) // 2,
-                                            BLOCK_FRAMES, min(peak, 65535)) + bytes(6))
+            out.write(b"CRSM" + struct.pack(">HHIIIIHH", 1, 2, rate, len(intro_r) // 2, len(loop_r) // 2,
+                                            BLOCK_FRAMES, min(peak, 65535), unit) + bytes(4))
             out.write(blocks(to_8bit(intro_r, gain)))
             out.write(blocks(to_8bit(loop_r, gain)))
 
@@ -142,7 +183,7 @@ def main(music_dir, output_dir, rate):
                 mp3_rate, os.path.join(output_dir, name + "_loop.mp3"), work)
 
         print(f"{name}: intro {len(intro_r) // 2 / rate:.2f} s, loop {len(loop_r) // 2 / rate:.2f} s, "
-              f"gain {gain:.2f}, {os.path.getsize(os.path.join(output_dir, name + '.crm')) // 1024} KB")
+              f"gain {gain:.2f}, fade {unit / 10000:.3f} s per speed unit, {os.path.getsize(os.path.join(output_dir, name + '.crm')) // 1024} KB")
 
     for f in os.listdir(work):
         os.remove(os.path.join(work, f))

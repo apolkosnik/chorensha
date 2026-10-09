@@ -2,8 +2,9 @@
 #
 # Packages the Amiga port for users: binaries/amiga/release/ with the
 # ChoRenSha drawer (and its icon) holding the program, its tool icon, the
-# ReadMe and the game data, and binaries/amiga/ChoRenSha-amiga.zip of it.
-# Run ./build.sh first.
+# ReadMe, the game data and the music streams, and
+# binaries/amiga/ChoRenSha-amiga.zip of it. Run ./build.sh and
+# tools/music/build_music.sh first.
 
 set -euo pipefail
 
@@ -22,6 +23,11 @@ cp sources/amiga/icons/ChoRenSha.info "$drawer/ChoRenSha.info"
 cp sources/amiga/icons/drawer.info "$release/ChoRenSha.info"
 cp docs/amiga/ReadMe.txt "$drawer/ReadMe.txt"
 cp -r binaries/amiga/BGM_DAT binaries/amiga/ETC_DAT binaries/amiga/PCM_DAT binaries/amiga/XSP_DAT "$drawer/"
+
+# The music streams (tools/music/build_music.sh), without the MP3 files.
+[ -d binaries/amiga/MUSIC_DAT ] || { echo "binaries/amiga/MUSIC_DAT missing: run tools/music/build_music.sh" >&2; exit 1; }
+mkdir "$drawer/MUSIC_DAT"
+cp binaries/amiga/MUSIC_DAT/*.crm "$drawer/MUSIC_DAT/"
 
 # A zip (UnZip on the Amiga keeps the file names); the lha here (Lhasa)
 # cannot create archives.

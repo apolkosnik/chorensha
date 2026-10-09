@@ -335,7 +335,7 @@ static uint32_t mcdrv_call(int service, uint32_t d1, uint32_t a0)
 int main(int argc, char **argv)
 {
 	if (argc < 5) {
-		fprintf(stderr, "usage: mcdrv_render MCDRV.X song.MDC seconds output.log\n");
+		fprintf(stderr, "usage: mcdrv_render MCDRV.X song.MDC seconds output.log [loops [fade_seconds fade_speed]]\n");
 		return 2;
 	}
 
@@ -410,6 +410,9 @@ int main(int argc, char **argv)
 	int stop_loops = argc > 5 ? atoi(argv[5]) : 0;	/* stop after this many loops */
 	int last_loops = 0;
 	long interrupts = 0;
+	/* Optional _FADEOUT with the given speed at the given time (measures fades). */
+	double fade_at = argc > 7 ? atof(argv[6]) * 4000000.0 : -1;
+	int fade_speed = argc > 7 ? atoi(argv[7]) : 0;
 
 	while (now < end) {
 		/* Next timer event. */
@@ -440,6 +443,12 @@ int main(int argc, char **argv)
 			m68k_set_irq(6);
 			m68k_execute(200000);	/* the handler returns to the idle loop */
 			interrupts++;
+
+			if (fade_at >= 0 && now >= fade_at) {
+				mcdrv_call(0x14, fade_speed, 0);	/* _FADEOUT */
+				fprintf(log_file, "fade %.0f %d\n", now, fade_speed);
+				fade_at = -1;
+			}
 
 			int loops = mcdrv_call(0x0D, 0, 0) & 0xFFFF;	/* _GETLOOPCOUNT (word) */
 			if (loops != last_loops) {

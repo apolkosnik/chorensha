@@ -67,6 +67,8 @@
 	xref audio_stop
 	xref audio_status
 	xref write_samples_dump
+	xref music_call
+	xref music_tick
 	xref release_renderer
 	xref PLAYER_SCORE
 	xref PLAYER_INFO_STRUCT
@@ -981,6 +983,8 @@ frame_hardware_tick:
 
 vbl_server:
 	addq.l	#1,total_vbl_count
+
+	jsr		music_tick
 
 	ifd __HEARTBEAT__
 
@@ -1990,11 +1994,13 @@ pcm8_call:
 
 	rte
 
-; MCDRV is reported as absent by the music driver probe in sz2.s, so the game
-; does not call it.
+; MCDRV: the pre-rendered music (audio.s). Without MUSIC_DAT the probe in
+; sz2.s reports no driver and the game does not call it.
 
 mcdrv_call:
 	addq.l	#4,sp
+
+	jsr		music_call
 
 	rte
 

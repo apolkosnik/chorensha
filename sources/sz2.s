@@ -4373,6 +4373,7 @@ L_00022296:
 
 	ifd __AMIGA__
 
+	jsr		amiga_mcdrv_probe ; The pre-rendered music: version, or -1.
 	bra.s	L_000222CA
 
 	endif
@@ -12798,6 +12799,14 @@ L_0002679A:
 	jsr     READ_FILE                              ; 000267F2 4EB9 0005 A13A
 
 	lea     36(A7),A7                               ; 000267F8 4FEF 0024
+
+	ifd __AMIGA__
+
+	move.l	D5,A0 ; Song data.
+	move.l	D6,A1 ; File name.
+	jsr		amiga_music_loaded
+
+	endif
 	move.l  D4,-(A7)                                ; 000267FC 2F04
 	jsr     CLOSE_FILE                              ; 000267FE 4EB9 0005 A2AA
 

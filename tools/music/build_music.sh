@@ -7,7 +7,8 @@
 # How: the original driver MCDRV.X (CUL, free software, v0.69) runs in a
 # 68000 emulator (Musashi) with a minimal Human68k/X68000 environment
 # (mcdrv_render.c), plays each song driven by the YM2151 timers and records
-# the YM2151 register writes; ymfm's YM2151 renders them (opm_render.cpp);
+# the YM2151 register writes (and, in a second run, how long _FADEOUT takes);
+# ymfm's YM2151 renders them (opm_render.cpp);
 # make_amiga_music.py cuts intro and loop (first and second pass up to the
 # song's loop command) and converts them.
 #
@@ -64,6 +65,8 @@ g++ -O2 -std=c++17 -I"$deps/ymfm/src" -o "$build/opm_render" "$music/opm_render.
 for song in "$songs"/*.MDC; do
 	name=$(basename "$song" .MDC)
 	"$build/mcdrv_render" "$deps/mcdrv/MCDRV.X" "$song" 900 "$work/$name.log" 3 2> /dev/null
+	# The fade length: _FADEOUT with speed 4 at 1 s.
+	"$build/mcdrv_render" "$deps/mcdrv/MCDRV.X" "$song" 60 "$work/$name.fade.log" 0 1 4 2> /dev/null
 	"$build/opm_render" "$work/$name.log" "$work/${name}_full.wav" 2> /dev/null
 done
 

@@ -7,7 +7,7 @@ Commodore Amiga: the X68000 program runs on the 68020+ with the X68000's
 hardware emulated in software, and its picture is shown on a graphics
 card (RTG) or on the AGA chipset.
 
-Work in progress: sound effects are in, music is not yet.
+Work in progress: sound effects and music are in.
 
 
 Requirements
@@ -17,7 +17,9 @@ Requirements
   - Either a graphics card with Picasso96 or CyberGraphX (8-bit screen,
     320 x 256 or 320 x 240), or an AGA Amiga (A1200, A4000, CD32 with
     expansion) with at least 8 MB of fast RAM.
-  - About 3 MB of free fast RAM and 0.5 MB of chip RAM for the sounds.
+  - About 3 MB of free fast RAM and 0.6 MB of chip RAM for the sounds.
+  - For the music, 66 MB of disk space (MUSIC_DAT) and a hard disk or
+    other storage that reads 44 KB per second while the game runs.
 
 Speed: the game itself runs at full speed (55 frames per second) on every
 supported machine; how many of those frames are shown depends on the
@@ -37,8 +39,10 @@ ChoRenSha icon, or start it from a Shell:
   ChoRenSha
 
 The program needs its data drawers (BGM_DAT, ETC_DAT, PCM_DAT, XSP_DAT)
-next to it. Started from Workbench, its messages appear in a small window,
-which stays open after the game has ended until you close it.
+next to it. MUSIC_DAT holds the music: without it (delete or rename it,
+e.g. to run from a small disk), the game runs without music. Started from
+Workbench, its messages appear in a small window, which stays open after
+the game has ended until you close it.
 
 
 Controls
@@ -67,6 +71,10 @@ Notes
   - Shell arguments (or the ARGUMENTS tool type of the icon) are for
     testing: "ChoRenSha 6000" plays the attract demo for 6000 frames and
     writes timing measurements to the current directory.
+  - Music: the original songs (YM2151 FM, for the MCDRV driver) were
+    played by MCDRV 0.69 (CUL, free software) and recorded, and are
+    streamed from disk in 8-bit stereo at 22 kHz on Paula's channels 2
+    and 3; the sound effects use channels 0 and 1.
 
 
 Credits

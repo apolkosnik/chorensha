@@ -1,4 +1,4 @@
-; Audio: the X68000's ADPCM sound effects on Paula.
+; Audio: the X68000's ADPCM sound effects and the MCDRV music on Paula.
 ;
 ; The game plays its effects with IOCS _ADPCMOUT, one at a time (it keeps the
 ; priority of the effect playing and asks _ADPCMSNS whether it still plays).
@@ -13,9 +13,29 @@
 ;
 ; Playback: channels 0 (left) and 1 (right), allocated through audio.device
 ; for the whole run, so the effects sound centred like the X68000's mono
-; ADPCM sent to both sides. Channels 2 and 3 are allocated as well and left
-; silent for the music. Paula plays the decoded data at the X68000 rate
-; (15625 Hz: period 227 on PAL machines), then loops a silent word.
+; ADPCM sent to both sides. Channels 2 and 3 are allocated as well, for the
+; music. Paula plays the decoded data at the X68000 rate (15625 Hz: period
+; 227 on PAL machines), then loops a silent word.
+;
+; Music: the game plays its songs (BGM_DAT/*.MDC, YM2151) through MCDRV
+; (trap #4). The songs are rendered from the original driver beforehand
+; (tools/music/build_music.sh) into MUSIC_DAT/NAME.crm: 8-bit stereo, intro
+; then loop, in blocks of 4096 frames, each block its left samples followed
+; by its right samples. With MUSIC_DAT present, the MCDRV probe reports the
+; driver, the game loads the songs named in SZ2_BGM.CNF as on the X68000
+; (amiga_music_loaded keeps each song's file name), and the MCDRV calls
+; play the matching stream:
+; - A reader process streams the file into a ring of 8 blocks in chip RAM
+;   (1.5 s at 22050 Hz), looping back to the loop start.
+; - Paula plays the blocks on channels 3 (left) and 2 (right). Both run with
+;   the same period and lengths, so they stay together; channel 2's audio
+;   interrupt (at the start of each block) queues the next block and frees
+;   the one that ended. Without a block ready, it queues silence.
+; - The frame software interrupt passes the game's requests on to the
+;   process (no OS calls in the trap handler) and runs _FADEOUT: MCDRV
+;   lowers the level by 0.75 dB every speed ticks of the song, 64 steps
+;   (the .crm header has the measured length per unit of speed), then the
+;   song is silent and stops.
 
 	xdef initialize_audio
 	xdef release_audio
@@ -24,6 +44,11 @@
 	xdef audio_stop
 	xdef audio_status
 	xdef write_samples_dump
+	xdef music_call
+	xdef music_tick
+	xdef amiga_music_loaded
+	xdef amiga_mcdrv_probe
+	xdef print_music_summary
 
 	xref exec_base
 	xref dos_base
@@ -34,8 +59,17 @@
 
 ; exec.library
 
+_LVODisable=-120
+_LVOEnable=-126
+_LVOForbid=-132
+_LVOSetIntVector=-162
 _LVOAllocMem=-198
 _LVOFreeMem=-210
+_LVOFindTask=-294
+_LVOWait=-318
+_LVOSignal=-324
+_LVOAllocSignal=-330
+_LVOFreeSignal=-336
 _LVOOpenDevice=-444
 _LVOCloseDevice=-450
 _LVOCreateMsgPort=-666
@@ -44,13 +78,37 @@ _LVODeleteMsgPort=-672
 MEMF_CHIP=1<<1
 MEMF_CLEAR=1<<16
 
+; Interrupt structure
+
+ln_Type=8
+ln_Name=10
+is_Data=14
+is_Code=18
+IS_SIZE=22
+NT_INTERRUPT=2
+
 ; dos.library
 
 _LVOOpen=-30
 _LVOClose=-36
+_LVORead=-42
 _LVOWrite=-48
+_LVOSeek=-66
+_LVOLock=-84
+_LVOUnLock=-90
+_LVOCreateNewProc=-498
+_LVOVPrintf=-954
 
+MODE_OLDFILE=1005
 MODE_NEWFILE=1006
+ACCESS_READ=-2
+OFFSET_BEGINNING=-1
+
+NP_Entry=$800003eb
+NP_StackSize=$800003f3
+NP_Name=$800003f4
+NP_Priority=$800003f5
+TAG_DONE=0
 
 ; timer.device
 
@@ -69,6 +127,8 @@ IOAUDIO_SIZE=68
 
 DMACON=$dff096
 VHPOSR=$dff006
+INTENA=$dff09a
+INTREQ=$dff09c
 AUD0LC=$dff0a0
 AUD1LC=$dff0b0
 AUD2LC=$dff0c0
@@ -80,9 +140,51 @@ ac_vol=8
 DMAF_SETCLR=$8000
 DMAF_MASTER=$0200
 EFFECT_CHANNELS=%0011 ; 0 left, 1 right.
+MUSIC_CHANNELS=%1100 ; 2 right, 3 left.
 ALL_CHANNELS=%1111
 
+INTF_SETCLR=$8000
+INTB_AUD2=9
+INTF_AUD2=1<<INTB_AUD2
+
 MAXIMUM_VOLUME=64
+MINIMUM_PERIOD=124 ; Paula's fastest DMA rate.
+
+; Music
+
+MCDRV_VERSION=$69 ; Reported by the probe (MCDRV 0.69 rendered the songs).
+MAXIMUM_SONGS=16
+SONG_NAME_SIZE=40 ; "MUSIC_DAT/" + up to 24 characters + ".crm" + 0
+SONG_BASE_NAME_SIZE=24
+SONG_ENTRY_SIZE=4+SONG_NAME_SIZE ; MDC data address, stream file name.
+BLOCK_FRAMES=4096
+RING_SLOTS=8 ; A power of two.
+SLOT_SHIFT=13 ; Slot bytes: left and right samples of one block.
+SILENCE_BYTES=512 ; Played when no block is ready.
+RING_BYTES=(RING_SLOTS<<SLOT_SHIFT)+SILENCE_BYTES
+FADE_STEPS=64
+READER_PRIORITY=1 ; Above the game: it mostly waits.
+READER_STACK_SIZE=8192
+
+; .crm header (big-endian)
+
+crm_magic=0
+crm_version=4
+crm_channels=6
+crm_rate=8
+crm_intro_frames=12
+crm_loop_frames=16
+crm_block_frames=20
+crm_peak=24
+crm_fade_unit=26 ; 1/10000 s per unit of _FADEOUT speed.
+CRM_HEADER_SIZE=32
+
+; MCDRV functions the game uses
+
+MCDRV_TRANSMDC=$01 ; a0 = song data, d1 = size.
+MCDRV_PLAYMUSIC=$02
+MCDRV_STOPMUSIC=$05
+MCDRV_FADEOUT=$14 ; d1 = speed.
 
 ; Game sample table: 256 entries of 16 bytes.
 
@@ -130,6 +232,7 @@ initialize_audio:
 	jsr		_LVOReadEClock(a6)
 	mulu.l	#5,d0
 	move.l	d0,d2
+	move.l	d0,paula_clock
 
 	lea		adpcm_rates,a0
 	lea		adpcm_periods,a1
@@ -185,6 +288,8 @@ initialize_audio:
 	clr.l	effects_played
 	st		audio_available
 
+	bsr		initialize_music
+
 	bra		.done
 
 .delete_port:
@@ -212,6 +317,8 @@ release_audio:
 
 	tst.b	audio_available
 	beq		.no_channels
+
+	bsr		release_music
 
 	clr.b	audio_available
 
@@ -653,6 +760,875 @@ audio_status:
 
 ; ------------------------------------------------------------------------------
 ;
+; Music. Sets up the ring, the channel 2 audio interrupt and the reader
+; process when MUSIC_DAT exists. Called from initialize_audio once the
+; channels are allocated (task context, OS stack). Without it, the MCDRV
+; probe reports no driver and the game plays no music, as before.
+
+initialize_music:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	clr.b	music_available
+	move.l	#-1,music_transferred
+
+	move.l	dos_base,a6
+	move.l	#music_directory,d1
+	moveq	#ACCESS_READ,d2
+	jsr		_LVOLock(a6)
+	move.l	d0,d1
+	beq		.done
+
+	jsr		_LVOUnLock(a6)
+
+	move.l	exec_base,a6
+	move.l	#RING_BYTES,d0
+	move.l	#MEMF_CHIP|MEMF_CLEAR,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,ring_memory
+	beq		.done
+
+	add.l	#RING_SLOTS<<SLOT_SHIFT,d0
+	move.l	d0,ring_silence
+
+	bsr		reset_ring
+
+	; Signal for the reader process's start and end.
+
+	moveq	#-1,d0
+	jsr		_LVOAllocSignal(a6)
+	move.b	d0,handshake_signal
+	bmi		.free_ring
+
+	sub.l	a1,a1
+	jsr		_LVOFindTask(a6)
+	move.l	d0,music_parent
+
+	; Channel 2 audio interrupt (exclusive: audio.device gave us the
+	; channels).
+
+	move	#INTF_AUD2,INTENA
+	move	#INTF_AUD2,INTREQ
+
+	lea		music_interrupt,a1
+	move.b	#NT_INTERRUPT,ln_Type(a1)
+	move.l	#music_interrupt_name,ln_Name(a1)
+	clr.l	is_Data(a1)
+	move.l	#music_block_started,is_Code(a1)
+	moveq	#INTB_AUD2,d0
+	jsr		_LVOSetIntVector(a6)
+	move.l	d0,old_audio_vector
+
+	; The reader process. It signals once it is set up (music_process is
+	; then its task, or 0 if it could not start).
+
+	clr.b	music_quit
+	clr.l	music_process
+
+	move.l	dos_base,a6
+	move.l	#reader_tags,d1
+	jsr		_LVOCreateNewProc(a6)
+	tst.l	d0
+	beq		.restore_vector
+
+	move.l	exec_base,a6
+	moveq	#0,d0
+	move.b	handshake_signal,d1
+	bset	d1,d0
+	jsr		_LVOWait(a6)
+
+	tst.l	music_process
+	beq		.restore_vector
+
+	st		music_available
+	st		music_enabled
+
+	bra		.done
+
+.restore_vector:
+	move.l	exec_base,a6
+	moveq	#INTB_AUD2,d0
+	move.l	old_audio_vector,a1
+	jsr		_LVOSetIntVector(a6)
+
+	moveq	#0,d0
+	move.b	handshake_signal,d0
+	jsr		_LVOFreeSignal(a6)
+
+.free_ring:
+	move.l	exec_base,a6
+	move.l	ring_memory,a1
+	move.l	#RING_BYTES,d0
+	jsr		_LVOFreeMem(a6)
+	clr.l	ring_memory
+
+.done:
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Stops the music, ends the reader process and gives back the interrupt and
+; the ring. Called from release_audio.
+
+release_music:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	tst.b	music_available
+	beq		.done
+
+	sf		music_available ; music_tick and music_call do nothing now.
+	bsr		stop_playback
+
+	move.l	exec_base,a6
+	st		music_quit
+	move.l	music_process,a1
+	move.l	music_wake_mask,d0
+	jsr		_LVOSignal(a6)
+
+	moveq	#0,d0
+	move.b	handshake_signal,d1
+	bset	d1,d0
+	jsr		_LVOWait(a6)
+
+	bsr		stop_playback
+
+	moveq	#INTB_AUD2,d0
+	move.l	old_audio_vector,a1
+	jsr		_LVOSetIntVector(a6)
+
+	moveq	#0,d0
+	move.b	handshake_signal,d0
+	jsr		_LVOFreeSignal(a6)
+
+	move.l	ring_memory,a1
+	move.l	#RING_BYTES,d0
+	jsr		_LVOFreeMem(a6)
+	clr.l	ring_memory
+
+.done:
+	movem.l	(sp)+,d2-d7/a2-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; MCDRV probe (sz2.s): returns d0.l = the driver version if the music can
+; play, else -1.
+
+amiga_mcdrv_probe:
+	moveq	#-1,d0
+	tst.b	music_available
+	beq		.done
+
+	moveq	#MCDRV_VERSION,d0
+
+.done:
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; After the game loaded a song (INITIALIZE_SOUND, game context): a0 = the
+; song data, a1 = its file name from SZ2_BGM.CNF ("BGM_DAT\SZ2_S1.mdc").
+; Keeps the data address with the stream's name ("MUSIC_DAT/SZ2_S1.crm").
+; Preserves all registers.
+
+amiga_music_loaded:
+	movem.l	d0-d1/a0-a3,-(sp)
+
+	move.l	music_song_count,d0
+	cmp.l	#MAXIMUM_SONGS,d0
+	bcc		.done
+
+	mulu	#SONG_ENTRY_SIZE,d0
+	lea		music_songs,a2
+	add.l	d0,a2
+	move.l	a0,(a2)+
+
+	; Base name: after the last '\', '/' or ':'.
+
+	move.l	a1,a3
+
+.scan:
+	move.b	(a1)+,d0
+	beq		.scanned
+
+	cmp.b	#$5c,d0 ; '\'
+	beq		.separator
+
+	cmp.b	#'/',d0
+	beq		.separator
+
+	cmp.b	#':',d0
+	bne		.scan
+
+.separator:
+	move.l	a1,a3
+
+	bra		.scan
+
+.scanned:
+	lea		music_directory_prefix,a0
+
+.prefix:
+	move.b	(a0)+,(a2)+
+	bne		.prefix
+
+	subq.l	#1,a2
+
+	moveq	#SONG_BASE_NAME_SIZE-1,d1
+
+.base:
+	move.b	(a3)+,d0
+	cmp.b	#'.',d0
+	beq		.extension
+
+	cmp.b	#' ',d0
+	bls		.extension ; End, or a line end or space.
+
+	move.b	d0,(a2)+
+	dbf		d1,.base
+
+.extension:
+	lea		stream_extension,a0
+
+.extension_loop:
+	move.b	(a0)+,(a2)+
+	bne		.extension_loop
+
+	addq.l	#1,music_song_count
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a3
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; MCDRV call (trap #4, supervisor mode): d0.l = function, d1.l, a0. Returns
+; d0.l = 0. No OS calls: requests for the reader process are passed on by
+; music_tick. Preserves the other registers.
+
+music_call:
+	movem.l	d1-d2/a0-a1,-(sp)
+
+	tst.b	music_available
+	beq		.return
+
+	cmp.l	#MCDRV_TRANSMDC,d0
+	beq		.transfer
+
+	cmp.l	#MCDRV_PLAYMUSIC,d0
+	beq		.play
+
+	cmp.l	#MCDRV_STOPMUSIC,d0
+	beq		.stop
+
+	cmp.l	#MCDRV_FADEOUT,d0
+	beq		.fade
+
+	bra		.return
+
+.transfer:
+	; The song to play next: the entry with this data.
+
+	move.l	#-1,music_transferred
+	lea		music_songs,a1
+	moveq	#0,d2
+
+.find:
+	cmp.l	music_song_count,d2
+	beq		.return
+
+	cmp.l	(a1),a0
+	beq		.found
+
+	lea		SONG_ENTRY_SIZE(a1),a1
+	addq.l	#1,d2
+
+	bra		.find
+
+.found:
+	move.l	d2,music_transferred
+
+	bra		.return
+
+.play:
+	bsr		stop_playback
+	move.l	music_transferred,d2
+
+	bra		.request
+
+.stop:
+	bsr		stop_playback
+	moveq	#-1,d2
+
+.request:
+	move.l	d2,music_request_song
+	addq.l	#1,music_request_serial
+	st		music_wake_pending
+
+	bra		.return
+
+.fade:
+	tst.b	music_playing
+	beq		.return
+
+	and.l	#$ffff,d1
+	bne		.speed_set
+
+	moveq	#1,d1
+
+.speed_set:
+	move.l	d1,fade_speed
+	st		fade_requested
+
+.return:
+	moveq	#0,d0
+	movem.l	(sp)+,d1-d2/a0-a1
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; From the frame software interrupt: passes requests on to the reader
+; process and runs the fade (in E clock time). Preserves all registers.
+
+music_tick:
+	tst.b	music_available
+	beq		.return
+
+	movem.l	d0-d2/a0-a1/a6,-(sp)
+
+	tst.b	music_wake_pending
+	beq		.no_wake
+
+	sf		music_wake_pending
+	bsr		wake_reader
+
+.no_wake:
+	tst.b	fade_requested
+	beq		.no_new_fade
+
+	; Fade length in E clock ticks: speed * unit * frequency / 10000.
+
+	sf		fade_requested
+	move.l	timer_base,a6
+	lea		fade_eclock,a0
+	jsr		_LVOReadEClock(a6)
+	move.l	fade_eclock+4,fade_start
+
+	move.l	fade_speed,d1
+	mulu	song_fade_unit,d1
+	mulu.l	d0,d2:d1
+	divu.l	#10000,d2:d1
+	tst.l	d1
+	bne		.length_set
+
+	moveq	#1,d1
+
+.length_set:
+	move.l	d1,fade_length
+	st		fade_active
+
+.no_new_fade:
+	tst.b	fade_active
+	beq		.done
+
+	tst.b	music_playing
+	beq		.done
+
+	move.l	timer_base,a6
+	lea		fade_eclock,a0
+	jsr		_LVOReadEClock(a6)
+	move.l	fade_eclock+4,d1
+	sub.l	fade_start,d1
+	cmp.l	fade_length,d1
+	bcc		.faded
+
+	moveq	#0,d2
+	mulu.l	#FADE_STEPS,d2:d1
+	divu.l	fade_length,d2:d1 ; Step.
+	lea		fade_volumes,a0
+	moveq	#0,d0
+	move.b	(a0,d1.l),d0
+	move	d0,AUD2LC+ac_vol
+	move	d0,AUD3LC+ac_vol
+
+	bra		.done
+
+.faded:
+	; Silent, as MCDRV leaves it: stop, and let the process close the file.
+
+	bsr		stop_playback
+	move.l	#-1,music_request_song
+	addq.l	#1,music_request_serial
+	bsr		wake_reader
+
+.done:
+	movem.l	(sp)+,d0-d2/a0-a1/a6
+
+.return:
+	rts
+
+wake_reader:
+	move.l	exec_base,a6
+	move.l	music_process,a1
+	move.l	music_wake_mask,d0
+	jmp		_LVOSignal(a6)
+
+; ------------------------------------------------------------------------------
+;
+; Stops the music channels and their interrupt. Any context. Preserves all
+; registers.
+
+stop_playback:
+	move	#INTF_AUD2,INTENA
+	move	#MUSIC_CHANNELS,DMACON
+	move	#INTF_AUD2,INTREQ
+	clr		AUD2LC+ac_vol
+	clr		AUD3LC+ac_vol
+	sf		music_playing
+	sf		fade_active
+	sf		fade_requested
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Channel 2 audio interrupt: Paula has started the queued block (and copied
+; its address and length), so the block before has ended. Frees it, wakes
+; the reader, and queues the next one. a6 = exec base. May change d0-d1 and
+; a0-a1.
+
+music_block_started:
+	move	#INTF_AUD2,INTREQ
+
+	move.l	playing_slot,d0
+	move.l	queued_slot,playing_slot
+	tst.l	d0
+	bmi		.queue ; Silence, or nothing, has ended.
+
+	addq.l	#1,ring_free
+	addq.l	#1,blocks_played
+	move.l	music_process,a1
+	move.l	music_wake_mask,d0
+	jsr		_LVOSignal(a6)
+
+.queue:
+	bra		queue_next_block
+
+; Points channels 3 (left) and 2 (right) at the next ready block, or at the
+; silence if there is none. Interrupt, or the process with interrupts
+; disabled. May change d0-d1 and a0.
+
+queue_next_block:
+	tst.l	ring_ready
+	beq		.silence
+
+	subq.l	#1,ring_ready
+	move.l	ring_read,d0
+	move.l	d0,queued_slot
+	lea		slot_frames,a0
+	moveq	#0,d1
+	move	(a0,d0.l*2),d1
+
+	addq.l	#1,d0
+	and.l	#RING_SLOTS-1,d0
+	move.l	d0,ring_read
+
+	move.l	queued_slot,d0
+	lsl.l	#8,d0
+	lsl.l	#SLOT_SHIFT-8,d0
+	add.l	ring_memory,d0
+	move.l	d0,AUD3LC
+	add.l	d1,d0
+	move.l	d0,AUD2LC
+	lsr		#1,d1 ; Words.
+	move	d1,AUD3LC+ac_len
+	move	d1,AUD2LC+ac_len
+
+	rts
+
+.silence:
+	move.l	#-1,queued_slot
+	move.l	ring_silence,d0
+	move.l	d0,AUD3LC
+	move.l	d0,AUD2LC
+	move	#SILENCE_BYTES/2,AUD3LC+ac_len
+	move	#SILENCE_BYTES/2,AUD2LC+ac_len
+
+	tst.b	stream_ended
+	bne		.done
+
+	addq.l	#1,music_underruns
+
+.done:
+	rts
+
+; Empty ring: all slots free. Only while the music interrupt is off.
+
+reset_ring:
+	clr.l	ring_write
+	clr.l	ring_read
+	clr.l	ring_ready
+	move.l	#RING_SLOTS,ring_free
+	move.l	#-1,playing_slot
+	move.l	#-1,queued_slot
+	sf		stream_ended
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Reader process. Handles the game's requests (stop, or play a song) and
+; keeps the ring filled from the song's file.
+
+reader_process:
+	move.l	exec_base,a6
+	moveq	#-1,d0
+	jsr		_LVOAllocSignal(a6)
+	move.b	d0,wake_signal
+	bmi		.failed
+
+	moveq	#0,d1
+	bset	d0,d1
+	move.l	d1,music_wake_mask
+
+	sub.l	a1,a1
+	jsr		_LVOFindTask(a6)
+	move.l	d0,music_process
+
+	bsr		signal_parent
+
+.wait:
+	move.l	exec_base,a6
+	move.l	music_wake_mask,d0
+	jsr		_LVOWait(a6)
+
+	tst.b	music_quit
+	bne		.quit
+
+	move.l	music_request_serial,d0
+	cmp.l	handled_serial,d0
+	beq		.no_request
+
+	move.l	d0,handled_serial
+	bsr		stop_playback
+	bsr		close_song
+	bsr		reset_ring
+
+	move.l	music_request_song,d0
+	bmi		.no_request
+
+	bsr		open_song
+
+.no_request:
+	bsr		fill_ring
+	bsr		start_if_ready
+
+	bra		.wait
+
+.quit:
+	bsr		close_song
+
+	move.l	exec_base,a6
+	moveq	#0,d0
+	move.b	wake_signal,d0
+	jsr		_LVOFreeSignal(a6)
+
+.failed:
+	; Forbid: the process ends before the parent can go on (and unload
+	; this code); the forbid ends with the process.
+
+	move.l	exec_base,a6
+	jsr		_LVOForbid(a6)
+	bsr		signal_parent
+
+	moveq	#0,d0
+
+	rts
+
+signal_parent:
+	move.l	exec_base,a6
+	move.l	music_parent,a1
+	moveq	#0,d0
+	move.b	handshake_signal,d1
+	bset	d1,d0
+	jmp		_LVOSignal(a6)
+
+; d0.l = song entry. Opens its stream and reads the header; on any problem
+; the file stays closed (and the song silent).
+
+open_song:
+	movem.l	d2-d3/a6,-(sp)
+
+	mulu	#SONG_ENTRY_SIZE,d0
+	lea		music_songs+4,a0
+	add.l	d0,a0
+
+	move.l	dos_base,a6
+	move.l	a0,d1
+	move.l	#MODE_OLDFILE,d2
+	jsr		_LVOOpen(a6)
+	move.l	d0,song_file
+	beq		.failed
+
+	move.l	d0,d1
+	move.l	#song_header,d2
+	moveq	#CRM_HEADER_SIZE,d3
+	jsr		_LVORead(a6)
+	cmp.l	#CRM_HEADER_SIZE,d0
+	bne		.bad
+
+	lea		song_header,a0
+	cmp.l	#'CRSM',crm_magic(a0)
+	bne		.bad
+
+	cmp		#2,crm_channels(a0)
+	bne		.bad
+
+	cmp.l	#BLOCK_FRAMES,crm_block_frames(a0)
+	bne		.bad
+
+	move.l	crm_intro_frames(a0),d0
+	or.l	crm_loop_frames(a0),d0
+	btst	#0,d0
+	bne		.bad ; Paula plays words.
+
+	; Period: Paula clock / rate, rounded.
+
+	move.l	crm_rate(a0),d1
+	beq		.bad
+
+	move.l	paula_clock,d0
+	move.l	d1,d2
+	lsr.l	#1,d2
+	add.l	d2,d0
+	divu.l	d1,d0
+	cmp.l	#MINIMUM_PERIOD,d0
+	bcs		.bad
+
+	cmp.l	#$ffff,d0
+	bhi		.bad
+
+	move	d0,song_period
+
+	move.l	crm_intro_frames(a0),d0
+	move.l	d0,part_left
+	add.l	d0,d0
+	add.l	#CRM_HEADER_SIZE,d0
+	move.l	d0,loop_offset
+	move.l	crm_loop_frames(a0),loop_frames
+	move	crm_fade_unit(a0),song_fade_unit
+	sf		in_loop
+
+	bra		.done
+
+.bad:
+	bsr		close_song
+
+.failed:
+	addq.l	#1,music_errors
+
+.done:
+	movem.l	(sp)+,d2-d3/a6
+
+	rts
+
+close_song:
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+
+	move.l	song_file,d1
+	beq		.done
+
+	move.l	dos_base,a6
+	jsr		_LVOClose(a6)
+	clr.l	song_file
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a1/a6
+
+	rts
+
+; Reads blocks into the free slots, until the ring is full, the song ends,
+; or a new request (or the end of the run) comes in.
+
+fill_ring:
+	movem.l	d2-d5/a6,-(sp)
+
+.loop:
+	tst.l	song_file
+	beq		.done
+
+	tst.l	ring_free
+	beq		.done
+
+	tst.b	music_quit
+	bne		.done
+
+	move.l	music_request_serial,d0
+	cmp.l	handled_serial,d0
+	bne		.done
+
+	move.l	part_left,d0
+	bne		.read
+
+	; End of the intro or of the loop. The loop follows the intro in the
+	; file; after the loop, back to its start.
+
+	tst.l	loop_frames
+	beq		.end_of_song
+
+	tst.b	in_loop
+	beq		.enter_loop
+
+	move.l	dos_base,a6
+	move.l	song_file,d1
+	move.l	loop_offset,d2
+	moveq	#OFFSET_BEGINNING,d3
+	jsr		_LVOSeek(a6)
+	tst.l	d0
+	bmi		.error
+
+.enter_loop:
+	st		in_loop
+	move.l	loop_frames,d0
+	move.l	d0,part_left
+
+.read:
+	cmp.l	#BLOCK_FRAMES,d0
+	bls		.size_set
+
+	move.l	#BLOCK_FRAMES,d0
+
+.size_set:
+	move.l	d0,d4 ; Frames.
+	move.l	ring_write,d5
+	move.l	d5,d2
+	moveq	#SLOT_SHIFT,d0
+	lsl.l	d0,d2
+	add.l	ring_memory,d2
+	move.l	d4,d3
+	add.l	d3,d3
+	move.l	song_file,d1
+	move.l	dos_base,a6
+	jsr		_LVORead(a6)
+	move.l	d4,d1
+	add.l	d1,d1
+	cmp.l	d1,d0
+	bne		.error
+
+	lea		slot_frames,a0
+	move	d4,(a0,d5.l*2)
+	addq.l	#1,d5
+	and.l	#RING_SLOTS-1,d5
+	move.l	d5,ring_write
+	sub.l	d4,part_left
+	addq.l	#1,blocks_read
+
+	subq.l	#1,ring_free ; (Single instructions: the interrupt changes
+	addq.l	#1,ring_ready ; these too.)
+
+	bra		.loop
+
+.error:
+	addq.l	#1,music_errors
+
+.end_of_song:
+	st		stream_ended
+	bsr		close_song
+
+.done:
+	movem.l	(sp)+,d2-d5/a6
+
+	rts
+
+; Starts the channels once the ring is full (or holds the whole rest of a
+; short song), unless a newer request came in meanwhile.
+
+start_if_ready:
+	movem.l	d2/a6,-(sp)
+
+	tst.b	music_playing
+	bne		.done
+
+	tst.l	ring_ready
+	beq		.done
+
+	tst.l	ring_free
+	beq		.start
+
+	tst.b	stream_ended
+	beq		.done
+
+.start:
+	move.l	exec_base,a6
+	jsr		_LVODisable(a6)
+
+	tst.b	music_quit
+	bne		.enable
+
+	move.l	music_request_serial,d0
+	cmp.l	handled_serial,d0
+	bne		.enable
+
+	move	song_period,d0
+	move	d0,AUD2LC+ac_per
+	move	d0,AUD3LC+ac_per
+	moveq	#MAXIMUM_VOLUME,d0
+	move	d0,AUD2LC+ac_vol
+	move	d0,AUD3LC+ac_vol
+
+	move.l	#-1,playing_slot
+	bsr		queue_next_block
+
+	; Paula takes the block and raises the interrupt, which queues the next.
+
+	move	#INTF_AUD2,INTREQ
+	move	#INTF_SETCLR|INTF_AUD2,INTENA
+	move	#DMAF_SETCLR|DMAF_MASTER|MUSIC_CHANNELS,DMACON
+	st		music_playing
+	addq.l	#1,songs_started
+
+.enable:
+	jsr		_LVOEnable(a6)
+
+.done:
+	movem.l	(sp)+,d2/a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Run summary line (main.s, after the run): nothing without MUSIC_DAT.
+
+print_music_summary:
+	movem.l	d2/a6,-(sp)
+
+	tst.b	music_enabled
+	beq		.done
+
+	lea		music_summary_arguments,a0
+	move.l	music_song_count,(a0)+
+	move.l	songs_started,(a0)+
+	move.l	blocks_read,(a0)+
+	move.l	blocks_played,(a0)+
+	move.l	music_underruns,(a0)+
+	move.l	music_errors,(a0)+
+
+	move.l	dos_base,a6
+	move.l	#music_summary_format,d1
+	move.l	#music_summary_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+.done:
+	movem.l	(sp)+,d2/a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
 ; Measurement runs: samples.bin, for tests/amiga/samples_check.py. 'CRSA',
 ; effects played (long), chip RAM address (long) and size (long) of the
 ; decoded samples, the game's sample table (256 x 16 bytes, as rewritten),
@@ -712,6 +1688,41 @@ write_samples_dump:
 
 samples_file_name:
 	dc.b	'samples.bin',0
+
+music_directory:
+	dc.b	'MUSIC_DAT',0
+
+music_directory_prefix:
+	dc.b	'MUSIC_DAT/',0
+
+stream_extension:
+	dc.b	'.crm',0
+
+reader_name:
+	dc.b	'Cho Ren Sha music',0
+
+music_interrupt_name:
+	dc.b	'Cho Ren Sha music',0
+
+music_summary_format:
+	dc.b	'Music: %ld songs, %ld started, %ld blocks read, %ld played, %ld underruns, %ld errors',10,0
+
+	even
+
+reader_tags:
+	dc.l	NP_Entry,reader_process
+	dc.l	NP_Name,reader_name
+	dc.l	NP_Priority,READER_PRIORITY
+	dc.l	NP_StackSize,READER_STACK_SIZE
+	dc.l	TAG_DONE
+
+; Paula volume for each fade step (0.75 dB each).
+
+fade_volumes:
+	dc.b	64,59,54,49,45,42,38,35,32,29,27,25,23,21,19,18
+	dc.b	16,15,14,12,11,10,10,9,8,7,7,6,6,5,5,4
+	dc.b	4,4,3,3,3,3,2,2,2,2,2,2,1,1,1,1
+	dc.b	1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,0
 
 	even
 
@@ -839,10 +1850,161 @@ decoder_table:
 adpcm_periods:
 	ds.w	5
 
+paula_clock:
+	ds.l	1
+
+; Music
+
+music_songs:
+	ds.b	MAXIMUM_SONGS*SONG_ENTRY_SIZE
+
+music_song_count:
+	ds.l	1
+
+music_transferred:
+	ds.l	1 ; Song entry of the last _TRANSMDC, or -1.
+
+music_request_song:
+	ds.l	1 ; Song entry to play, or -1: stop.
+
+music_request_serial:
+	ds.l	1 ; Counts the requests.
+
+handled_serial:
+	ds.l	1 ; The last request the reader handled.
+
+music_process:
+	ds.l	1
+
+music_parent:
+	ds.l	1
+
+music_wake_mask:
+	ds.l	1
+
+music_interrupt:
+	ds.b	IS_SIZE
+
+	even
+
+old_audio_vector:
+	ds.l	1
+
+ring_memory:
+	ds.l	1
+
+ring_silence:
+	ds.l	1
+
+ring_write:
+	ds.l	1 ; Next slot the reader fills.
+
+ring_read:
+	ds.l	1 ; Next slot the interrupt queues.
+
+ring_ready:
+	ds.l	1 ; Slots filled and not queued yet.
+
+ring_free:
+	ds.l	1
+
+playing_slot:
+	ds.l	1 ; Slot Paula plays (-1: silence or none).
+
+queued_slot:
+	ds.l	1 ; Slot Paula plays next (-1: silence).
+
+slot_frames:
+	ds.w	RING_SLOTS
+
+song_file:
+	ds.l	1
+
+song_header:
+	ds.b	CRM_HEADER_SIZE
+
+part_left:
+	ds.l	1 ; Frames left to read in the intro or the loop.
+
+loop_frames:
+	ds.l	1
+
+loop_offset:
+	ds.l	1
+
+song_period:
+	ds.w	1
+
+song_fade_unit:
+	ds.w	1
+
+fade_speed:
+	ds.l	1
+
+fade_start:
+	ds.l	1 ; E clock (low long).
+
+fade_length:
+	ds.l	1 ; E clock ticks.
+
+fade_eclock:
+	ds.l	2
+
+songs_started:
+	ds.l	1
+
+blocks_read:
+	ds.l	1
+
+blocks_played:
+	ds.l	1
+
+music_underruns:
+	ds.l	1
+
+music_errors:
+	ds.l	1
+
+music_summary_arguments:
+	ds.l	6
+
 audio_available:
 	ds.b	1
 
 samples_decoded:
+	ds.b	1
+
+music_available:
+	ds.b	1
+
+music_enabled:
+	ds.b	1 ; Music was set up in this run (for the summary).
+
+music_playing:
+	ds.b	1
+
+music_wake_pending:
+	ds.b	1
+
+music_quit:
+	ds.b	1
+
+fade_requested:
+	ds.b	1
+
+fade_active:
+	ds.b	1
+
+stream_ended:
+	ds.b	1
+
+in_loop:
+	ds.b	1
+
+handshake_signal:
+	ds.b	1
+
+wake_signal:
 	ds.b	1
 
 ; ------------------------------------------------------------------------------

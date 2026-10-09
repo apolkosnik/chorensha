@@ -25,6 +25,10 @@
 # (OpenAL Soft's wave backend) and the emulation runs at real speed, not in
 # warp mode, so the sound is not skipped. Drive sounds, the emulated output
 # filter and interpolation are off for the capture.
+# The rendered music (MUSIC_DAT/*.crm, from tools/music/build_music.sh) is
+# copied too when it exists, so the game plays its music; MUSIC=0 leaves it
+# out (the game then finds no MCDRV and plays none). The MP3 files are never
+# copied.
 #
 # configs:
 #   a1200-4mb  A1200, AGA, 68020 14 MHz, 2 MB chip, 4 MB fast (below the minimum)
@@ -134,7 +138,16 @@ drive=$work_dir/WORK
 mkdir -p "$drive"
 
 cp "$executable" "$drive/program"
-cp -r "$game_data_dir"/*_DAT "$drive/"
+for data in "$game_data_dir"/*_DAT; do
+	if [ "$(basename "$data")" != MUSIC_DAT ]; then
+		cp -r "$data" "$drive/"
+	fi
+done
+
+if [ "${MUSIC:-1}" != 0 ] && [ -d "$game_data_dir/MUSIC_DAT" ]; then
+	mkdir "$drive/MUSIC_DAT"
+	cp "$game_data_dir"/MUSIC_DAT/*.crm "$drive/MUSIC_DAT/"
+fi
 
 if [ -n "${INPUT_SCRIPT:-}" ]; then
 	cp "$INPUT_SCRIPT" "$drive/input.bin"

@@ -22,6 +22,7 @@
 	xdef machine_cpu
 	xdef machine_rtg
 
+	xref print_music_summary
 	xref start_emulator
 	xref heap_used
 	xref frame_count
@@ -659,6 +660,9 @@ print_run_summary:
 	move.l	#exit_format,d1
 	move.l	#print_arguments,d2
 	jsr		_LVOVPrintf(a6)
+
+	jsr		print_music_summary
+	move.l	dos_base,a6
 
 	ifd __RENDER_PROFILE__
 
