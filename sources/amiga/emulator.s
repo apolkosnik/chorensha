@@ -23,11 +23,12 @@
 	xdef amiga_printf
 	xdef free_frame_records
 
-	xref iocs_joystick_data
 	xref keyboard_matrix
 	xref initialize_input
 	xref release_input
 	xref update_input
+	xref input_tick
+	xref joystick_now
 
 	xdef exit_reason
 	xdef rendered_frames
@@ -89,7 +90,12 @@
 	endif
 
 ; Debug output on the serial port: -D__TRACE__ (every Human68k, IOCS and
-; trap call) and/or -D__HEARTBEAT__ (task state and PC every 50 VBL).
+; trap call) and/or -D__HEARTBEAT__ (task state and PC every 50 VBL). With
+; -D__WATCHDOG__ as well, the heartbeat report is printed only once the game
+; has completed no frame for WATCHDOG_TICKS (after its first 100 frames),
+; once per stall: for freezes, without the serial output of every report.
+
+WATCHDOG_TICKS=555 ; 10 s.
 
 	ifd __TRACE__
 __DEBUG_OUTPUT__ equ 1
@@ -985,14 +991,38 @@ vbl_server:
 	addq.l	#1,total_vbl_count
 
 	jsr		audio_tick
+	jsr		input_tick
 
 	ifd __HEARTBEAT__
+
+	ifd __WATCHDOG__
+
+	move.l	frame_count,d0
+	cmp.l	watchdog_frame,d0
+	beq		.stalled
+
+	move.l	d0,watchdog_frame
+	clr.l	watchdog_ticks
+
+	bra		.no_heartbeat
+
+.stalled:
+	cmp.l	#100,d0
+	bcs		.no_heartbeat
+
+	addq.l	#1,watchdog_ticks
+	cmp.l	#WATCHDOG_TICKS,watchdog_ticks
+	bne		.no_heartbeat
+
+	else
 
 	move.l	total_vbl_count,d0
 	divu	#50,d0
 	swap	d0
 	tst		d0
 	bne		.no_heartbeat
+
+	endif
 
 	move.l	main_task,a0
 	moveq	#0,d0
@@ -1088,7 +1118,21 @@ vbl_server:
 
 .find_frame:
 	addq.l	#2,a0
-	cmp		#$006c,(a0)
+	move	(a0),d0
+	cmp		#$0064,d0 ; Level 1 (software interrupt), 2, 3 or 6 frame.
+	beq		.frame_vector
+
+	cmp		#$0068,d0
+	beq		.frame_vector
+
+	cmp		#$006c,d0
+	beq		.frame_vector
+
+	cmp		#$0078,d0
+	bne		.next_word
+
+.frame_vector:
+	btst	#5,-6(a0) ; SR of the interrupted code: user mode only.
 	bne		.next_word
 
 	move.l	-4(a0),d0
@@ -2089,7 +2133,7 @@ iocs_call:
 	cmp.b	#$3b,d0 ; _JOYGET
 	bne		.not_joyget
 
-	move.l	iocs_joystick_data,d0
+	jsr		joystick_now ; The current state: the game polls it in loops.
 
 	rte
 
@@ -3378,6 +3422,13 @@ trace_buffer:
 
 trace_iocs_arguments:
 	ds.l	2
+	ifd __WATCHDOG__
+watchdog_frame:
+	ds.l	1
+watchdog_ticks:
+	ds.l	1
+	endif
+
 trace_heartbeat_arguments:
 	ds.l	49
 trace_heartbeat_buffer:

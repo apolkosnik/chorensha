@@ -1,0 +1,30 @@
+# Game over with the fire button held: the name entry (after the last life)
+# first loops on _JOYGET, completing no frames, until all buttons are
+# released. Main menu: START (trigger A); then play with fire held, weaving,
+# until the lives run out (about frame 2475, frame timer tick 2830 on
+# rtg-030). At tick 4000, in the name entry's wait loop, everything is
+# released: the game must see it and go on (run with "3000 input.bin": it
+# then reaches the frame limit). When _JOYGET answered with the state of
+# the last completed frame, the game waited there for ever.
+300 a
+310 -
+600 a
+700 a+left
+800 a+right
+900 a+left
+1000 a+right
+1100 a+left
+1200 a+right
+1300 a+left
+1400 a+right
+1500 a+left
+1600 a+right
+1700 a+up
+1800 a+down
+1900 a+left
+2000 a+right
+2100 a+left
+2200 a+right
+2300 a+left
+2400 a
+tick 4000 -

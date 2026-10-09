@@ -4,7 +4,12 @@
 ;
 ; The game reads the joystick with IOCS _JOYGET (X68000 bits, active low:
 ; 0 up, 1 down, 2 left, 3 right, 5 trigger A, 6 trigger B) and the keyboard
-; with _BITSNS (X68000 key matrix, 16 groups of 8 scancodes). Keys also drive
+; with _BITSNS (X68000 key matrix, 16 groups of 8 scancodes). Both answer with
+; the current state, as the X68000 hardware does: the game also polls them in
+; loops that complete no frame (the name entry after a game over waits there
+; for the buttons to be released). The keyboard is kept up to date by the
+; input.device handler, the joystick is read on every frame timer tick
+; (input_tick); only scripted input advances with the game's frames. Keys also drive
 ; the joystick bits, as in the Falcon port:
 ;
 ;   cursor keys          joystick directions
@@ -15,6 +20,8 @@
 	xdef initialize_input
 	xdef release_input
 	xdef update_input
+	xdef input_tick
+	xdef joystick_now
 
 	xdef iocs_joystick_data
 	xdef keyboard_matrix
@@ -22,6 +29,7 @@
 	xref exec_base
 	xref dos_base
 	xref frame_count
+	xref total_vbl_count
 
 ; exec.library
 
@@ -69,6 +77,7 @@ _LVOReadJoyPort=-30
 
 JOYSTICK_PORT=1 ; Game port 2.
 JP_TYPE_MASK=$f0000000
+JP_TYPE_NOTAVAIL=$00000000
 JP_TYPE_GAMECTLR=$10000000
 JP_TYPE_JOYSTK=$30000000
 JPB_BUTTON_BLUE=23
@@ -103,15 +112,18 @@ KEY_STATE_SIZE=16+128/8+128+8 ; keyboard_matrix ... joystick_bit_counts
 NO_BIT=$ff
 
 ; Input script (tests): 'CRSI', number of records, then 8-byte records:
-; frame (long), kind (byte), value (byte), padding. Kind 0: joystick state
-; from that frame on (X68000 bits, active low). Kind 1: a raw key event
-; (Amiga raw key code, bit 7 = release), written into input.device so it
-; takes the same path as a real key.
+; time (long), kind (byte), value (byte), padding. Kind 0: joystick state
+; from that game frame on (X68000 bits, active low). Kind 1: a raw key event
+; (Amiga raw key code, bit 7 = release) at that frame, written into
+; input.device so it takes the same path as a real key. Kind 2: joystick
+; state from that frame timer tick on (total_vbl_count), for input while
+; the game completes no frames. Records are sorted by time.
 
 SCRIPT_HEADER_SIZE=8
 SCRIPT_RECORD_SIZE=8
 SCRIPT_JOYSTICK=0
 SCRIPT_KEY=1
+SCRIPT_TICK_JOYSTICK=2
 
 IND_WRITEEVENT=11
 io_Length=36
@@ -156,6 +168,13 @@ initialize_input:
 	move.l	d0,lowlevel_base
 
 	endif
+
+	; ReadJoyPort acquires its resources on the first call, which must come
+	; from a task; after that it may be called from interrupts (input_tick).
+
+	sf		joystick_ready
+	bsr		read_joystick
+	move.l	exec_base,a6
 
 	; Keyboard handler.
 
@@ -294,11 +313,16 @@ release_input:
 ; Once per game frame (task context): read the joystick port and the input
 ; script, and combine all sources into the _JOYGET value.
 
-update_input:
-	movem.l	d2-d7/a2-a6,-(sp)
+; Reads the joystick or CD32 pad in port 2 into joystick_state (lowlevel.
+; library). Task context the first time; then also from interrupts. If
+; another caller is inside ReadJoyPort, the state is left as it was.
+; Preserves all registers.
+
+read_joystick:
+	movem.l	d0-d2/a0-a1/a6,-(sp)
 
 	move.l	lowlevel_base,d0
-	beq		.no_joystick
+	beq		.done
 
 	move.l	d0,a6
 	moveq	#JOYSTICK_PORT,d0
@@ -306,11 +330,15 @@ update_input:
 
 	move.l	d0,d1
 	and.l	#JP_TYPE_MASK,d1
+	cmp.l	#JP_TYPE_NOTAVAIL,d1
+	beq		.done ; Busy, or the resources were not available.
+
+	st		joystick_ready
 	cmp.l	#JP_TYPE_JOYSTK,d1
 	beq		.joystick
 
 	cmp.l	#JP_TYPE_GAMECTLR,d1
-	bne		.no_joystick
+	bne		.done
 
 .joystick:
 	moveq	#-1,d2
@@ -341,6 +369,84 @@ update_input:
 .not_blue:
 	move.b	d2,joystick_state
 
+.done:
+	movem.l	(sp)+,d0-d2/a0-a1/a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; From the frame software interrupt: the joystick, and the script's tick
+; records. Preserves all registers.
+
+input_tick:
+	tst.b	joystick_ready
+	beq		.script ; Still read by update_input until ReadJoyPort works.
+
+	bsr		read_joystick
+
+.script:
+	movem.l	d0/a0-a1,-(sp)
+
+	move.l	script_next_tick_record,d0
+	beq		.done
+
+	move.l	d0,a0
+	move.l	script_end,a1
+
+.loop:
+	cmp.l	a1,a0
+	bcc		.end
+
+	cmp.b	#SCRIPT_TICK_JOYSTICK,4(a0)
+	bne		.next
+
+	move.l	(a0),d0
+	cmp.l	total_vbl_count,d0
+	bhi		.end
+
+	move.b	5(a0),script_joystick_state
+
+.next:
+	addq.l	#SCRIPT_RECORD_SIZE,a0
+
+	bra		.loop
+
+.end:
+	move.l	a0,script_next_tick_record
+
+.done:
+	movem.l	(sp)+,d0/a0-a1
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; _JOYGET (trap handler): d0.l = the current joystick bits (X68000, active
+; low): a bit is pressed if the joystick, the keyboard or the script presses
+; it.
+
+joystick_now:
+	moveq	#-1,d0
+	move.b	joystick_state,d0
+	and.b	keyboard_joystick_state,d0
+	and.b	script_joystick_state,d0
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Once per game frame: the joystick while ReadJoyPort cannot be used from
+; the frame timer yet, and the script's frame records.
+
+update_input:
+	movem.l	d2-d7/a2-a6,-(sp)
+
+	tst.b	joystick_ready
+	bne		.no_joystick
+
+	bsr		read_joystick
+
 .no_joystick:
 	; Script: apply every record whose frame has been reached.
 
@@ -353,6 +459,9 @@ update_input:
 .script_loop:
 	cmp.l	a1,a0
 	bcc		.script_done
+
+	cmp.b	#SCRIPT_TICK_JOYSTICK,4(a0)
+	beq		.next_record ; input_tick's.
 
 	move.l	(a0),d0
 	cmp.l	frame_count,d0
@@ -586,6 +695,7 @@ load_input_script:
 
 	lea		SCRIPT_HEADER_SIZE(a0),a1
 	move.l	a1,script_next_record
+	move.l	a1,script_next_tick_record
 	add.l	d0,a0
 	move.l	a0,script_end
 
@@ -769,6 +879,8 @@ script_size:
 	ds.l	1
 script_next_record:
 	ds.l	1
+script_next_tick_record:
+	ds.l	1
 script_end:
 	ds.l	1
 
@@ -798,6 +910,8 @@ keyboard_joystick_state:
 	ds.b	1
 script_joystick_state:
 	ds.b	1
+joystick_ready:
+	ds.b	1 ; ReadJoyPort has its resources (may be called from interrupts).
 input_device_open:
 	ds.b	1
 input_handler_added:

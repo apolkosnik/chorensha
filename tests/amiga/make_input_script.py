@@ -4,6 +4,10 @@
 Text input, one step per line:
 
     <frame> <controls>             joystick held from that frame on
+    tick <tick> <controls>         joystick held from that frame timer tick
+                                   on (55.46 per second, counted from the
+                                   start; for input while the game completes
+                                   no frames, as in its wait loops)
     <frame> key <name> press       a key event through input.device
     <frame> key <name> release
 
@@ -11,9 +15,10 @@ Controls: up, down, left, right, a (trigger A), b (trigger B), or - for
 nothing; several can be combined with '+' (up+a). Key names: see KEYS
 (Amiga raw keys). Lines starting with '#' are comments.
 
-Output: 'CRSI', number of records, then 8-byte records: frame (long), kind
-(0 joystick, 1 key), value (joystick byte, active low X68000 bits, or raw
-key code with bit 7 set for a release), padding. All big-endian.
+Output: 'CRSI', number of records, then 8-byte records: frame or tick
+(long), kind (0 joystick, 1 key, 2 joystick at a tick), value (joystick
+byte, active low X68000 bits, or raw key code with bit 7 set for a release),
+padding. All big-endian.
 
 usage: make_input_script.py input.txt input.bin
 """
@@ -38,9 +43,15 @@ def main(source, destination):
             continue
 
         words = line.split()
+        kind = 0
+
+        if words[0] == "tick":
+            kind = 2
+            words = words[1:]
+
         frame = int(words[0])
 
-        if words[1] == "key":
+        if words[1] == "key" and kind == 0:
             name, action = words[2], words[3]
 
             if name not in KEYS or action not in ("press", "release"):
@@ -59,7 +70,7 @@ def main(source, destination):
 
                 joystick &= ~(1 << BITS[control])
 
-        records.append((frame, number, 0, joystick))
+        records.append((frame, number, kind, joystick))
 
     records.sort()
 
