@@ -5,14 +5,11 @@
 /binaries/atari/*.o
 /binaries/atari/*.lod
 /binaries/atari/*.tos
-/binaries/amiga/sz2
 /binaries/amiga/sz2_dbg
 /binaries/amiga/sz2_profile
 /binaries/amiga/vram_bench
 /binaries/amiga/hardware_test/
 /binaries/amiga/hardware_test.zip
 /binaries/amiga/release/
-/binaries/amiga/ChoRenSha-amiga.zip
-/binaries/amiga/ChoRenSha-amiga.lha
 /tools/music/deps/
 /binaries/amiga/MUSIC_DAT/
