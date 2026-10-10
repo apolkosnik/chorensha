@@ -276,6 +276,14 @@ OS_STACK_LEAVE macro
 start_emulator:
 	movem.l	d1-d7/a0-a6,-(sp)
 
+	ifd __EXIT_CHECK__
+	move.l	$4.w,a1
+	move.l	a1,exit_check_exec ; AbsExecBase.
+	move.l	$90(a1),exit_check_vector ; IntVects[INTB_VERTB]: iv_Data, iv_Code.
+	move.l	$94(a1),exit_check_vector+4
+	bsr		exit_check_announce
+	endif
+
 	move.l	a0,input_script_name
 	move.l	#EXIT_GAME,exit_reason
 	move.l	d0,frame_limit
@@ -455,6 +463,208 @@ start_emulator:
 
 ; ------------------------------------------------------------------------------
 ;
+	ifd __EXIT_CHECK__
+
+	xdef exit_check
+
+; a0 = step name: prints the vector and whether it changed, and flushes.
+
+exit_check:
+	movem.l	d2/a2-a3/a6,-(sp)
+
+	move.l	exit_check_exec,a1 ; The ExecBase saved at the start.
+	lea		exit_check_arguments,a2
+	move.l	a0,(a2)+
+	move.l	$90(a1),(a2)+
+	move.l	$94(a1),(a2)+
+	move.l	$4.w,(a2)+
+	lea		exit_check_same,a0
+	move.l	$4.w,d0
+	cmp.l	a1,d0
+	bne		.changed
+	move.l	$90(a1),d0
+	cmp.l	exit_check_vector,d0
+	bne		.changed
+	move.l	$94(a1),d0
+	cmp.l	exit_check_vector+4,d0
+	beq		.print
+
+.changed:
+	lea		exit_check_changed,a0
+
+.print:
+	move.l	a0,(a2)+
+
+	; Also into exit_check_log (read with a monitor after a crash).
+
+	move.l	exit_check_exec,a6
+	lea		exit_check_format,a0
+	lea		exit_check_arguments,a1
+	lea		exit_log_char(pc),a2
+	move.l	exit_check_log_next,a3
+	jsr		-522(a6) ; RawDoFmt
+	bsr		exit_log_end
+
+	move.l	dos_base,a6
+	move.l	#exit_check_format,d1
+	move.l	#exit_check_arguments,d2
+	jsr		_LVOVPrintf(a6)
+	jsr		_LVOOutput(a6)
+	move.l	d0,d1
+	jsr		_LVOFlush(a6)
+
+	movem.l	(sp)+,d2/a2-a3/a6
+
+	rts
+
+; After RawDoFmt into the log: exit_check_log_next to the terminating 0 (the
+; log's last byte is always 0). Uses a0.
+
+exit_log_end:
+	move.l	exit_check_log_next,a0
+
+.find:
+	tst.b	(a0)+
+	bne		.find
+
+	subq.l	#1,a0
+	move.l	a0,exit_check_log_next
+
+	rts
+
+; RawDoFmt output: d0.b into (a3)+, while there is room.
+
+exit_log_char:
+	cmp.l	#exit_check_log+EXIT_CHECK_LOG_SIZE-1,a3
+	bcc		.full
+
+	move.b	d0,(a3)+
+
+.full:
+	rts
+
+; After each DOS or IOCS call (also from supervisor mode): a0 = kind, d1 =
+; call number. The first time AbsExecBase or the VERTB vector differs from
+; the start, a line goes into the log (no printing). Preserves all registers.
+
+watch_check:
+	movem.l	d0-d1/a0-a3/a6,-(sp)
+
+	tst.b	watch_reported
+	bne		.done
+
+	move.l	exit_check_exec,a1
+	move.l	$4.w,d0
+	cmp.l	a1,d0
+	bne		.changed
+	move.l	$90(a1),d0
+	cmp.l	exit_check_vector,d0
+	bne		.changed
+	move.l	$94(a1),d0
+	cmp.l	exit_check_vector+4,d0
+	beq		.done
+
+.changed:
+	st		watch_reported
+	lea		watch_arguments,a2
+	move.l	a0,(a2)+
+	and.l	#$ffff,d1
+	move.l	d1,(a2)+
+	move.l	$4.w,(a2)+
+	move.l	$90(a1),(a2)+
+	move.l	$94(a1),(a2)+
+	move.l	frame_count,(a2)+
+	move.l	a1,a6
+	lea		watch_format,a0
+	lea		watch_arguments,a1
+	lea		exit_log_char(pc),a2
+	move.l	exit_check_log_next,a3
+	jsr		-522(a6) ; RawDoFmt
+	bsr		exit_log_end
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a3/a6
+
+	rts
+
+watch_format:
+	dc.b	'WATCH: changed after %s $%04lx: $4 = $%08lx, VERTB $%08lx $%08lx, frame %ld',10,0
+watch_dos:
+	dc.b	'DOS call',0
+watch_iocs:
+	dc.b	'IOCS call',0
+	even
+
+; Prints where exit_check_log is (start_emulator, before the screen opens).
+
+exit_check_announce:
+	movem.l	d0-d2/a0-a1/a6,-(sp)
+
+	move.l	#exit_check_log,exit_check_log_next
+	move.l	#exit_check_log,exit_check_arguments
+	move.l	dos_base,a6
+	move.l	#exit_check_log_format,d1
+	move.l	#exit_check_arguments,d2
+	jsr		_LVOVPrintf(a6)
+	jsr		_LVOOutput(a6)
+	move.l	d0,d1
+	jsr		_LVOFlush(a6)
+
+	movem.l	(sp)+,d0-d2/a0-a1/a6
+
+	rts
+
+exit_check_log_format:
+	dc.b	'exit check: log at $%08lx',10,0
+exit_check_format:
+	dc.b	'exit check: %s: VERTB vector $%08lx $%08lx, $4 = $%08lx %s',10,0
+exit_check_same:
+	dc.b	'unchanged',0
+exit_check_changed:
+	dc.b	'CHANGED',0
+	even
+
+	data
+
+exit_check_vector:
+	ds.l	2
+exit_check_exec:
+	ds.l	1
+watch_arguments:
+	ds.l	6
+watch_reported:
+	ds.b	1
+	even
+exit_check_arguments:
+	ds.l	5
+exit_check_log_next:
+	ds.l	1
+EXIT_CHECK_LOG_SIZE=2048
+exit_check_log:
+	ds.b	EXIT_CHECK_LOG_SIZE
+
+	text
+
+	endif
+
+; -D__EXIT_CHECK__ builds (hardware diagnosis): ExecBase's vertical blank
+; vector (IntVects[INTB_VERTB]: data, code) is saved at the start and printed
+; after each exit step, with whether it changed (exit_check, a0 = step).
+
+EXIT_CHECK macro
+	ifd __EXIT_CHECK__
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+	lea		.check_name\@(pc),a0
+	jsr		exit_check
+	movem.l	(sp)+,d0-d1/a0-a1/a6
+	bra		.check_done\@
+.check_name\@:
+	dc.b	\1,0
+	even
+.check_done\@:
+	endif
+	endm
+
 ; Leaves the game from any point in its main context (exit menu entry,
 ; _EXIT/_EXIT2, frame limit) and returns from start_emulator.
 
@@ -477,7 +687,11 @@ amiga_exit_game:
 	lea		game_stack_swap,a0
 	jsr		_LVOStackSwap(a6)
 
+	EXIT_CHECK	'game stack swapped back'
+
 	jsr		stop_frame_timer
+
+	EXIT_CHECK	'frame timer stopped'
 
 	move.l	exec_base,a6
 	move.l	main_task,a0
@@ -485,11 +699,20 @@ amiga_exit_game:
 
 	jsr		release_input
 
+	EXIT_CHECK	'input released'
+
 	jsr		finish_pipelined_frame
 	jsr		close_display
+
+	EXIT_CHECK	'display closed'
+
 	jsr		release_renderer
 
+	EXIT_CHECK	'renderer released'
+
 	jsr		close_all_files
+
+	EXIT_CHECK	'files closed'
 
 	tst.l	frame_records
 	beq		.no_graphics_dump
@@ -507,6 +730,8 @@ amiga_exit_game:
 
 .no_graphics_dump:
 	jsr		release_audio
+
+	EXIT_CHECK	'audio released'
 
 	; Heap high-water mark: the area was cleared at allocation.
 
@@ -532,9 +757,13 @@ amiga_exit_game:
 	lea		timer_request,a1
 	jsr		_LVOCloseDevice(a6)
 
+	EXIT_CHECK	'timer closed'
+
 	move.l	heap_address,a1
 	move.l	heap_size,d0
 	jsr		_LVOFreeMem(a6)
+
+	EXIT_CHECK	'heap freed'
 
 	move.l	vbl_signal_number,d0
 	jsr		_LVOFreeSignal(a6)
@@ -2071,6 +2300,14 @@ mcdrv_call:
 iocs_call:
 	addq.l	#4,sp
 
+	ifd __EXIT_CHECK__
+	movem.l	d1/a0,-(sp)
+	move.b	d0,d1
+	lea		watch_iocs,a0
+	jsr		watch_check
+	movem.l	(sp)+,d1/a0
+	endif
+
 	ifd __TRACE__
 
 	jsr		trace_iocs_call
@@ -2469,6 +2706,14 @@ human68k_call:
 
 	endif
 
+	ifd __EXIT_CHECK__
+	move.l	a0,-(sp)
+	move	d7,d1
+	lea		watch_dos,a0
+	jsr		watch_check
+	move.l	(sp)+,a0
+	endif
+
 	OS_STACK_LEAVE
 
 	movem.l	(sp)+,d1-d7/a0-a6
@@ -2744,6 +2989,32 @@ human68k_ldiv:
 
 human68k_return_zero:
 	moveq	#0,d0
+
+	rts
+
+; _INPOUT(code.w): $FE/$FF read a key without waiting: a key held in the
+; X68000 key matrix (RETURN, SPACE, ESC, cursor keys, ...) reads as RETURN,
+; none as 0. The game waits with it after an error message ("press any
+; key"), which would otherwise never end. Other codes (output) do nothing.
+
+human68k_inpout:
+	move	(a5),d1
+	cmp		#$fe,d1
+	bcs		human68k_return_zero
+
+	lea		keyboard_matrix,a0
+	moveq	#16/4-1,d1
+
+.matrix:
+	tst.l	(a0)+
+	bne		.key
+
+	dbf		d1,.matrix
+
+	bra		human68k_return_zero
+
+.key:
+	moveq	#$0d,d0
 
 	rts
 
@@ -3334,7 +3605,7 @@ human68k_call_table:
 	dc.w	$ff00 ; _EXIT
 	dc.l	human68k_exit
 	dc.w	$ff06 ; _INPOUT
-	dc.l	human68k_return_zero
+	dc.l	human68k_inpout
 	dc.w	$ff09 ; _PRINT
 	dc.l	human68k_print
 	dc.w	$ff0d ; _FFLUSH

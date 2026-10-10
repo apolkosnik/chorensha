@@ -102,6 +102,9 @@ _LVOWrite=-48
 _LVOPutStr=-948
 _LVOSelectInput=-294
 _LVOCurrentDir=-126
+_LVOLock=-84
+_LVOUnLock=-90
+ACCESS_READ=-2
 _LVOSelectOutput=-300
 _LVOVPrintf=-954
 
@@ -217,6 +220,10 @@ start:
 	st		directory_changed
 
 .directory_done:
+	bsr		check_data_drawers
+	tst.l	d0
+	beq		.close_dos
+
 	bsr		read_tool_arguments
 	bsr		parse_audio_options ; Also the display options, for select_display.
 
@@ -252,6 +259,13 @@ start:
 	move.l	input_script_name,a0
 	jsr		start_emulator
 
+	ifd __EXIT_CHECK__
+	movem.l	d0-d1/a0-a1,-(sp)
+	lea		check_returned,a0
+	jsr		exit_check
+	movem.l	(sp)+,d0-d1/a0-a1
+	endif
+
 	ifd __NO_CPU_CACHES__
 
 	move.l	d0,-(sp)
@@ -282,10 +296,19 @@ start:
 	jsr		_LVOPutStr(a6)
 
 .close_graphics:
+	ifd __EXIT_CHECK__
+	lea		check_summary,a0
+	jsr		exit_check
+	endif
 
 	move.l	exec_base,a6
 	move.l	graphics_base,a1
 	jsr		_LVOCloseLibrary(a6)
+
+	ifd __EXIT_CHECK__
+	lea		check_graphics,a0
+	jsr		exit_check
+	endif
 
 .close_dos:
 	tst.b	directory_changed
@@ -304,6 +327,11 @@ start:
 	jsr		_LVOSelectInput(a6)
 	move.l	old_output,d1
 	jsr		_LVOSelectOutput(a6)
+	ifd __EXIT_CHECK__
+	lea		check_console,a0
+	jsr		exit_check
+	endif
+
 	move.l	console,d1
 	jsr		_LVOClose(a6)
 
@@ -326,6 +354,51 @@ start:
 	movem.l	(sp)+,d2-d7/a2-a6
 
 	moveq	#0,d0
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; The game's data drawers must be in the current directory (the program's).
+; Returns d0 = 1, or 0 after saying which one is missing (the game itself
+; would stop on a black screen with a message behind it). Preserves a6.
+
+check_data_drawers:
+	movem.l	d2-d3/a2/a6,-(sp)
+
+	move.l	dos_base,a6
+	lea		data_drawer_names,a2
+
+.loop:
+	move.l	(a2)+,d3
+	beq		.all_there
+
+	move.l	d3,d1
+	moveq	#ACCESS_READ,d2
+	jsr		_LVOLock(a6)
+	tst.l	d0
+	beq		.missing
+
+	move.l	d0,d1
+	jsr		_LVOUnLock(a6)
+
+	bra		.loop
+
+.missing:
+	move.l	d3,print_arguments
+	move.l	#missing_data_format,d1
+	move.l	#print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	moveq	#0,d0
+
+	bra		.done
+
+.all_there:
+	moveq	#1,d0
+
+.done:
+	movem.l	(sp)+,d2-d3/a2/a6
 
 	rts
 
@@ -1456,6 +1529,34 @@ read_tool_arguments:
 
 ; ------------------------------------------------------------------------------
 	data
+
+data_drawer_names:
+	dc.l	bgm_dat_name,etc_dat_name,pcm_dat_name,xsp_dat_name,0
+bgm_dat_name:
+	dc.b	'BGM_DAT',0
+etc_dat_name:
+	dc.b	'ETC_DAT',0
+pcm_dat_name:
+	dc.b	'PCM_DAT',0
+xsp_dat_name:
+	dc.b	'XSP_DAT',0
+missing_data_format:
+	dc.b	'The drawer %s is missing: start the game from its ChoRenSha drawer, with BGM_DAT, ETC_DAT, PCM_DAT and XSP_DAT next to the program.',10,0
+	even
+
+	ifd __EXIT_CHECK__
+	xref exit_check
+check_returned:
+	dc.b	'emulator returned',0
+check_summary:
+	dc.b	'summary printed',0
+check_graphics:
+	dc.b	'graphics.library closed',0
+check_console:
+	dc.b	'closing the console window',0
+	even
+	endif
+
 
 music_volume_keyword:
 	dc.b	'MUSICVOL=',0
