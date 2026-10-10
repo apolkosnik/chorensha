@@ -7,7 +7,8 @@ Commodore Amiga: the X68000 program runs on the 68020+ with the X68000's
 hardware emulated in software, and its picture is shown on a graphics
 card (RTG) or on the AGA chipset.
 
-Work in progress: sound effects and music are in.
+The whole game plays, with its sound effects and its music (on Paula, or
+through AHI or an MHI MP3 decoder).
 
 
 Requirements
@@ -18,21 +19,16 @@ Requirements
     320 x 256 or 320 x 240), or an AGA Amiga (A1200, A4000, CD32 with
     expansion) with at least 8 MB of fast RAM.
   - About 3 MB of free fast RAM and 0.6 MB of chip RAM for the sounds.
-  - For the music, 100 MB of disk space (MUSIC_DAT: 66 MB of streams, and
-    34 MB of MP3 files for MHI, which may be deleted without MHI) and a
-    hard disk or other storage that reads 44 KB per second while the game
-    runs.
+  - For the music, 108 MB of disk space (MUSIC_DAT: 65 MB of streams for
+    Paula and AHI, and 43 MB of MP3 files for MHI, which may be deleted if
+    you do not use MHI), on a hard disk or other storage that reads 44 KB
+    per second while the game runs.
 
-Speed: the game itself runs at full speed (55 frames per second) on every
-supported machine; how many of those frames are shown depends on the
-machine. A 68030 at 50 MHz with a graphics card shows about 40 per second;
-a stock A1200 (68020 at 14 MHz, AGA) about 5.
-
-If a graphics card is present it is used; otherwise the AGA screen. The
-argument AGA (or RTG) chooses the display (Shell: "ChoRenSha AGA", or the
-tool type ARGUMENTS=AGA); MODE=0x<mode id> picks the graphics card's screen
-mode (an 8-bit mode of at least 320 x 240; the ID as listed by the screen
-mode preferences). The start-up text shows the screen mode used.
+Speed: the game itself always runs at full speed (55 frames per second);
+how many of those frames are shown depends on the machine. A 68030 at
+50 MHz shows about 30 to 40 per second with a graphics card and about 15
+to 20 on AGA; a stock A1200 (68020 at 14 MHz, AGA) about 5. The ` key
+shows the number (see Controls).
 
 
 Installation and start
@@ -50,6 +46,8 @@ e.g. to run from a small disk), the game runs without music. Started from
 Workbench, its messages appear in a small window, which stays open after
 the game has ended until you close it.
 
+To quit, choose EXIT in the game's menu.
+
 
 Controls
 --------
@@ -66,48 +64,64 @@ Controls
     P or ESC               pause (press again to continue)
     M                      mouse control on / off
     ` (left of 1)          frames-per-second counter on / off (top left)
+    1, TAB, RETURN, SPACE  as the same keys on the X68000
 
-  Mouse control (M): in a stage the ship follows the mouse's movement
-  (move the mouse 3 cm left, the ship goes about as far left) and stops
-  when the mouse stops; the left mouse button shoots, the
-  right one is the second button. The game shows "mouse on" or "mouse
-  off" for two seconds.
+  Mouse (after M):
+    movement               move
+    left button            shot
+    right button           second button
 
-  Auto fire: holding the shot button (fire, CTRL, Z or the left mouse
-  button) keeps shooting; the original game shot once per press.
-    ESC, 1, TAB, RETURN, SPACE work as the same keys on the X68000.
+  Mouse control: in a stage the ship follows the mouse's movement (move
+  the mouse 3 cm left, the ship goes about as far left) and stops when
+  the mouse stops. The game shows "mouse on" or "mouse off" for two
+  seconds.
 
-To quit, choose EXIT in the game's menu.
+  Auto fire: holding the shot button keeps shooting (the original game
+  shot once per press).
+
+
+Options
+-------
+
+Give options as Shell arguments ("ChoRenSha AGA MUSICVOL=40") or in the
+icon's ARGUMENTS tool type (ARGUMENTS=AGA MUSICVOL=40). Mode IDs are hex;
+write them as 0x... (in a Shell, $ starts a variable).
+
+  AGA, RTG             The display to use. Default: the graphics card if
+                       there is one, otherwise AGA.
+  MODE=0x<id>          The graphics card's screen mode (an 8-bit mode of at
+                       least 320 x 240; the ID as the ScreenMode preferences
+                       list it). Default: the best mode for 320 x 256.
+  AHI, AHI=0x<id>      Effects and music through AHI (sound cards), in the
+                       mode chosen for the music unit in the AHI
+                       preferences, or in the mode given.
+  MHI, MHI=<driver>    Music from the MP3 files on an MHI decoder:
+                       LIBS:MHI/mhiz3660.library, or the driver given (e.g.
+                       MHI=mhizz9000.library). Effects stay on Paula (or
+                       AHI).
+  MUSICVOL=<0-64>      The music's volume (default 64, full).
+  SFXVOL=<0-64>        The effects' volume (default 64, full).
+
+The start-up text shows the screen mode and the sound output in use. If
+an option cannot be used (no AGA, no graphics card, an unsuitable mode, no
+AHI, no MHI decoder), the start-up text says why and the default is used.
+
+A number ("ChoRenSha 6000") is for testing: the attract demo runs for that
+many frames and the program writes timing measurements to its drawer.
 
 
 Notes
 -----
 
   - The game keeps its X68000 timing: 55.46 frames per second, from a CIA
-    timer. When a machine cannot show every frame, frames are left out,
+    timer. When a machine cannot show every frame, frames are left out;
     the game does not slow down.
-  - Shell arguments (or the ARGUMENTS tool type of the icon) are for
-    testing: "ChoRenSha 6000" plays the attract demo for 6000 frames and
-    writes timing measurements to the current directory.
   - Music: the original songs (YM2151 FM, for the MCDRV driver) were
-    played by MCDRV 0.69 (CUL, free software) and recorded, and are
-    streamed from disk in 8-bit stereo at 22 kHz on Paula's channels 2
-    and 3; the sound effects use channels 0 and 1.
-  - Sound cards: with the argument AHI (Shell: "ChoRenSha AHI", or the
-    tool type ARGUMENTS=AHI) the effects and the music play through AHI,
-    in the audio mode chosen for the music unit in the AHI preferences;
-    AHI=0x<mode id> picks a mode (the IDs are listed by AHI's
-    preferences program). Without AHI, or if it cannot be opened, Paula
-    plays them. The line "Sound: AHI, ..." at the start shows the mode.
-  - MP3 decoder cards: with the argument MHI the music plays from the MP3
-    files in MUSIC_DAT on an MHI decoder (LIBS:MHI/mhiz3660.library), or
-    MHI=<driver> with another MHI driver (e.g. MHI=mhizz9000.library). If
-    the driver cannot be opened or has no decoder, the game says so and
-    plays the music as usual. Effects stay on Paula (or AHI with AHI).
-  - Volume: MUSICVOL=<0-64> and SFXVOL=<0-64> (arguments or ARGUMENTS
-    tool type, e.g. "ChoRenSha MUSICVOL=40") set the music's and the
-    effects' volume; both default to 64 (full). The songs keep their
-    original levels relative to each other.
+    played by MCDRV 0.69 itself and recorded, then streamed from disk:
+    in 8-bit stereo at 22 kHz on Paula's channels 2 and 3 (the sound
+    effects use channels 0 and 1), or through AHI, or as MP3 on an MHI
+    decoder. The songs keep their original levels relative to each
+    other, and loop as on the X68000.
 
 
 Credits
@@ -117,3 +131,5 @@ Credits
   Atari Falcon port and the disassembly this port builds on: Sascha
   Springer.
   Amiga port: Adam Polkosnik.
+  Music recorded with MCDRV 0.69 by CUL (free software), played by the
+  Musashi 68000 emulator and rendered with ymfm's YM2151 (Aaron Giles).
