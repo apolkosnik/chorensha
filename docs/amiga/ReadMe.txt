@@ -28,7 +28,11 @@ supported machine; how many of those frames are shown depends on the
 machine. A 68030 at 50 MHz with a graphics card shows about 40 per second;
 a stock A1200 (68020 at 14 MHz, AGA) about 5.
 
-If a graphics card is present it is used; otherwise the AGA screen.
+If a graphics card is present it is used; otherwise the AGA screen. The
+argument AGA (or RTG) chooses the display (Shell: "ChoRenSha AGA", or the
+tool type ARGUMENTS=AGA); MODE=0x<mode id> picks the graphics card's screen
+mode (an 8-bit mode of at least 320 x 240; the ID as listed by the screen
+mode preferences). The start-up text shows the screen mode used.
 
 
 Installation and start

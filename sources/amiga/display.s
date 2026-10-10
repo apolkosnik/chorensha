@@ -21,12 +21,14 @@
 	xdef capture_screen
 	xdef display_active
 	xdef update_fps_display
+	xdef display_mode_request
 
 	xref fps_display
 	xref rendered_frames
 	xref total_vbl_count
 
 	xref exec_base
+	xref dos_base
 	xref machine_display
 	xref machine_rtg
 
@@ -122,6 +124,20 @@ _LVOSetAPen=-342
 _LVOSetBPen=-348
 _LVOSetDrMd=-354
 _LVORawDoFmt=-522
+_LVOFindDisplayInfo=-726
+_LVOGetDisplayInfoData=-756
+_LVOVPrintf=-954
+DTAG_DISP=$80000000
+DTAG_DIMS=$80001000
+dis_NotAvailable=16 ; DisplayInfo (after its QueryHeader).
+DISPLAY_INFO_SIZE=48
+_LVOIsCyberModeID=-54
+DTAG_NAME=$80003000
+dim_MaxDepth=16 ; DimensionInfo (after its 16-byte QueryHeader).
+dim_Nominal=26 ; struct Rectangle: MinX, MinY, MaxX, MaxY.
+DIMENSION_INFO_SIZE=88
+nif_Name=16 ; NameInfo.
+NAME_INFO_SIZE=56
 JAM2=1
 _LVOReadPixelArray8=-780
 _LVOAllocBitMap=-918
@@ -271,9 +287,22 @@ open_display:
 	beq		.failed
 
 .library_open:
-	; Mode: 320 x 256 x 8, else 320 x 240.
+	; Mode: the one asked for (MODE=<id>) if it suits, else the best for
+	; 320 x 256 x 8, else 320 x 240.
 
 	move.l	#PICTURE_HEIGHT,screen_height
+
+	move.l	display_mode_request,d0
+	beq		.find_mode
+
+	bsr		check_mode
+	tst.l	d0
+	bmi		.find_mode ; Not usable: check_mode said why.
+
+	move.l	d0,screen_height
+	move.l	display_mode_request,d0
+
+	bra		.mode_found
 
 .find_mode:
 	cmp.l	#BACKEND_CYBERGRAPHX,backend
@@ -306,6 +335,7 @@ open_display:
 .mode_found:
 	move.l	d0,screen_tags_mode
 	move.l	screen_height,screen_tags_height
+	bsr		print_mode
 
 	move.l	intuition_base,a6
 	sub.l	a0,a0
@@ -1206,6 +1236,159 @@ c2p_c2plib:
 
 ; ------------------------------------------------------------------------------
 ;
+; MODE=<id> (main.s): d0.l = the display ID. Returns d0.l = the screen
+; height to use (256, or 240 for a mode with fewer lines), or -1 if the
+; mode cannot be used (unknown, not 8 bits deep: the picture is uploaded as
+; palette indices, or smaller than 320 x 240); then says why.
+
+check_mode:
+	movem.l	d2-d3/a2/a6,-(sp)
+
+	move.l	d0,d3
+	move.l	graphics_base,a6
+	jsr		_LVOFindDisplayInfo(a6)
+	move.l	#mode_unknown_text,d2
+	tst.l	d0
+	beq		.refused
+
+	move.l	d0,a2 ; Handle.
+
+	; A graphics card's mode (the picture is uploaded to the card), and
+	; available.
+
+	move.l	a2,a0
+	lea		display_info,a1
+	move.l	#DISPLAY_INFO_SIZE,d0
+	move.l	#DTAG_DISP,d1
+	move.l	d3,d2
+	jsr		_LVOGetDisplayInfoData(a6)
+	move.l	#mode_unknown_text,d2
+	tst.l	d0
+	beq		.refused
+
+	lea		display_info,a0
+	move.l	#mode_unavailable_text,d2
+	tst		dis_NotAvailable(a0)
+	bne		.refused
+
+	; A graphics card's mode: cybergraphics.library (CyberGraphX, or
+	; Picasso96's compatible one) knows it. (Picasso96 does not mark its
+	; modes DIPF_IS_FOREIGN.) Without that library this is not checked.
+
+	move.l	exec_base,a6
+	lea		cybergraphics_name,a1
+	moveq	#40,d0
+	jsr		_LVOOpenLibrary(a6)
+	tst.l	d0
+	beq		.card_checked
+
+	move.l	d0,a6
+	move.l	d3,d0
+	jsr		_LVOIsCyberModeID(a6)
+	move.l	d0,-(sp)
+	move.l	a6,a1
+	move.l	exec_base,a6
+	jsr		_LVOCloseLibrary(a6)
+	move.l	(sp)+,d0
+	move.l	graphics_base,a6
+	move.l	#mode_native_text,d2
+	tst		d0
+	beq		.refused
+
+.card_checked:
+	move.l	graphics_base,a6
+
+	move.l	a2,a0
+	lea		dimension_info,a1
+	move.l	#DIMENSION_INFO_SIZE,d0
+	move.l	#DTAG_DIMS,d1
+	move.l	d3,d2
+	jsr		_LVOGetDisplayInfoData(a6)
+	move.l	#mode_unknown_text,d2
+	tst.l	d0
+	beq		.refused
+
+	lea		dimension_info,a2
+	move.l	#mode_depth_text,d2
+	cmp		#8,dim_MaxDepth(a2)
+	bne		.refused
+
+	move.l	#mode_size_text,d2
+	move	dim_Nominal+4(a2),d0 ; MaxX - MinX + 1
+	sub		dim_Nominal(a2),d0
+	addq	#1,d0
+	cmp		#SCREEN_WIDTH,d0
+	bcs		.refused
+
+	move	dim_Nominal+6(a2),d0
+	sub		dim_Nominal+2(a2),d0
+	addq	#1,d0
+	cmp		#240,d0
+	bcs		.refused
+
+	move.l	#PICTURE_HEIGHT,d1
+	cmp		#PICTURE_HEIGHT,d0
+	bcc		.height_set
+
+	move.l	#240,d1
+
+.height_set:
+	move.l	d1,d0
+
+	bra		.done
+
+.refused:
+	move.l	d3,mode_print_arguments
+	move.l	d2,mode_print_arguments+4
+	move.l	dos_base,a6
+	move.l	#mode_refused_format,d1
+	move.l	#mode_print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+	moveq	#-1,d0
+
+.done:
+	movem.l	(sp)+,d2-d3/a2/a6
+
+	rts
+
+; The RTG mode in use: "Screen mode: <name> ($id), 320 x <height>."
+; screen_tags_mode = the display ID. Preserves all registers.
+
+print_mode:
+	movem.l	d0-d3/a0-a1/a6,-(sp)
+
+	lea		name_info+nif_Name,a0
+	move.b	#'?',(a0)+
+	clr.b	(a0)
+
+	move.l	graphics_base,a6
+	move.l	screen_tags_mode,d0
+	jsr		_LVOFindDisplayInfo(a6)
+	tst.l	d0
+	beq		.print
+
+	move.l	d0,a0
+	lea		name_info,a1
+	move.l	#NAME_INFO_SIZE,d0
+	move.l	#DTAG_NAME,d1
+	move.l	screen_tags_mode,d2
+	jsr		_LVOGetDisplayInfoData(a6)
+
+.print:
+	move.l	#name_info+nif_Name,mode_print_arguments
+	move.l	screen_tags_mode,mode_print_arguments+4
+	move.l	screen_height,mode_print_arguments+8
+	move.l	dos_base,a6
+	move.l	#mode_format,d1
+	move.l	#mode_print_arguments,d2
+	jsr		_LVOVPrintf(a6)
+
+	movem.l	(sp)+,d0-d3/a0-a1/a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
 ; FPS counter: at each frame end (task context, OS stack). While it is on
 ; (fps_display, the ` key), the pictures shown per second are recomputed
 ; about once a second and drawn at the top of the left border; when it is
@@ -1455,6 +1638,21 @@ aga_screen_tags_mode:
 	dc.l	SA_Exclusive,-1
 	dc.l	TAG_DONE
 
+mode_format:
+	dc.b	'Screen mode: %s (mode $%08lx), 320 x %ld.',10,0
+mode_refused_format:
+	dc.b	'MODE=$%08lx cannot be used (%s): the best mode is used instead.',10,0
+mode_unknown_text:
+	dc.b	'no such mode',0
+mode_unavailable_text:
+	dc.b	'not available',0
+mode_native_text:
+	dc.b	'not a graphics card mode',0
+mode_depth_text:
+	dc.b	'not an 8-bit mode',0
+mode_size_text:
+	dc.b	'smaller than 320 x 240',0
+
 fps_format:
 	dc.b	'%2ld ',0
 fps_wait_text:
@@ -1502,6 +1700,17 @@ temporary_rastport:
 
 fps_rastport:
 	ds.b	RASTPORT_SIZE
+
+display_mode_request:
+	ds.l	1 ; MODE=<id> (main.s), or 0.
+mode_print_arguments:
+	ds.l	3
+display_info:
+	ds.b	DISPLAY_INFO_SIZE
+dimension_info:
+	ds.b	DIMENSION_INFO_SIZE
+name_info:
+	ds.b	NAME_INFO_SIZE
 
 fps_tick:
 	ds.l	1 ; Frame timer tick at the last count.

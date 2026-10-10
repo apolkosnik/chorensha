@@ -29,6 +29,7 @@
 	xref audio_effect_volume
 	xref audio_mhi_requested
 	xref audio_mhi_driver
+	xref display_mode_request
 	xref start_emulator
 	xref heap_used
 	xref frame_count
@@ -85,6 +86,8 @@ MEMF_TOTAL=1<<19
 ; list headers out, so an 8 MB board reports slightly less than 8192 kB.
 
 AGA_MINIMUM_FAST_KB=8000
+DISPLAY_RTG=1 ; machine_display values (and display_request).
+DISPLAY_AGA=2
 
 pr_MsgPort=92
 pr_CLI=172
@@ -213,6 +216,7 @@ start:
 
 .directory_done:
 	bsr		read_tool_arguments
+	bsr		parse_audio_options ; Also the display options, for select_display.
 
 	lea		graphics_name,a1
 	moveq	#36,d0
@@ -227,7 +231,6 @@ start:
 	tst.l	machine_display
 	beq		.close_graphics
 
-	jsr		parse_audio_options
 	jsr		parse_frame_limit
 
 	ifd __NO_CPU_CACHES__
@@ -532,6 +535,20 @@ print_info_text:
 	move.l	#print_arguments,d2
 	jsr		_LVOVPrintf(a6)
 
+	; A display asked for that this machine cannot give.
+
+	move.l	#aga_refused_text,d1
+	cmp.l	#DISPLAY_AGA,display_request_refused
+	beq		.refused
+
+	move.l	#rtg_refused_text,d1
+	cmp.l	#DISPLAY_RTG,display_request_refused
+	bne		.display_path
+
+.refused:
+	jsr		_LVOPutStr(a6)
+
+.display_path:
 	; Display path.
 
 	move.l	machine_display,d0
@@ -558,7 +575,9 @@ print_info_text:
 ; AHI=$20001 or AHI=0x20001) in that mode; "MUSICVOL=<0-64>" and
 ; "SFXVOL=<0-64>" set the music's and the effects' volume (default 64);
 ; "MHI" plays the music on an MHI decoder (LIBS:MHI/mhiz3660.library),
-; "MHI=<driver>" with that driver (e.g. MHI=mhizz9000.library).
+; "MHI=<driver>" with that driver (e.g. MHI=mhizz9000.library). Display:
+; "AGA" or "RTG" chooses the display (default: a graphics card if there is
+; one, else AGA), "MODE=<id>" (hex) the RTG screen mode.
 ; The arguments are copied without them for parse_frame_limit.
 
 parse_audio_options:
@@ -634,6 +653,40 @@ parse_audio_options:
 	bra		.token
 
 .not_volume:
+	; AGA, RTG (whole words).
+
+	lea		aga_keyword,a3
+	moveq	#DISPLAY_AGA,d2
+	bsr		match_word
+	bne		.display_request
+
+	lea		rtg_keyword,a3
+	moveq	#DISPLAY_RTG,d2
+	bsr		match_word
+	beq		.not_display
+
+.display_request:
+	move.l	d2,display_request
+	add.l	d0,a0
+	sub.l	d0,d1
+
+	bra		.token
+
+.not_display:
+	; MODE=<hex> (the RTG screen mode).
+
+	lea		mode_keyword,a3
+	bsr		match_keyword
+	beq		.not_mode
+
+	add.l	d0,a0
+	sub.l	d0,d1
+	bsr		parse_hex
+	move.l	d0,display_mode_request
+
+	bra		.token
+
+.not_mode:
 	; MHI, MHI=<driver>.
 
 	lea		mhi_keyword,a3
@@ -823,6 +876,94 @@ parse_audio_options:
 
 .done:
 	movem.l	(sp)+,d2-d3/a2-a3
+
+	rts
+
+; As match_keyword, but only for a whole word: the keyword must be followed
+; by the end of the text or a space.
+
+match_word:
+	bsr		match_keyword
+	beq		.done
+
+	cmp.l	d0,d1
+	beq		.matched ; At the end.
+
+	cmp.b	#' ',(a0,d0.l)
+	bls		.matched
+
+	moveq	#0,d0
+
+	rts
+
+.matched:
+	tst.l	d0
+
+.done:
+	rts
+
+; a0/d1 = argument text and characters left: reads a hex number ($ or 0x
+; may come first). Returns d0.l = the number; a0/d1 advanced past it.
+
+parse_hex:
+	move.l	d2,-(sp)
+	moveq	#0,d2
+
+	tst.l	d1
+	beq		.done
+
+	cmp.b	#'$',(a0)
+	bne		.not_dollar
+
+	addq.l	#1,a0
+	subq.l	#1,d1
+
+	bra		.digits
+
+.not_dollar:
+	cmp.l	#2,d1
+	bcs		.digits
+
+	cmp.b	#'0',(a0)
+	bne		.digits
+
+	moveq	#~$20,d0
+	and.b	1(a0),d0
+	cmp.b	#'X',d0
+	bne		.digits
+
+	addq.l	#2,a0
+	subq.l	#2,d1
+
+.digits:
+	tst.l	d1
+	beq		.done
+
+	moveq	#0,d0
+	move.b	(a0),d0
+	sub.b	#'0',d0
+	cmp.b	#9,d0
+	bls		.digit
+
+	moveq	#~$20,d0
+	and.b	(a0),d0
+	sub.b	#'A',d0
+	cmp.b	#5,d0
+	bhi		.done
+
+	add.b	#10,d0
+
+.digit:
+	lsl.l	#4,d2
+	or.b	d0,d2
+	addq.l	#1,a0
+	subq.l	#1,d1
+
+	bra		.digits
+
+.done:
+	move.l	d2,d0
+	move.l	(sp)+,d2
 
 	rts
 
@@ -1188,13 +1329,39 @@ write_measurements:
 
 select_display:
 	moveq	#0,d0
+	clr.l	display_request_refused
 
 	cmp.l	#20,machine_cpu
 	bcs		.done
 
+	; AGA asked for (argument AGA): if the machine can.
+
+	cmp.l	#DISPLAY_AGA,display_request
+	bne		.not_aga_request
+
+	moveq	#DISPLAY_AGA,d0
+	cmp.l	#2,machine_chipset
+	bne		.refused
+
+	cmp.l	#AGA_MINIMUM_FAST_KB,machine_fast_total_kb
+	bcc		.done
+
+.refused:
+	move.l	display_request,display_request_refused
+
+.not_aga_request:
+	; RTG asked for, or by default: a graphics card if there is one.
+
 	moveq	#1,d0
 	tst.l	machine_rtg
 	bne		.done
+
+	cmp.l	#DISPLAY_RTG,display_request
+	bne		.no_card
+
+	move.l	display_request,display_request_refused
+
+.no_card:
 
 	moveq	#0,d0
 	cmp.l	#2,machine_chipset
@@ -1292,6 +1459,16 @@ effect_volume_keyword:
 	dc.b	'SFXVOL=',0
 mhi_keyword:
 	dc.b	'MHI',0
+aga_refused_text:
+	dc.b	'AGA was asked for, but this machine has no AGA chipset or less than 8 MB of fast RAM.',10,0
+rtg_refused_text:
+	dc.b	'RTG was asked for, but there is no graphics card (Picasso96 or CyberGraphX).',10,0
+aga_keyword:
+	dc.b	'AGA',0
+rtg_keyword:
+	dc.b	'RTG',0
+mode_keyword:
+	dc.b	'MODE=',0
 
 	even
 ; ------------------------------------------------------------------------------
@@ -1434,6 +1611,11 @@ tool_arguments:
 
 filtered_arguments:
 	ds.b	ARGUMENTS_SIZE
+
+display_request:
+	ds.l	1 ; DISPLAY_AGA or DISPLAY_RTG from the arguments, or 0.
+display_request_refused:
+	ds.l	1 ; The request could not be met (print_info_text says so).
 old_directory:
 	ds.l	1
 directory_changed:
