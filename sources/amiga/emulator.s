@@ -281,6 +281,14 @@ start_emulator:
 	move.l	a1,exit_check_exec ; AbsExecBase.
 	move.l	$90(a1),exit_check_vector ; IntVects[INTB_VERTB]: iv_Data, iv_Code.
 	move.l	$94(a1),exit_check_vector+4
+	move.l	watch_address,a1 ; (d0 holds the frame limit.)
+	cmp.l	#0,a1
+	beq		.no_watch
+
+	move.l	(a1),watch_values
+	move.l	4(a1),watch_values+4
+
+.no_watch:
 	bsr		exit_check_announce
 	endif
 
@@ -470,7 +478,7 @@ start_emulator:
 ; a0 = step name: prints the vector and whether it changed, and flushes.
 
 exit_check:
-	movem.l	d2/a2-a3/a6,-(sp)
+	movem.l	d2-d3/a2-a3/a6,-(sp)
 
 	move.l	exit_check_exec,a1 ; The ExecBase saved at the start.
 	lea		exit_check_arguments,a2
@@ -513,7 +521,27 @@ exit_check:
 	move.l	d0,d1
 	jsr		_LVOFlush(a6)
 
-	movem.l	(sp)+,d2/a2-a3/a6
+	; The whole log also into exitcheck.txt (current directory), for runs
+	; whose output cannot be read (Workbench starts in emulation).
+
+	move.l	#exit_check_file_name,d1
+	move.l	#1006,d2 ; MODE_NEWFILE
+	jsr		-30(a6) ; Open
+	move.l	d0,d3
+	beq		.no_file
+
+	move.l	d3,d1
+	move.l	#exit_check_log,d2
+	move.l	exit_check_log_next,d0
+	sub.l	d2,d0
+	move.l	d0,d3
+	move.l	d1,-(sp)
+	jsr		-48(a6) ; Write
+	move.l	(sp)+,d1
+	jsr		-36(a6) ; Close
+
+.no_file:
+	movem.l	(sp)+,d2-d3/a2-a3/a6
 
 	rts
 
@@ -562,7 +590,37 @@ watch_check:
 	bne		.changed
 	move.l	$94(a1),d0
 	cmp.l	exit_check_vector+4,d0
+	bne		.changed
+
+	move.l	watch_address,d0 ; main.s: graphics_base and workbench_message.
 	beq		.done
+
+	move.l	d0,a0
+	move.l	(a0),d0
+	cmp.l	watch_values,d0
+	bne		.changed_main
+	move.l	4(a0),d0
+	cmp.l	watch_values+4,d0
+	beq		.done
+
+.changed_main:
+	st		watch_reported
+	lea		watch_main_arguments,a2
+	move.l	8(sp),(a2)+ ; The caller's a0 (saved): the kind.
+	and.l	#$ffff,d1
+	move.l	d1,(a2)+
+	move.l	(a0),(a2)+
+	move.l	4(a0),(a2)+
+	move.l	frame_count,(a2)+
+	move.l	exit_check_exec,a6
+	lea		watch_main_format,a0
+	lea		watch_main_arguments,a1
+	lea		exit_log_char(pc),a2
+	move.l	exit_check_log_next,a3
+	jsr		-522(a6) ; RawDoFmt
+	bsr		exit_log_end
+
+	bra		.done
 
 .changed:
 	st		watch_reported
@@ -589,6 +647,8 @@ watch_check:
 
 watch_format:
 	dc.b	'WATCH: changed after %s $%04lx: $4 = $%08lx, VERTB $%08lx $%08lx, frame %ld',10,0
+watch_main_format:
+	dc.b	'WATCH: main graphics_base/workbench_message changed after %s $%04lx: $%08lx $%08lx, frame %ld',10,0
 watch_dos:
 	dc.b	'DOS call',0
 watch_iocs:
@@ -602,6 +662,8 @@ exit_check_announce:
 
 	move.l	#exit_check_log,exit_check_log_next
 	move.l	#exit_check_log,exit_check_arguments
+	move.l	watch_values,exit_check_arguments+4
+	move.l	watch_values+4,exit_check_arguments+8
 	move.l	dos_base,a6
 	move.l	#exit_check_log_format,d1
 	move.l	#exit_check_arguments,d2
@@ -614,8 +676,65 @@ exit_check_announce:
 
 	rts
 
+; After the game (main.s): exceptions in the task are logged (number, PC,
+; SR, user stack) and then passed on to the previous trap handler.
+
+	xdef install_exit_trap_logger
+	xdef watch_address
+
+install_exit_trap_logger:
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+
+	move.l	exit_check_exec,a6
+	sub.l	a1,a1
+	jsr		-294(a6) ; FindTask
+	move.l	d0,a0
+	move.l	tc_TrapCode(a0),exit_trap_old
+	move.l	#exit_trap_logger,tc_TrapCode(a0)
+
+	movem.l	(sp)+,d0-d1/a0-a1/a6
+
+	rts
+
+exit_trap_logger:
+	movem.l	d0-d1/a0-a3/a6,-(sp)
+
+	lea		exit_trap_arguments,a1
+	move.l	7*4(sp),(a1) ; Exception number.
+	move.l	7*4+4+2(sp),d0 ; PC.
+	move.l	d0,4(a1)
+	sub.l	#start_of_code,d0
+	move.l	d0,8(a1)
+	moveq	#0,d0
+	move	7*4+4(sp),d0 ; SR.
+	move.l	d0,12(a1)
+	move	usp,a0
+	move.l	a0,16(a1)
+	move.l	(a0),20(a1)
+	move.l	4(a0),24(a1)
+	move.l	8(a0),28(a1)
+
+	move.l	exit_check_exec,a6
+	lea		exit_trap_format,a0
+	lea		exit_log_char(pc),a2
+	move.l	exit_check_log_next,a3
+	jsr		-522(a6) ; RawDoFmt
+	bsr		exit_log_end
+
+	movem.l	(sp)+,d0-d1/a0-a3/a6
+
+	move.l	exit_trap_old,-(sp)
+
+	rts
+
+exit_trap_format:
+	dc.b	'TRAP: exception %ld, PC $%08lx (code + $%08lx), SR $%04lx, USP $%08lx: $%08lx $%08lx $%08lx',10,0
+	even
+
+exit_check_file_name:
+	dc.b	'exitcheck.txt',0
 exit_check_log_format:
-	dc.b	'exit check: log at $%08lx',10,0
+	dc.b	'exit check: log at $%08lx (main graphics_base $%08lx, workbench_message $%08lx at the start)',10,0
 exit_check_format:
 	dc.b	'exit check: %s: VERTB vector $%08lx $%08lx, $4 = $%08lx %s',10,0
 exit_check_same:
@@ -630,8 +749,18 @@ exit_check_vector:
 	ds.l	2
 exit_check_exec:
 	ds.l	1
+exit_trap_old:
+	ds.l	1
+watch_address:
+	ds.l	1
+exit_trap_arguments:
+	ds.l	8
 watch_arguments:
 	ds.l	6
+watch_main_arguments:
+	ds.l	5
+watch_values:
+	ds.l	2
 watch_reported:
 	ds.b	1
 	even

@@ -129,6 +129,7 @@ _LVOLock=-84
 _LVOUnLock=-90
 _LVOCreateNewProc=-498
 _LVOVPrintf=-954
+_LVOPutStr=-948
 
 MODE_OLDFILE=1005
 MODE_NEWFILE=1006
@@ -436,8 +437,49 @@ initialize_audio:
 	clr.l	silence
 
 .done:
+	bsr		print_sound_outputs
+
 	movem.l	(sp)+,d2-d7/a2-a6
 
+	rts
+
+; The start-up text's sound lines: the effects (AHI prints its own) and the
+; music (MHI prints its own).
+
+print_sound_outputs:
+	move.l	dos_base,a6
+
+	tst.b	audio_available
+	bne		.effects
+
+	move.l	#no_sound_text,d1
+	jmp		_LVOPutStr(a6)
+
+.effects:
+	tst.b	using_ahi
+	bne		.music
+
+	move.l	#paula_effects_text,d1
+	jsr		_LVOPutStr(a6)
+
+.music:
+	move.l	#no_music_text,d1
+	tst.b	music_available
+	beq		.print_music
+
+	tst.b	using_mhi
+	bne		.done ; "Music: MHI, ..." is printed.
+
+	move.l	#ahi_music_text,d1
+	tst.b	using_ahi
+	bne		.print_music
+
+	move.l	#paula_music_text,d1
+
+.print_music:
+	jsr		_LVOPutStr(a6)
+
+.done:
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -2986,6 +3028,17 @@ music_summary_format:
 
 ahi_device_name:
 	dc.b	'ahi.device',0
+
+no_sound_text:
+	dc.b	'Sound: none (the audio channels are in use): the game runs silent.',10,0
+paula_effects_text:
+	dc.b	'Sound: Paula, effects on channels 0 and 1.',10,0
+paula_music_text:
+	dc.b	'Music: Paula, channels 2 and 3, streamed from MUSIC_DAT.',10,0
+ahi_music_text:
+	dc.b	'Music: AHI, streamed from MUSIC_DAT.',10,0
+no_music_text:
+	dc.b	'Music: off (no MUSIC_DAT drawer, or not enough memory).',10,0
 
 mhi_format:
 	dc.b	'Music: MHI, %s.',10,0

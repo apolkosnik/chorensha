@@ -227,6 +227,10 @@ start:
 	bsr		read_tool_arguments
 	bsr		parse_audio_options ; Also the display options, for select_display.
 
+	; (A Workbench start has left dos.library in a6: the console window and
+	; the current directory above.)
+
+	move.l	exec_base,a6
 	lea		graphics_name,a1
 	moveq	#36,d0
 	jsr		_LVOOpenLibrary(a6)
@@ -255,12 +259,17 @@ start:
 
 	endif
 
+	ifd __EXIT_CHECK__
+	move.l	#graphics_base,watch_address ; And workbench_message after it.
+	endif
+
 	move.l	frame_limit,d0
 	move.l	input_script_name,a0
 	jsr		start_emulator
 
 	ifd __EXIT_CHECK__
 	movem.l	d0-d1/a0-a1,-(sp)
+	jsr		install_exit_trap_logger
 	lea		check_returned,a0
 	jsr		exit_check
 	movem.l	(sp)+,d0-d1/a0-a1
@@ -1546,6 +1555,8 @@ missing_data_format:
 
 	ifd __EXIT_CHECK__
 	xref exit_check
+	xref install_exit_trap_logger
+	xref watch_address
 check_returned:
 	dc.b	'emulator returned',0
 check_summary:
