@@ -21,7 +21,7 @@ mkdir -p "$drawer"
 cp binaries/amiga/sz2 "$drawer/ChoRenSha"
 cp sources/amiga/icons/ChoRenSha.info "$drawer/ChoRenSha.info"
 cp sources/amiga/icons/drawer.info "$release/ChoRenSha.info"
-cp docs/amiga/ReadMe.txt "$drawer/ReadMe.txt"
+cp README.md "$drawer/ReadMe.txt"
 cp -r binaries/amiga/BGM_DAT binaries/amiga/ETC_DAT binaries/amiga/PCM_DAT binaries/amiga/XSP_DAT "$drawer/"
 
 # The music (tools/music/build_music.sh): the streams, and the MP3 files for
