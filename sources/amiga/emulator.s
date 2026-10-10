@@ -31,6 +31,8 @@
 	xref joystick_now
 	xref mouse_frame_hook
 	xref update_fps_display
+	xref finish_pipelined_frame
+	xref poll_pipelined_frame
 
 	xdef exit_reason
 	xdef rendered_frames
@@ -483,6 +485,7 @@ amiga_exit_game:
 
 	jsr		release_input
 
+	jsr		finish_pipelined_frame
 	jsr		close_display
 	jsr		release_renderer
 
@@ -1277,6 +1280,7 @@ amiga_wait_vbl:
 	jsr		update_fps_display
 
 	jsr		frame_wait_begin
+	jsr		poll_pipelined_frame ; A pipelined picture whose background is done.
 
 	ifd __LOCKSTEP__
 
@@ -1373,6 +1377,7 @@ amiga_xsp_vsync:
 	jsr		update_fps_display
 
 	jsr		frame_wait_begin
+	jsr		poll_pipelined_frame ; A pipelined picture whose background is done.
 
 	add.l	d7,frame_schedule
 
@@ -1587,6 +1592,7 @@ render_and_present:
 	beq		.done
 
 	clr.l	screenshot_due
+	jsr		finish_pipelined_frame ; The screenshot shows this frame.
 	bsr		write_screenshot
 
 .done:
@@ -2366,6 +2372,7 @@ poll_render:
 
 	jsr		render_frame
 	jsr		present_frame
+	jsr		finish_pipelined_frame ; Shown now (pipelined frames).
 
 	tst.l	frame_records
 	beq		.no_screenshot

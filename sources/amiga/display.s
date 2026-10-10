@@ -9,14 +9,17 @@
 ; Picasso96 system (its compatibility layer), -D__FORCE_AGA__ the AGA screen
 ; on a machine with an RTG board, to test those paths.
 ;
-; AGA: a 320 x 256 x 8 PAL lores screen (interleaved bitplanes), double
+; AGA: a 320 x 256 x 8 PAL lores screen (interleaved bitplanes), triple
 ; buffered with ScreenBuffers: graphics.s draws each frame in planar form and
-; copies it into the hidden bitmap (planar_copy_to_screen, through
+; copies it into the next bitmap (planar_copy_to_screen, through
 ; begin_planar_frame), or composes it in the chunky render buffer, which is
-; then converted into the hidden bitmap (c2p);
-; ChangeScreenBuffer() shows it at the next vertical blank. Before drawing
-; into a bitmap again, its safe message (the previous flip has taken effect)
-; is awaited.
+; then converted into the next bitmap (c2p), or has the blitter compose its
+; background there while the game goes on and draws the rest later
+; (pipelined_frame_target, flip_pipelined_frame); ChangeScreenBuffer() shows
+; it at the next vertical blank. The bitmaps take turns, so the next one was
+; left two flips ago: before each flip the safe message of the previous one
+; (the bitmap shown before it may be drawn into) is awaited, and drawing
+; never waits.
 
 	xdef open_display
 	xdef close_display
@@ -25,8 +28,11 @@
 	xdef display_active
 	xdef update_fps_display
 	xdef display_mode_request
+	xdef graphics_base
 	xdef planar_display_available
 	xdef begin_planar_frame
+	xdef pipelined_frame_target
+	xdef flip_pipelined_frame
 
 	xref fps_display
 	xref rendered_frames
@@ -204,6 +210,7 @@ RENDER_STRIDE=GUARD+PICTURE_WIDTH+GUARD
 SCREEN_WIDTH=320
 POINTER_SIZE=16
 AGA_DEPTH=8
+SCREEN_BUFFERS=3
 AGA_X_BYTES=(SCREEN_WIDTH-PICTURE_WIDTH)/2/8 ; Picture start in a plane row.
 
 ; Screenshots: from the picture's left edge; -D__CAPTURE_BORDER__ (test
@@ -503,12 +510,19 @@ open_screen_buffers:
 	move.l	d0,screen_buffers+4
 	beq		.failed
 
-	; Safe messages to safe_port; both bitmaps must have 8 evenly spaced
+	move.l	screen,a0
+	sub.l	a1,a1
+	moveq	#0,d0
+	jsr		_LVOAllocScreenBuffer(a6)
+	move.l	d0,screen_buffers+8
+	beq		.failed
+
+	; Safe messages to safe_port; all bitmaps must have 8 evenly spaced
 	; planes (interleaved: one row of each plane after the other) with the
 	; same layout.
 
 	lea		screen_buffers,a2
-	moveq	#2-1,d4
+	moveq	#SCREEN_BUFFERS-1,d4
 
 .buffer_loop:
 	move.l	(a2)+,a0
@@ -524,7 +538,7 @@ open_screen_buffers:
 	move.l	bm_Planes+4(a1),d1
 	sub.l	bm_Planes(a1),d1 ; Plane spacing.
 
-	cmp.l	#1,d4
+	cmp.l	#SCREEN_BUFFERS-1,d4
 	bne		.compare_layout
 
 	move.l	d0,plane_row_bytes
@@ -632,22 +646,19 @@ close_display:
 
 	rts
 
-; AGA: show the screen's own bitmap again, then free both ScreenBuffers and
+; AGA: show the screen's own bitmap again, then free the ScreenBuffers and
 ; the port.
 
 close_screen_buffers:
 	movem.l	d2-d7/a2-a6,-(sp)
 
 	tst.l	screen_buffers
-	beq		.free_second
-
-	tst.l	screen_buffers+4
-	beq		.free_first
-
-	bsr		wait_until_safe
+	beq		.free_port
 
 	tst.l	shown_buffer
-	beq		.free_second
+	beq		.free_others
+
+	bsr		wait_until_safe
 
 .show_first:
 	move.l	intuition_base,a6
@@ -665,27 +676,25 @@ close_screen_buffers:
 .shown:
 	clr.l	shown_buffer
 	st		safe_pending
+
+.free_others:
 	bsr		wait_until_safe
 
-.free_second:
-	move.l	screen_buffers+4,d0
-	beq		.free_first
+	lea		screen_buffers+SCREEN_BUFFERS*4,a2
+	moveq	#SCREEN_BUFFERS-1,d2
 
-	clr.l	screen_buffers+4
+.free_loop:
+	move.l	-(a2),d0
+	beq		.next_free
+
+	clr.l	(a2)
 	move.l	intuition_base,a6
 	move.l	screen,a0
 	move.l	d0,a1
 	jsr		_LVOFreeScreenBuffer(a6)
 
-.free_first:
-	move.l	screen_buffers,d0
-	beq		.free_port
-
-	clr.l	screen_buffers
-	move.l	intuition_base,a6
-	move.l	screen,a0
-	move.l	d0,a1
-	jsr		_LVOFreeScreenBuffer(a6)
+.next_free:
+	dbf		d2,.free_loop
 
 .free_port:
 	move.l	safe_port,d0
@@ -756,6 +765,14 @@ present_frame:
 	; next vertical blank).
 
 .aga:
+	tst.b	pipelined_frame
+	beq		.not_pipelined
+
+	sf		pipelined_frame ; Shown later (flip_pipelined_frame).
+
+	bra		.uploaded
+
+.not_pipelined:
 	jsr		planar_copy_to_screen
 
 	tst.b	planar_frame
@@ -766,13 +783,7 @@ present_frame:
 	bra		.flip
 
 .convert:
-	bsr		wait_until_safe
-
-	moveq	#1,d0
-	sub.l	shown_buffer,d0
-	lea		screen_buffers,a0
-	move.l	(a0,d0.l*4),a1
-	move.l	a1,hidden_screen_buffer
+	bsr		next_screen_buffer
 	move.l	sb_BitMap(a1),a1
 	move.l	bm_Planes(a1),a1
 	add.w	#AGA_X_BYTES,a1
@@ -811,20 +822,7 @@ present_frame:
 	endif
 
 .flip:
-	move.l	intuition_base,a6
-	move.l	screen,a0
-	move.l	hidden_screen_buffer,a1
-	jsr		_LVOChangeScreenBuffer(a6)
-	tst.l	d0
-	beq		.aga_shown ; Not shown (busy): drawn again next frame.
-
-	moveq	#1,d0
-	sub.l	d0,shown_buffer
-	neg.l	shown_buffer
-	st		safe_pending
-
-.aga_shown:
-	bsr		load_palette
+	bsr		flip_screen_buffer
 
 	bra		.uploaded
 
@@ -946,24 +944,91 @@ planar_display_available:
 ; Preserves all other registers.
 
 begin_planar_frame:
-	movem.l	d1/a0-a1/a6,-(sp)
+	movem.l	d1/a0-a1,-(sp)
 
-	bsr		wait_until_safe
-
-	moveq	#1,d0
-	sub.l	shown_buffer,d0
-	lea		screen_buffers,a0
-	move.l	(a0,d0.l*4),a1
-	move.l	a1,hidden_screen_buffer
+	bsr		next_screen_buffer
 	move.l	sb_BitMap(a1),a1
 	move.l	bm_Planes(a1),d0
 	addq.l	#AGA_X_BYTES,d0
 
 	st		planar_frame
 
-	movem.l	(sp)+,d1/a0-a1/a6
+	movem.l	(sp)+,d1/a0-a1
 
 	rts
+
+; graphics.s, pipelined frames: returns d0 = the picture's top left in plane
+; 0 of the next bitmap, which the blitter and graphics.s draw into while the
+; game goes on; present_frame leaves it to flip_pipelined_frame. Preserves
+; all other registers.
+
+pipelined_frame_target:
+	movem.l	d1/a0-a1,-(sp)
+
+	bsr		next_screen_buffer
+	move.l	sb_BitMap(a1),a1
+	move.l	bm_Planes(a1),d0
+	addq.l	#AGA_X_BYTES,d0
+
+	st		pipelined_frame
+
+	movem.l	(sp)+,d1/a0-a1
+
+	rts
+
+; graphics.s: shows the pipelined frame's bitmap and its palette (task
+; context). Preserves all registers.
+
+flip_pipelined_frame:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	bsr		flip_screen_buffer
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
+
+; Returns d0 = the picture's top left in plane 0 of the shown bitmap (test
+; builds). Preserves all other registers.
+
+; a1 = hidden_screen_buffer = the ScreenBuffer after the shown one, d1 =
+; its number (also in hidden_buffer_number). Uses a0.
+
+next_screen_buffer:
+	move.l	shown_buffer,d1
+	addq.l	#1,d1
+	cmp.l	#SCREEN_BUFFERS,d1
+	bne		.number_ok
+
+	moveq	#0,d1
+
+.number_ok:
+	move.l	d1,hidden_buffer_number
+	lea		screen_buffers,a0
+	move.l	(a0,d1.l*4),a1
+	move.l	a1,hidden_screen_buffer
+
+	rts
+
+; Shows hidden_screen_buffer once the previous flip has taken effect, then
+; loads the palette (both at the next vertical blank). If the screen is busy
+; the bitmap is not shown (drawn again next frame).
+
+flip_screen_buffer:
+	bsr		wait_until_safe
+
+	move.l	intuition_base,a6
+	move.l	screen,a0
+	move.l	hidden_screen_buffer,a1
+	jsr		_LVOChangeScreenBuffer(a6)
+	tst.l	d0
+	beq		.not_shown
+
+	move.l	hidden_buffer_number,shown_buffer
+	st		safe_pending
+
+.not_shown:
+	bra		load_palette
 
 ; ------------------------------------------------------------------------------
 ;
@@ -1594,7 +1659,7 @@ draw_fps_text:
 	bra		.done
 
 .aga:
-	; Into both buffers' bitmaps, through a RastPort of its own.
+	; Into all the buffers' bitmaps, through a RastPort of its own.
 
 	moveq	#0,d4
 
@@ -1613,7 +1678,7 @@ draw_fps_text:
 
 .next_buffer:
 	addq.l	#1,d4
-	cmp.l	#2,d4
+	cmp.l	#SCREEN_BUFFERS,d4
 	bne		.buffer_loop
 
 .done:
@@ -1822,11 +1887,13 @@ capture_info:
 
 safe_port:
 	ds.l	1
-screen_buffers: ; The screen's own bitmap, then the second one.
-	ds.l	2
-shown_buffer: ; 0 or 1.
+screen_buffers: ; The screen's own bitmap, then the others.
+	ds.l	SCREEN_BUFFERS
+shown_buffer: ; Its number.
 	ds.l	1
-hidden_screen_buffer:
+hidden_screen_buffer: ; The next one to show.
+	ds.l	1
+hidden_buffer_number:
 	ds.l	1
 plane_row_bytes:
 	ds.l	1
@@ -1845,6 +1912,8 @@ c2plib_scrambled: ; One row.
 	ds.b	PICTURE_WIDTH
 	endif
 planar_frame: ; graphics.s has drawn this frame into the hidden bitmap.
+	ds.b	1
+pipelined_frame: ; The frame is drawn and shown later (flip_pipelined_frame).
 	ds.b	1
 safe_pending:
 	ds.b	1

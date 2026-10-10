@@ -44,6 +44,8 @@
 	xdef release_renderer
 	xdef compiled_sprite_count
 	xdef planar_copy_to_screen
+	xdef finish_pipelined_frame
+	xdef poll_pipelined_frame
 
 	xdef render_buffer
 	xdef hardware_palette
@@ -66,6 +68,10 @@
 	xref exec_base
 	xref planar_display_available
 	xref begin_planar_frame
+	xref pipelined_frame_target
+	xref flip_pipelined_frame
+	xref graphics_base
+	xref machine_cpu
 
 	ifd __RENDER_PROFILE__
 	xref timer_base
@@ -145,6 +151,11 @@ OPCODE_RTS=$4e75
 _LVOAllocMem=-198
 _LVOFreeMem=-210
 _LVOCacheClearU=-636
+_LVOFindTask=-294
+_LVOWait=-318
+_LVOSignal=-324
+_LVOAllocSignal=-330
+_LVOFreeSignal=-336
 
 MEMF_ANY=0
 
@@ -382,6 +393,9 @@ render_frame:
 
 	PROFILE	-1
 
+	bsr		finish_pipelined_frame ; The picture before (pipelined).
+	PROFILE	4
+
 	tst.b	layers_dirty
 	beq		.layers_ok
 
@@ -439,9 +453,18 @@ render_frame:
 
 	rts
 
-	; AGA: straight into the hidden screen buffer's bitplanes.
+	; AGA: in planar form.
 
 .planar:
+	tst.b	planar_blitter
+	beq		.planar_now
+
+	bsr		prepare_pipelined_frame
+	PROFILE	1
+
+	bra		.done
+
+.planar_now:
 	ifnd __NO_GRAPHICS__
 	bsr		planar_graphics
 	endif
@@ -2199,6 +2222,15 @@ compile_sprite_variant:
 ; buffer itself (display.s begin_planar_frame). Pixels get the same palette
 ; slots as in the chunky buffer, so the picture is the same.
 ;
+; On a 68020 (or with -D__PLANAR_BLITTER__) frames are pipelined instead:
+; at the frame the blitter composes the background into the next screen
+; buffer (from copies of the planar layers in chip RAM), queued through
+; QBlit, while the CPU prepares the text and the sprites and then goes on
+; with the game; at a later frame end (or the next picture) the text and the
+; sprites are drawn straight into that buffer, which is then shown
+; (finish_pipelined_frame). The picture is one frame later; screenshots and
+; the poll renders finish at once.
+;
 ;   - Background: GVRAM pages 0 and 1 are converted once (build_layers) into
 ;     planar layers, per line eight 32-pixel groups of eight plane longs,
 ;     plus a mask of page 0's opaque pixels per group. Each group is copied
@@ -2227,6 +2259,44 @@ PLANAR_TEXT_LINE=4+PLANAR_GROUPS*PLANAR_TEXT_GROUP ; Group bits (byte), groups.
 PLANAR_TEXT_SIZE=PLANAR_TEXT_LINE*RENDER_HEIGHT
 PLANAR_FRAME_SIZE=PLANAR_LINE*RENDER_HEIGHT
 PLANAR_MEMORY_SIZE=PLANAR_LAYER_SIZE*2+PLANAR_MASK_SIZE+PLANAR_TEXT_SIZE+PLANAR_FRAME_SIZE
+
+; Blitter: the chip layers have the plane rows of a line one after the
+; other (plane p at p * 32) and 768 lines (the first 256 again after the
+; 512), so the 256 lines from any scroll position follow each other; the
+; mask has 32 bytes per line. Per plane one blit of 16 words x 256 rows:
+; D = A | (C & ~B), A = page 0, B = page 0's mask, C = page 1.
+
+BLIT_LAYER_LINES=LAYER_LINES+RENDER_HEIGHT
+BLIT_LAYER_SIZE=PLANAR_LAYER_LINE*BLIT_LAYER_LINES
+BLIT_MASK_SIZE=PLANAR_GROUPS*4*BLIT_LAYER_LINES
+BLIT_MEMORY_SIZE=BLIT_LAYER_SIZE*2+BLIT_MASK_SIZE
+BLIT_SOURCE_MODULO=PLANAR_LAYER_LINE-PLANAR_GROUPS*4
+BLIT_DESTINATION_MODULO=PLANAR_LINE-PLANAR_GROUPS*4
+BLIT_CONTROL=$0ff20000 ; BLTCON0: A, B, C, D, minterm $f2; BLTCON1: 0.
+BLIT_SIZE=(RENDER_HEIGHT<<6)|(PLANAR_GROUPS*2) ; (vasm: | binds tighter than *.)
+
+MEMF_CHIP=1<<1
+_LVOQBlit=-276
+_LVOWaitBlit=-228
+
+bn_function=4 ; struct bltnode
+bn_stat=8
+bn_cleanup=14
+BLTNODE_SIZE=18
+
+DMACONR=$002 ; Custom chip registers (offsets).
+DMAB_BLTDONE=14 ; DMACONR: blitter busy.
+BLTCON0=$040
+BLTAFWM=$044
+BLTCPT=$048
+BLTBPT=$04c
+BLTAPT=$050
+BLTDPT=$054
+BLTSIZE=$058
+BLTCMOD=$060
+BLTBMOD=$062
+BLTAMOD=$064
+BLTDMOD=$066
 
 PLANAR_ARENA_SIZE=$100000
 PLANAR_ARENA_MINIMUM=$40000
@@ -2455,6 +2525,48 @@ initialize_planar:
 
 	st		planar_enabled
 
+	; Pipelined frames with the blitter on a 68020 (a 68030 composes in
+	; fast RAM faster than the blitter).
+
+	ifnd __PLANAR_DIRECT__
+	ifnd __PLANAR_BLITTER__
+	cmp.l	#30,machine_cpu
+	bcc		.done
+	endif
+
+	; blit_background signals the task when the background is done.
+
+	moveq	#-1,d0
+	jsr		_LVOAllocSignal(a6)
+	move.l	d0,blit_signal
+	bmi		.done
+
+	sub.l	a1,a1
+	jsr		_LVOFindTask(a6)
+	move.l	d0,blit_task
+
+	move.l	#BLIT_MEMORY_SIZE,d0
+	moveq	#MEMF_CHIP,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,blit_memory
+	beq		.free_signal
+
+	move.l	d0,blit_layer0
+	add.l	#BLIT_LAYER_SIZE,d0
+	move.l	d0,blit_layer1
+	add.l	#BLIT_LAYER_SIZE,d0
+	move.l	d0,blit_mask
+
+	st		planar_blitter
+
+	bra		.done
+
+.free_signal:
+	move.l	blit_signal,d0
+	jsr		_LVOFreeSignal(a6)
+	move.l	#-1,blit_signal
+	endif
+
 .done:
 	movem.l	(sp)+,d0-d1/a0-a1/a6
 
@@ -2463,8 +2575,28 @@ initialize_planar:
 release_planar:
 	movem.l	d0-d1/a0-a1/a6,-(sp)
 
+	bsr		finish_pipelined_frame
+
 	sf		planar_enabled
+	sf		planar_blitter
 	move.l	exec_base,a6
+
+	move.l	blit_memory,d0
+	beq		.no_blit_memory
+
+	clr.l	blit_memory
+	move.l	d0,a1
+	move.l	#BLIT_MEMORY_SIZE,d0
+	jsr		_LVOFreeMem(a6)
+
+.no_blit_memory:
+	move.l	blit_signal,d0
+	bmi		.no_signal
+
+	move.l	#-1,blit_signal
+	jsr		_LVOFreeSignal(a6)
+
+.no_signal:
 
 	move.l	planar_arena,d0
 	beq		.no_arena
@@ -2503,6 +2635,10 @@ planar_frame_target:
 	or		L_00E80000+CRTC_PAGE1_X,d1
 	and		#511,d1
 	bne		.done ; Horizontal scroll: the chunky per-pixel path.
+
+	moveq	#1,d0 ; Pipelined: prepare_pipelined_frame takes the buffer.
+	tst.b	planar_blitter
+	bne		.done
 
 	ifd __PLANAR_DIRECT__
 	jsr		begin_planar_frame
@@ -2601,8 +2737,280 @@ build_planar_layers:
 
 	dbf		d1,.mask
 
+	tst.b	planar_blitter
+	beq		.done
+
+	bsr		copy_chip_layers
+
+.done:
 	movem.l	(sp)+,d0-d7/a0-a6
 
+	rts
+
+; The blitter's copies of the planar layers and the mask in chip RAM.
+
+copy_chip_layers:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	move.l	planar_layer0,a0
+	move.l	blit_layer0,a1
+	bsr		.chip_layer
+	move.l	planar_layer1,a0
+	move.l	blit_layer1,a1
+	bsr		.chip_layer
+
+	move.l	planar_mask,a0
+	move.l	blit_mask,a1
+	move.l	a1,a2
+	move	#LAYER_LINES*PLANAR_GROUPS-1,d2
+
+.chip_mask:
+	move.l	(a0)+,(a1)+
+	dbf		d2,.chip_mask
+
+	move	#RENDER_HEIGHT*PLANAR_GROUPS-1,d2
+
+.chip_mask_again:
+	move.l	(a2)+,(a1)+
+	dbf		d2,.chip_mask_again
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
+
+; a0 = planar layer (groups of eight plane longs), a1 = chip layer (plane
+; rows), then the first RENDER_HEIGHT lines again.
+
+.chip_layer:
+	move.l	a1,a2
+	move	#LAYER_LINES-1,d2
+
+.chip_line:
+	move.l	a0,a3
+	moveq	#8-1,d3
+
+.chip_plane:
+	move.l	(a3),(a1)+
+	move.l	1*32(a3),(a1)+
+	move.l	2*32(a3),(a1)+
+	move.l	3*32(a3),(a1)+
+	move.l	4*32(a3),(a1)+
+	move.l	5*32(a3),(a1)+
+	move.l	6*32(a3),(a1)+
+	move.l	7*32(a3),(a1)+
+	addq.l	#4,a3
+
+	dbf		d3,.chip_plane
+
+	lea		PLANAR_LAYER_LINE(a0),a0
+
+	dbf		d2,.chip_line
+
+	move	#RENDER_HEIGHT*PLANAR_LAYER_LINE/4-1,d2
+
+.chip_again:
+	move.l	(a2)+,(a1)+
+	dbf		d2,.chip_again
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Pipelined frames (blitter). Starts the frame: queues the background's
+; blits into the next screen buffer, then prepares the text and the sprites
+; while they run. Task context.
+
+prepare_pipelined_frame:
+	jsr		pipelined_frame_target
+	move.l	d0,planar_destination
+	move.l	d0,blit_destination
+
+	moveq	#0,d1
+	move	L_00E80000+CRTC_PAGE0_Y,d1
+	and		#LAYER_LINES-1,d1
+	move.l	d1,d2
+	lsl.l	#8,d1 ; * PLANAR_LAYER_LINE
+	add.l	blit_layer0,d1
+	move.l	d1,blit_page0
+	lsl.l	#5,d2 ; * PLANAR_GROUPS * 4
+	add.l	blit_mask,d2
+	move.l	d2,blit_page0_mask
+
+	moveq	#0,d1
+	move	L_00E80000+CRTC_PAGE1_Y,d1
+	and		#LAYER_LINES-1,d1
+	lsl.l	#8,d1
+	add.l	blit_layer1,d1
+	move.l	d1,blit_page1
+
+	clr		blit_plane
+	sf		blit_done
+	st		pipeline_pending
+
+	ifnd __NO_GRAPHICS__
+	move.l	graphics_base,a6
+	lea		blit_node,a1
+	jsr		_LVOQBlit(a6)
+	else
+	st		blit_done
+	endif
+
+	; R1: text in front of the sprites?
+
+	move	L_00E82000+VC_PRIORITY,d0
+	move	d0,d1
+	lsr		#8,d0
+	lsr		#4,d0
+	and		#3,d0 ; Sprites.
+	lsr		#8,d1
+	lsr		#2,d1
+	and		#3,d1 ; Text.
+	cmp		d1,d0
+	shi		pipeline_text_in_front
+
+	ifnd __NO_TEXT__
+	bsr		planar_convert_text
+	endif
+	ifnd __NO_SPRITES__
+	bsr		planar_prepare_sprites
+	endif
+
+	rts
+
+; QBlit routine (a0 = custom chips; interrupt or task context): one plane's
+; blit per call; the call after the eighth blit marks the background done
+; and signals the task. Uses d0-d1/a0-a1.
+
+blit_background:
+	; The blitter may still be busy (its busy bit is set a little after a
+	; blit starts): the registers are only written once it is idle.
+
+	tst.b	DMACONR(a0) ; (The first read of the busy bit can be stale.)
+
+.busy:
+	btst	#DMAB_BLTDONE-8,DMACONR(a0)
+	bne		.busy
+
+	move	blit_plane,d0
+	cmp		#8,d0
+	beq		.finished
+
+	move.l	#BLIT_CONTROL,BLTCON0(a0)
+	move.l	#-1,BLTAFWM(a0)
+	move.l	blit_page1,BLTCPT(a0)
+	move.l	blit_page0_mask,BLTBPT(a0)
+	move.l	blit_page0,BLTAPT(a0)
+	move.l	blit_destination,BLTDPT(a0)
+	move	#BLIT_SOURCE_MODULO,BLTCMOD(a0)
+	clr		BLTBMOD(a0)
+	move	#BLIT_SOURCE_MODULO,BLTAMOD(a0)
+	move	#BLIT_DESTINATION_MODULO,BLTDMOD(a0)
+	move	#BLIT_SIZE,BLTSIZE(a0) ; Starts it.
+
+	add.l	#PLANAR_GROUPS*4,blit_page0
+	add.l	#PLANAR_GROUPS*4,blit_page1
+	add.l	#PLANAR_ROW_BYTES,blit_destination
+	addq	#1,blit_plane
+
+	moveq	#1,d0 ; Call again.
+
+	rts
+
+.finished:
+	st		blit_done
+
+	move.l	a6,-(sp)
+	move.l	exec_base,a6
+	move.l	blit_task,a1
+	move.l	blit_signal,d0
+	moveq	#0,d1
+	bset	d0,d1
+	move.l	d1,d0
+	jsr		_LVOSignal(a6)
+	move.l	(sp)+,a6
+
+	moveq	#0,d0
+
+	rts
+
+; Finishes the pipelined frame, if one is started: waits for its
+; background, draws the text and the sprites into it and shows it. Task
+; context. Preserves all registers.
+
+finish_pipelined_frame:
+	tst.b	pipeline_pending
+	beq		.done
+
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	; Wait() rather than a busy loop: the blitter queue may be waiting for
+	; a task of lower priority to give the blitter up.
+
+	move.l	exec_base,a6
+
+.wait:
+	tst.b	blit_done
+	bne		.blitted
+
+	move.l	blit_signal,d1
+	moveq	#0,d0
+	bset	d1,d0
+	jsr		_LVOWait(a6)
+
+	bra		.wait
+
+.blitted:
+	sf		pipeline_pending
+
+	; The last blit has ended; the CPU reads what the blitter wrote (a
+	; 68030's data cache).
+
+	move.l	graphics_base,a6
+	jsr		_LVOWaitBlit(a6)
+	move.l	exec_base,a6
+	jsr		_LVOCacheClearU(a6)
+
+	tst.b	pipeline_text_in_front
+	bne		.text_in_front
+
+	ifnd __NO_TEXT__
+	bsr		planar_draw_text
+	endif
+	ifnd __NO_SPRITES__
+	bsr		planar_draw_sprites
+	endif
+
+	bra		.show
+
+.text_in_front:
+	ifnd __NO_SPRITES__
+	bsr		planar_draw_sprites
+	endif
+	ifnd __NO_TEXT__
+	bsr		planar_draw_text
+	endif
+
+.show:
+	jsr		flip_pipelined_frame
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+.done:
+	rts
+
+; emulator.s, at every frame end: finishes the pipelined frame if its
+; background is done. Preserves all registers.
+
+poll_pipelined_frame:
+	tst.b	pipeline_pending
+	beq		.done
+
+	tst.b	blit_done
+	beq		.done
+
+	bra		finish_pipelined_frame
+
+.done:
 	rts
 
 ; Background: page 0 over page 1, each with its vertical scroll.
@@ -2700,6 +3108,13 @@ planar_graphics:
 ; frame, then draws the lines with text.
 
 planar_text:
+	bsr		planar_convert_text
+
+	bra		planar_draw_text
+
+; prepare_text, then the lines it converted into planar groups.
+
+planar_convert_text:
 	bsr		prepare_text
 
 	lea		text_planar_stale,a0
@@ -2721,6 +3136,12 @@ planar_text:
 	cmp		#RENDER_HEIGHT,d7
 	bne		.convert_loop
 
+	rts
+
+; Draws the lines with text.
+
+planar_draw_text:
+	lea		text_line_used,a1
 	move.l	planar_destination,a3
 	move.l	planar_text_lines,a4
 	moveq	#0,d7
@@ -2872,6 +3293,16 @@ convert_planar_text_line:
 ; Sprites, in the order of render_sprites.
 
 planar_sprites:
+	bsr		planar_prepare_sprites
+
+	bra		planar_draw_sprites
+
+; Fills planar_draw_list (planar sprite, x, y) in drawing order, making the
+; planar sprites. If the arena is emptied on the way (full), the list is
+; made again once, so that it holds no sprite made before.
+
+planar_prepare_sprites:
+	clr		planar_draw_count
 	bsr		order_sprites
 	beq		.done
 
@@ -2881,7 +3312,13 @@ planar_sprites:
 	bsr		reset_sprite_cache
 
 .cache_ok:
+	sf		planar_list_made_again
+
+.list:
+	clr		planar_draw_count
+	move.l	planar_reset_serial,d4
 	lea		sprite_order,a6
+	lea		planar_draw_list,a5
 	move	d7,d6
 	subq	#1,d6
 
@@ -2919,9 +3356,44 @@ planar_sprites:
 	and		#$f,d1
 
 	bsr		planar_sprite
-	bsr		draw_planar_sprite
+
+	cmp.l	planar_reset_serial,d4
+	beq		.listed
+
+	tst.b	planar_list_made_again
+	bne		.listed
+
+	st		planar_list_made_again
+
+	bra		.list
+
+.listed:
+	move.l	a4,(a5)+
+	move	d2,(a5)+
+	move	d3,(a5)+
+	addq	#1,planar_draw_count
 
 .next_sprite:
+	dbf		d6,.sprite_loop
+
+.done:
+	rts
+
+; Draws planar_draw_list.
+
+planar_draw_sprites:
+	move	planar_draw_count,d6
+	beq		.done
+
+	subq	#1,d6
+	lea		planar_draw_list,a6
+
+.sprite_loop:
+	move.l	(a6)+,a4
+	move	(a6)+,d2
+	move	(a6)+,d3
+	bsr		draw_planar_sprite
+
 	dbf		d6,.sprite_loop
 
 .done:
@@ -3306,6 +3778,8 @@ draw_planar_sprite:
 reset_planar_sprites:
 	movem.l	d0/a0,-(sp)
 
+	addq.l	#1,planar_reset_serial
+
 	ifd __RENDER_PROFILE__
 	addq.l	#1,planar_arena_resets
 	endif
@@ -3341,6 +3815,19 @@ text_dirty_rows: ; Bit per text character row (128); all dirty at start.
 
 text_overlay_scroll:
 	dc.l	-1
+
+	even
+
+blit_signal: ; Signal bit for the task (-1: none).
+	dc.l	-1
+
+blit_node: ; struct bltnode: next, function, stat, blitsize, beamsync, cleanup.
+	dc.l	0
+	dc.l	blit_background
+	dc.b	0,0
+	dc.w	0
+	dc.w	0
+	dc.l	0
 
 	even
 
@@ -3550,6 +4037,46 @@ planar_enabled:
 	ds.b	1
 planar_copy_pending: ; A frame was drawn into planar_frame.
 	ds.b	1
+planar_blitter: ; Pipelined frames, the background by the blitter.
+	ds.b	1
+pipeline_pending: ; A pipelined frame waits to be finished.
+	ds.b	1
+pipeline_text_in_front:
+	ds.b	1
+blit_done: ; Set by blit_background after the last blit.
+	ds.b	1
+planar_list_made_again:
+	ds.b	1
+
+	even
+
+planar_reset_serial: ; Counts reset_planar_sprites.
+	ds.l	1
+planar_draw_count:
+	ds.w	1
+planar_draw_list: ; Planar sprite, x, y.
+	ds.l	MAXIMUM_SPRITES*2
+
+blit_memory: ; Chip RAM: the layers and the mask for the blitter.
+	ds.l	1
+blit_layer0:
+	ds.l	1
+blit_layer1:
+	ds.l	1
+blit_mask:
+	ds.l	1
+blit_page0: ; The next blit's sources and destination.
+	ds.l	1
+blit_page0_mask:
+	ds.l	1
+blit_page1:
+	ds.l	1
+blit_destination:
+	ds.l	1
+blit_plane:
+	ds.w	1
+blit_task:
+	ds.l	1
 
 	even
 

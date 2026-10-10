@@ -9,6 +9,8 @@
 # pixel for pixel, and both runs must match the attract checkpoints.
 #
 # With C2PLIB=1 the AGA build converts through c2plib (-D__C2PLIB__).
+# AGA_GRAPHICS_FLAGS are passed to the AGA build's graphics.s (e.g.
+# -D__PLANAR_BLITTER__ for the pipelined blitter frames of the 68020).
 #
 # usage: aga_compare.sh [config (rtg-030)] [frames (6000)]
 # Results stay in a temporary directory, which is printed.
@@ -24,7 +26,7 @@ work=$(mktemp -d)
 vasm=./tools/vasmm68k_mot
 vlink=./tools/vlink
 
-objects() { # objects <directory> <display flags>
+objects() { # objects <directory> <display flags> [graphics flags]
 	local out=$1
 	mkdir -p "$out"
 	$vasm sources/amiga/main.s -quiet -Fhunk -m68000 -o "$out/main.o"
@@ -32,7 +34,7 @@ objects() { # objects <directory> <display flags>
 	$vasm sources/amiga/emulator.s -quiet -Fhunk -m68030 -D__LOCKSTEP__ -o "$out/emulator.o"
 	$vasm sources/amiga/input.s -quiet -Fhunk -m68030 -o "$out/input.o"
 	$vasm sources/amiga/audio.s -quiet -Fhunk -m68030 -o "$out/audio.o"
-	$vasm sources/amiga/graphics.s -quiet -Fhunk -m68030 -o "$out/graphics.o"
+	$vasm sources/amiga/graphics.s -quiet -Fhunk -m68030 ${3:-} -o "$out/graphics.o"
 	$vasm sources/amiga/display.s -quiet -Fhunk -m68030 $2 -o "$out/display.o"
 	$vasm sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o "$out/sz2.o"
 }
@@ -52,7 +54,7 @@ if [ -n "${C2PLIB:-}" ]; then
 	done
 fi
 
-objects "$work/aga" "$aga_flags"
+objects "$work/aga" "$aga_flags" "${AGA_GRAPHICS_FLAGS:-}"
 $vlink "$work"/aga/{main,sz2,mem_map,emulator,input,display,audio,graphics}.o "${extra[@]}" -bamigahunk -s -o "$work/aga/sz2"
 
 for build in rtg aga; do
