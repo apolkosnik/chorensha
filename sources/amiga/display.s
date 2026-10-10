@@ -10,9 +10,10 @@
 ; on a machine with an RTG board, to test those paths.
 ;
 ; AGA: a 320 x 256 x 8 PAL lores screen (interleaved bitplanes), double
-; buffered with ScreenBuffers: graphics.s draws each frame straight into the
-; hidden bitmap's planes (begin_planar_frame), or composes it in the chunky
-; render buffer, which is then converted into the hidden bitmap (c2p);
+; buffered with ScreenBuffers: graphics.s draws each frame in planar form and
+; copies it into the hidden bitmap (planar_copy_to_screen, through
+; begin_planar_frame), or composes it in the chunky render buffer, which is
+; then converted into the hidden bitmap (c2p);
 ; ChangeScreenBuffer() shows it at the next vertical blank. Before drawing
 ; into a bitmap again, its safe message (the previous flip has taken effect)
 ; is awaited.
@@ -42,6 +43,7 @@
 	xref _c2p_8x8_mexg_040
 	endif
 	xref render_buffer
+	xref planar_copy_to_screen
 	xref hardware_palette
 	xref palette_load_table
 	xref palette_changed
@@ -754,6 +756,8 @@ present_frame:
 	; next vertical blank).
 
 .aga:
+	jsr		planar_copy_to_screen
+
 	tst.b	planar_frame
 	beq		.convert
 

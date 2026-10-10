@@ -43,6 +43,7 @@
 	xdef initialize_renderer
 	xdef release_renderer
 	xdef compiled_sprite_count
+	xdef planar_copy_to_screen
 
 	xdef render_buffer
 	xdef hardware_palette
@@ -2189,10 +2190,14 @@ compile_sprite_variant:
 
 ; ------------------------------------------------------------------------------
 ;
-; Planar rendering (AGA): the frame is drawn straight into the hidden screen
-; buffer (display.s begin_planar_frame), an interleaved bitmap of 8 planes
-; with 320-pixel rows, the picture 32 pixels from the left edge. Pixels get
-; the same palette slots as in the chunky buffer, so the picture is the same.
+; Planar rendering (AGA): the frame is drawn into a planar frame in fast
+; RAM with the layout of the screen's bitmaps (interleaved, 8 planes,
+; 320-pixel rows, the picture 32 pixels from the left edge), which
+; display.s has copied into the hidden screen buffer (planar_copy_to_screen)
+; before it shows it; drawing in chip RAM directly is slower (the sprites'
+; read-modify-writes). -D__PLANAR_DIRECT__ draws into the hidden screen
+; buffer itself (display.s begin_planar_frame). Pixels get the same palette
+; slots as in the chunky buffer, so the picture is the same.
 ;
 ;   - Background: GVRAM pages 0 and 1 are converted once (build_layers) into
 ;     planar layers, per line eight 32-pixel groups of eight plane longs,
@@ -2220,7 +2225,8 @@ PLANAR_MASK_SIZE=PLANAR_GROUPS*4*LAYER_LINES
 PLANAR_TEXT_GROUP=4+8*4 ; Mask, eight planes.
 PLANAR_TEXT_LINE=4+PLANAR_GROUPS*PLANAR_TEXT_GROUP ; Group bits (byte), groups.
 PLANAR_TEXT_SIZE=PLANAR_TEXT_LINE*RENDER_HEIGHT
-PLANAR_MEMORY_SIZE=PLANAR_LAYER_SIZE*2+PLANAR_MASK_SIZE+PLANAR_TEXT_SIZE
+PLANAR_FRAME_SIZE=PLANAR_LINE*RENDER_HEIGHT
+PLANAR_MEMORY_SIZE=PLANAR_LAYER_SIZE*2+PLANAR_MASK_SIZE+PLANAR_TEXT_SIZE+PLANAR_FRAME_SIZE
 
 PLANAR_ARENA_SIZE=$100000
 PLANAR_ARENA_MINIMUM=$40000
@@ -2409,6 +2415,8 @@ initialize_planar:
 	move.l	d0,planar_mask
 	add.l	#PLANAR_MASK_SIZE,d0
 	move.l	d0,planar_text_lines
+	add.l	#PLANAR_TEXT_SIZE,d0
+	move.l	d0,planar_frame
 
 	move.l	#PLANAR_ARENA_SIZE,d0
 	move.l	d0,planar_arena_size
@@ -2496,11 +2504,63 @@ planar_frame_target:
 	and		#511,d1
 	bne		.done ; Horizontal scroll: the chunky per-pixel path.
 
+	ifd __PLANAR_DIRECT__
 	jsr		begin_planar_frame
+	else
+	move.l	planar_frame,d0
+	addq.l	#PLANAR_PICTURE_X,d0
+	st		planar_copy_pending
+	endif
 
 .done:
 	tst.l	d0
 
+	rts
+
+; display.s present_frame (AGA): copies a frame drawn into planar_frame into
+; the hidden screen buffer, if there is one (and makes present_frame show it
+; as it is). Preserves all registers.
+
+planar_copy_to_screen:
+	tst.b	planar_copy_pending
+	beq		.done
+
+	sf		planar_copy_pending
+
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	jsr		begin_planar_frame
+	move.l	d0,a1
+	move.l	planar_frame,a0
+	addq.l	#PLANAR_PICTURE_X,a0
+	lea		PLANAR_FRAME_SIZE(a0),a4
+
+.line_loop:
+	movem.l	(a0),d0-d6/a2
+	movem.l	d0-d6/a2,(a1)
+	movem.l	PLANAR_ROW_BYTES*1(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*1(a1)
+	movem.l	PLANAR_ROW_BYTES*2(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*2(a1)
+	movem.l	PLANAR_ROW_BYTES*3(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*3(a1)
+	movem.l	PLANAR_ROW_BYTES*4(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*4(a1)
+	movem.l	PLANAR_ROW_BYTES*5(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*5(a1)
+	movem.l	PLANAR_ROW_BYTES*6(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*6(a1)
+	movem.l	PLANAR_ROW_BYTES*7(a0),d0-d6/a2
+	movem.l	d0-d6/a2,PLANAR_ROW_BYTES*7(a1)
+
+	lea		PLANAR_LINE(a0),a0
+	lea		PLANAR_LINE(a1),a1
+	cmp.l	a4,a0
+	bne		.line_loop
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+.done:
 	rts
 
 ; build_layers: layer0 / layer1 into the planar layers, and page 0's mask.
@@ -3463,6 +3523,8 @@ planar_mask:
 	ds.l	1
 planar_text_lines:
 	ds.l	1
+planar_frame:
+	ds.l	1
 planar_arena:
 	ds.l	1
 planar_arena_size:
@@ -3485,6 +3547,8 @@ planar_text_group:
 	ds.w	1
 
 planar_enabled:
+	ds.b	1
+planar_copy_pending: ; A frame was drawn into planar_frame.
 	ds.b	1
 
 	even
