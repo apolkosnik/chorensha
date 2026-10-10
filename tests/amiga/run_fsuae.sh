@@ -170,10 +170,11 @@ done
 if [ -n "${WORKBENCH:-}" ]; then
 	# Started from Workbench like a double-click on its icon (WORKBENCH_ICON,
 	# copied as program.info, should give ARGUMENTS=<frames>): the run ends
-	# when the program has written its checkpoints. Its text goes to its own
-	# console window, not to output.txt.
+	# when the program has written its checkpoints (and AFTER_WAIT seconds
+	# more, default 3). Its text goes to its own console window, not to
+	# output.txt.
 	cp "$WORKBENCH_ICON" "$drive/program.info"
-	printf 'FailAt 21\nLoadWB\nWait 5\nCD WORK:\nWBRun WORK:program >WORK:wbrun.txt\nLab wait\nWait 2\nIf NOT EXISTS WORK:checkpoints.bin\n  Skip wait BACK\nEndIf\nWait 3\nEcho "started from Workbench" >WORK:output.txt\nEcho "done" >WORK:marker.txt\n' > "$drive/Run-Test"
+	printf 'FailAt 21\nLoadWB\nWait 5\nCD WORK:\nWBRun WORK:program >WORK:wbrun.txt\nLab wait\nWait 2\nIf NOT EXISTS WORK:checkpoints.bin\n  Skip wait BACK\nEndIf\nWait %s\nEcho "started from Workbench" >WORK:output.txt\nEcho "done" >WORK:marker.txt\n' "${AFTER_WAIT:-3}" > "$drive/Run-Test"
 elif [ -n "${RUN_FROM_RAM:-}" ]; then
 	# Everything copied to RAM: first, so the run does not use UAE's
 	# host-directory filesystem (WORK:); the files it writes are copied back.

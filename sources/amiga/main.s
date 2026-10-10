@@ -1486,7 +1486,11 @@ dos_name:
 	dc.b	'dos.library',0
 
 console_name:
+	ifd __CONSOLE_NO_WAIT__
+	dc.b	'CON:20/20/600/180/Cho Ren Sha 68k/AUTO/CLOSE',0 ; Test builds: the whole exit runs.
+	else
 	dc.b	'CON:20/20/600/180/Cho Ren Sha 68k/AUTO/CLOSE/WAIT',0
+	endif
 
 graphics_name:
 	dc.b	'graphics.library',0
