@@ -10,6 +10,14 @@
 # configs:
 #   a1200-8mb   A1200, AGA, 68020 14 MHz cycle-exact, 8 MB fast
 #   a1200-030   A1200, AGA, 68030 cycle-exact (x4 multiplier), 8 MB fast
+#   a1200-030-fast  A1200, AGA, 68030 as fast as the host allows, 64 MB
+#               Zorro III fast (the play_winuae.sh a1200-030 machine)
+#
+# SOUND_OUTPUT=exact emulates Paula (to SDL's dummy audio driver); by
+# default sound is off and Paula's DMA and interrupts do not run.
+#
+# INPUT_SCRIPT: copied to WORK:input.bin (pass "input.bin" in the arguments),
+# as in run_fsuae.sh.
 #
 # RESULT_DIR: files the program wrote (measure, graphics, checkpoints, samples,
 # profile, sums, screen_*) are copied there, named <name>-winuae-<config>.
@@ -58,6 +66,17 @@ cpu_multiplier=4
 chipmem_size=4
 fastmem_size=8"
 		;;
+	a1200-030-fast)
+		settings="kickstart_rom_file=$kickstart_dir/A1200.47.115.rom
+chipset_compatible=A1200
+cpu_model=68030
+cpu_24bit_addressing=false
+cpu_compatible=false
+cpu_cycle_exact=false
+cpu_speed=max
+chipmem_size=4
+z3mem_size=64"
+		;;
 	*)
 		echo "unknown config: $config" >&2
 		exit 2
@@ -85,7 +104,13 @@ if [ "${MUSIC:-1}" != 0 ] && [ -d "$game_data_dir/MUSIC_DAT" ]; then
 	fi
 fi
 
-printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output.txt\nEcho "done" >WORK:marker.txt\n' "$arguments" > "$drive/Run-Test"
+if [ -n "${INPUT_SCRIPT:-}" ]; then
+	cp "$INPUT_SCRIPT" "$drive/input.bin"
+fi
+
+# AFTER_WAIT: seconds the system runs on after the program has ended before
+# the run counts as done (something the program left behind may crash it).
+printf 'FailAt 21\nCD WORK:\nWORK:program %s >WORK:output.txt\nWhy >>WORK:output.txt\nWait %s\nEcho "done" >WORK:marker.txt\n' "$arguments" "${AFTER_WAIT:-0}" > "$drive/Run-Test"
 
 cat > "$work_dir/test.uae" <<EOF
 use_gui=no
@@ -93,7 +118,7 @@ $settings
 chipset=aga
 nr_floppies=0
 floppy0type=-1
-sound_output=none
+sound_output=${SOUND_OUTPUT:-none}
 filesystem2=ro,DH0:System:$system_dir,10
 filesystem2=rw,DH1:WORK:$drive,-128
 EOF
