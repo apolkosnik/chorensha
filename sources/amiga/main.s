@@ -54,6 +54,8 @@
 	xref text_lines_drawn
 	xref text_remaps
 	xref c2p_time
+	xref planar_sprites_made
+	xref planar_arena_resets
 	xref palette_entry_changes
 	endif
 
@@ -1197,6 +1199,8 @@ print_run_summary:
 
 .no_c2p_frames:
 	move.l	d0,(a3)+
+	move.l	planar_sprites_made,(a3)+
+	move.l	planar_arena_resets,(a3)+
 
 	move.l	#profile_format,d1
 	move.l	#print_arguments,d2
@@ -1548,7 +1552,7 @@ run_summary_format:
 
 	ifd __RENDER_PROFILE__
 profile_format:
-	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld, remapped all %ld times; c2p %ld (1/100 ms per rendered frame).',10,0
+	dc.b	'Render (1/100 ms per frame): palette %ld, graphics %ld, text %ld, sprites %ld, upload %ld; palette rebuilds %ld, LoadRGB32 %ld; text lines converted %ld, drawn %ld, remapped all %ld times; c2p %ld (1/100 ms per rendered frame); planar sprites made %ld, arena resets %ld.',10,0
 entry_format:
 	dc.b	'  palette entry %ld changed %ld times',10,0
 	endif
@@ -1671,8 +1675,8 @@ machine_chip_kb:
 machine_fast_kb:
 	ds.l	1
 
-print_arguments:
-	ds.l	10
+print_arguments: ; Up to 13 (the render profile line).
+	ds.l	13
 
 ; ------------------------------------------------------------------------------
 	end

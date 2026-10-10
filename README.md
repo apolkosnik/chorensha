@@ -68,8 +68,8 @@ The program alone, for updating an installed copy, is
 
 Speed: the game itself always runs at full speed (55 frames per second);
 how many of those frames are shown depends on the machine. A 68030 at
-50 MHz shows about 30 to 40 per second with a graphics card and about 15
-to 20 on AGA; a stock A1200 (68020 at 14 MHz, AGA) about 5. The `` ` ``
+50 MHz shows about 30 to 40 per second with a graphics card and about 20
+on AGA; a stock A1200 (68020 at 14 MHz, AGA) about 8. The `` ` ``
 key shows the number (see Controls).
 
 

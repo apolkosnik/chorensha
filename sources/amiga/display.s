@@ -10,10 +10,12 @@
 ; on a machine with an RTG board, to test those paths.
 ;
 ; AGA: a 320 x 256 x 8 PAL lores screen (interleaved bitplanes), double
-; buffered with ScreenBuffers: each frame is converted from the chunky render
-; buffer into the hidden bitmap (c2p), which ChangeScreenBuffer() then shows
-; at the next vertical blank. Before converting into a bitmap again, its safe
-; message (the previous flip has taken effect) is awaited.
+; buffered with ScreenBuffers: graphics.s draws each frame straight into the
+; hidden bitmap's planes (begin_planar_frame), or composes it in the chunky
+; render buffer, which is then converted into the hidden bitmap (c2p);
+; ChangeScreenBuffer() shows it at the next vertical blank. Before drawing
+; into a bitmap again, its safe message (the previous flip has taken effect)
+; is awaited.
 
 	xdef open_display
 	xdef close_display
@@ -22,6 +24,8 @@
 	xdef display_active
 	xdef update_fps_display
 	xdef display_mode_request
+	xdef planar_display_available
+	xdef begin_planar_frame
 
 	xref fps_display
 	xref rendered_frames
@@ -745,10 +749,19 @@ present_frame:
 
 	bra		.picasso96_upload
 
-	; AGA: convert into the hidden bitmap, show it, then the palette (both
-	; take effect at the next vertical blank).
+	; AGA: convert into the hidden bitmap (unless graphics.s has drawn the
+	; frame into it), show it, then the palette (both take effect at the
+	; next vertical blank).
 
 .aga:
+	tst.b	planar_frame
+	beq		.convert
+
+	sf		planar_frame
+
+	bra		.flip
+
+.convert:
 	bsr		wait_until_safe
 
 	moveq	#1,d0
@@ -793,12 +806,13 @@ present_frame:
 	add.l	d0,c2p_time
 	endif
 
+.flip:
 	move.l	intuition_base,a6
 	move.l	screen,a0
 	move.l	hidden_screen_buffer,a1
 	jsr		_LVOChangeScreenBuffer(a6)
 	tst.l	d0
-	beq		.aga_shown ; Not shown (busy): converted again next frame.
+	beq		.aga_shown ; Not shown (busy): drawn again next frame.
 
 	moveq	#1,d0
 	sub.l	d0,shown_buffer
@@ -893,6 +907,58 @@ present_frame:
 	movem.l	(sp)+,d2-d7/a2-a6
 
 .done:
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Planar rendering (graphics.s). Returns d0 = 1 if the AGA screen is open and
+; its bitmaps have the layout graphics.s draws into (interleaved, 320-pixel
+; rows of 8 planes, 256 lines), else 0.
+
+planar_display_available:
+	moveq	#0,d0
+	tst.b	display_active
+	beq		.done
+
+	cmp.l	#BACKEND_AGA,backend
+	bne		.done
+
+	cmp.l	#SCREEN_WIDTH/8,plane_spacing
+	bne		.done
+
+	cmp.l	#SCREEN_WIDTH/8*AGA_DEPTH,plane_row_bytes
+	bne		.done
+
+	cmp.l	#PICTURE_HEIGHT,screen_height
+	bne		.done
+
+	moveq	#1,d0
+
+.done:
+	rts
+
+; Waits until the hidden bitmap may be drawn into and returns d0 = the
+; picture's top left in its plane 0; present_frame then shows it as it is.
+; Preserves all other registers.
+
+begin_planar_frame:
+	movem.l	d1/a0-a1/a6,-(sp)
+
+	bsr		wait_until_safe
+
+	moveq	#1,d0
+	sub.l	shown_buffer,d0
+	lea		screen_buffers,a0
+	move.l	(a0,d0.l*4),a1
+	move.l	a1,hidden_screen_buffer
+	move.l	sb_BitMap(a1),a1
+	move.l	bm_Planes(a1),d0
+	addq.l	#AGA_X_BYTES,d0
+
+	st		planar_frame
+
+	movem.l	(sp)+,d1/a0-a1/a6
+
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -1774,6 +1840,8 @@ capture_bytes:
 c2plib_scrambled: ; One row.
 	ds.b	PICTURE_WIDTH
 	endif
+planar_frame: ; graphics.s has drawn this frame into the hidden bitmap.
+	ds.b	1
 safe_pending:
 	ds.b	1
 

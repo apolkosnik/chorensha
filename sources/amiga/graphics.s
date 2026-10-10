@@ -26,6 +26,12 @@
 ; remapping and palette fades need no rebuild; sprite and text colours share
 ; those slots when the colour matches and take free slots otherwise. Page 0
 ; is overlaid through per-line runs of opaque pixels.
+;
+; On the AGA screen the frame is drawn straight into the hidden screen
+; buffer's bitplanes instead (see "Planar rendering" below), without the
+; chunky buffer and its conversion; frames that path cannot draw (layers
+; not built yet, a horizontal scroll) are composed in the chunky buffer as
+; on RTG and converted by display.s.
 
 	xdef prepare_sprite_infos
 	xdef compile_sprite
@@ -57,10 +63,14 @@
 	xref L_00E80000
 	xref L_00E82000
 	xref exec_base
+	xref planar_display_available
+	xref begin_planar_frame
 
 	ifd __RENDER_PROFILE__
 	xref timer_base
 	xdef render_profile
+	xdef planar_sprites_made
+	xdef planar_arena_resets
 	xdef palette_rebuilds
 	xdef text_lines_converted
 	xdef text_lines_drawn
@@ -326,12 +336,16 @@ initialize_renderer:
 .allocated:
 	st		sprite_cache_reset
 
+	bsr		initialize_planar
+
 	movem.l	(sp)+,d0-d1/a0-a1/a6
 
 	rts
 
 release_renderer:
 	movem.l	d0-d1/a0-a1/a6,-(sp)
+
+	bsr		release_planar
 
 	move.l	arena,d0
 	beq		.done
@@ -375,6 +389,11 @@ render_frame:
 .layers_ok:
 	bsr		update_palette
 	PROFILE	0
+
+	bsr		planar_frame_target
+	move.l	d0,planar_destination
+	bne		.planar
+
 	ifnd __NO_GRAPHICS__
 	bsr		render_graphics
 	endif
@@ -418,6 +437,48 @@ render_frame:
 	movem.l	(sp)+,d0-d7/a0-a6
 
 	rts
+
+	; AGA: straight into the hidden screen buffer's bitplanes.
+
+.planar:
+	ifnd __NO_GRAPHICS__
+	bsr		planar_graphics
+	endif
+	PROFILE	1
+
+	move	L_00E82000+VC_PRIORITY,d0
+	move	d0,d1
+	lsr		#8,d0
+	lsr		#4,d0
+	and		#3,d0 ; Sprites.
+	lsr		#8,d1
+	lsr		#2,d1
+	and		#3,d1 ; Text.
+	cmp		d1,d0
+	bhi		.planar_text_in_front
+
+	ifnd __NO_TEXT__
+	bsr		planar_text
+	endif
+	PROFILE	2
+	ifnd __NO_SPRITES__
+	bsr		planar_sprites
+	endif
+	PROFILE	3
+
+	bra		.done
+
+.planar_text_in_front:
+	ifnd __NO_SPRITES__
+	bsr		planar_sprites
+	endif
+	PROFILE	3
+	ifnd __NO_TEXT__
+	bsr		planar_text
+	endif
+	PROFILE	2
+
+	bra		.done
 
 ; ------------------------------------------------------------------------------
 ;
@@ -565,6 +626,12 @@ build_layers:
 .next_span_line:
 	dbf		d3,.span_line_loop
 
+	tst.b	planar_enabled
+	beq		.no_planar
+
+	bsr		build_planar_layers
+
+.no_planar:
 	st		layers_ready
 	st		palette_rebuild ; New set of used graphics indices.
 
@@ -1307,43 +1374,7 @@ render_graphics_per_pixel:
 ; slots changed, and only lines with text are drawn.
 
 render_text:
-	; The text colours' palette slots changed: every visible line is
-	; converted again.
-
-	lea		sprite_remap,a3
-	lea		text_remap,a0
-	move.l	(a3),d0
-	cmp.l	(a0),d0
-	bne		.remap_changed
-	move.l	4(a3),d0
-	cmp.l	4(a0),d0
-	bne		.remap_changed
-	move.l	8(a3),d0
-	cmp.l	8(a0),d0
-	bne		.remap_changed
-	move.l	12(a3),d0
-	cmp.l	12(a0),d0
-	beq		.remap_same
-
-.remap_changed:
-	move.l	(a3),(a0)
-	move.l	4(a3),4(a0)
-	move.l	8(a3),8(a0)
-	move.l	12(a3),12(a0)
-
-	lea		text_dirty_rows,a0
-	moveq	#-1,d0
-	move.l	d0,(a0)+
-	move.l	d0,(a0)+
-	move.l	d0,(a0)+
-	move.l	d0,(a0)
-
-	ifd __RENDER_PROFILE__
-	addq.l	#1,text_remaps
-	endif
-
-.remap_same:
-	bsr		update_text_overlay
+	bsr		prepare_text
 
 	lea		text_line_used,a1
 	lea		text_draw,a4
@@ -1421,6 +1452,46 @@ render_text:
 
 	rts
 
+; Brings text_draw up to date: when the text colours' palette slots have
+; changed every visible line is converted again, otherwise the lines whose
+; character row was written.
+
+prepare_text:
+	lea		sprite_remap,a3
+	lea		text_remap,a0
+	move.l	(a3),d0
+	cmp.l	(a0),d0
+	bne		.remap_changed
+	move.l	4(a3),d0
+	cmp.l	4(a0),d0
+	bne		.remap_changed
+	move.l	8(a3),d0
+	cmp.l	8(a0),d0
+	bne		.remap_changed
+	move.l	12(a3),d0
+	cmp.l	12(a0),d0
+	beq		.remap_same
+
+.remap_changed:
+	move.l	(a3),(a0)
+	move.l	4(a3),4(a0)
+	move.l	8(a3),8(a0)
+	move.l	12(a3),12(a0)
+
+	lea		text_dirty_rows,a0
+	moveq	#-1,d0
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)
+
+	ifd __RENDER_PROFILE__
+	addq.l	#1,text_remaps
+	endif
+
+.remap_same:
+	bra		update_text_overlay
+
 ; Converts the visible lines whose character row is dirty into text_draw:
 ; per line, a bit for each of the 64 groups of four pixels that has text,
 ; then for each of those groups (in order) its mask and palette-mapped
@@ -1476,6 +1547,8 @@ update_text_overlay:
 	clr.l	4(a2)
 	lea		TEXT_GROUP_BITS(a2),a5
 
+	lea		text_planar_stale,a3
+	st		(a3,d7.w)
 	lea		text_line_used,a3
 	sf		(a3,d7.w)
 	lea		sprite_remap,a3
@@ -1596,12 +1669,15 @@ update_text_overlay:
 ; 4-0 drawn from 0 to 31 (later is in front), the entries of a bucket in
 ; reverse list order.
 
-render_sprites:
+; sprite_order = the sprites' list indices in drawing order. Returns d7 =
+; the number of sprites (Z set if none or no pattern data).
+
+order_sprites:
 	move	render_sprite_count,d7
 	beq		.done
 
 	move.l	SPRITE_DATA_ADDRESS,d0
-	beq		.done
+	beq		.none
 
 	; Count per bucket.
 
@@ -1660,8 +1736,24 @@ render_sprites:
 
 	dbf		d0,.order_loop
 
-	; Draw. Within a bucket the order above is reversed already; the
-	; buckets follow in ascending order.
+	; Within a bucket the order above is reversed already; the buckets
+	; follow in ascending order.
+
+	tst		d7
+
+.done:
+	rts
+
+.none:
+	moveq	#0,d7
+
+	rts
+
+; Draws the sprites into render_buffer.
+
+render_sprites:
+	bsr		order_sprites
+	beq		.done
 
 	tst.b	sprite_cache_reset
 	beq		.cache_ok
@@ -1858,6 +1950,13 @@ profile_mark:
 
 reset_sprite_cache:
 	sf		sprite_cache_reset
+
+	tst.l	planar_arena
+	beq		.no_planar
+
+	bsr		reset_planar_sprites
+
+.no_planar:
 
 	move.l	arena,arena_next
 	move.l	arena,d0
@@ -2088,6 +2187,1082 @@ compile_sprite_variant:
 
 	rts
 
+; ------------------------------------------------------------------------------
+;
+; Planar rendering (AGA): the frame is drawn straight into the hidden screen
+; buffer (display.s begin_planar_frame), an interleaved bitmap of 8 planes
+; with 320-pixel rows, the picture 32 pixels from the left edge. Pixels get
+; the same palette slots as in the chunky buffer, so the picture is the same.
+;
+;   - Background: GVRAM pages 0 and 1 are converted once (build_layers) into
+;     planar layers, per line eight 32-pixel groups of eight plane longs,
+;     plus a mask of page 0's opaque pixels per group. Each group is copied
+;     from page 0 (mask all set), from page 1 (mask clear) or merged.
+;   - Text: lines converted into text_draw (prepare_text) are converted on
+;     into planar groups (mask and eight plane longs); groups with text are
+;     drawn with masked long writes.
+;   - Sprites: per (pattern, flip, palette) a planar version (a mask word and
+;     eight plane words per row) and a routine that draws it are made on
+;     first use and kept in an arena, and made again when the palette's
+;     slots change. Each row is shifted into place and written with masked
+;     long writes: a plane that is clear (or set) at all the row's opaque
+;     pixels is one AND (or OR) into the screen. Sprites cut by the
+;     picture's edges are drawn from the planar version, clipped.
+
+PLANAR_ROW_BYTES=40 ; One plane's row of the 320-pixel screen.
+PLANAR_LINE=PLANAR_ROW_BYTES*8 ; Interleaved: all eight planes' rows.
+PLANAR_PICTURE_X=4 ; Picture start in a plane row (bytes).
+
+PLANAR_GROUPS=RENDER_WIDTH/32 ; 32-pixel groups per picture line.
+PLANAR_LAYER_LINE=PLANAR_GROUPS*8*4
+PLANAR_LAYER_SIZE=PLANAR_LAYER_LINE*LAYER_LINES
+PLANAR_MASK_SIZE=PLANAR_GROUPS*4*LAYER_LINES
+PLANAR_TEXT_GROUP=4+8*4 ; Mask, eight planes.
+PLANAR_TEXT_LINE=4+PLANAR_GROUPS*PLANAR_TEXT_GROUP ; Group bits (byte), groups.
+PLANAR_TEXT_SIZE=PLANAR_TEXT_LINE*RENDER_HEIGHT
+PLANAR_MEMORY_SIZE=PLANAR_LAYER_SIZE*2+PLANAR_MASK_SIZE+PLANAR_TEXT_SIZE
+
+PLANAR_ARENA_SIZE=$100000
+PLANAR_ARENA_MINIMUM=$40000
+
+; Planar sprite: next (same pattern and flip), palette, its routine, the
+; palette's slots it was made with, then 16 rows of a mask word and eight
+; plane words. The routine follows it in the arena (or comes later, when it
+; was made again).
+
+PE_NEXT=0
+PE_PALETTE=4
+PE_CODE=6
+PE_REMAP=10
+PE_ROWS=26
+PE_ROW=2+8*2
+PLANAR_ENTRY_SIZE=PE_ROWS+16*PE_ROW
+
+; Sprite routines: a2 = the screen long of row 0, d5 = shift; uses d0-d3.
+; Per row with opaque pixels:
+;   move.l #mask<<16,d0 / lsr.l d5,d0 / move.l d0,d1 / not.l d1
+; then per plane, at offset row * PLANAR_LINE + plane * PLANAR_ROW_BYTES:
+;   clear: and.l d1,offset(a2)
+;   set:   or.l d0,offset(a2)
+;   mixed: move.l #plane<<16,d2 / lsr.l d5,d2 / move.l offset(a2),d3 /
+;          and.l d1,d3 / or.l d2,d3 / move.l d3,offset(a2)
+
+OPCODE_MOVE_IMMEDIATE_D0=$203c
+OPCODE_LSR_D0_MOVE_D0_D1=$eaa82200 ; lsr.l d5,d0 / move.l d0,d1
+OPCODE_NOT_D1=$4681
+OPCODE_AND_D1_TO_A2=$c3aa
+OPCODE_OR_D0_TO_A2=$81aa
+OPCODE_MOVE_IMMEDIATE_D2=$243c
+OPCODE_LSR_D2=$eaaa
+OPCODE_MOVE_A2_TO_D3=$262a
+OPCODE_AND_D1_OR_D2=$c6818682 ; and.l d1,d3 / or.l d2,d3
+OPCODE_MOVE_D3_TO_A2=$2543
+PLANAR_CODE_MAXIMUM=16*(6+4+2+8*20)+2
+
+; MERGE a, b, shift, mask, spare: swaps the mask bits of a with the bits of b
+; shifted right by shift.
+
+MERGE macro
+	move.l	\2,\5
+	lsr.l	#\3,\5
+	eor.l	\1,\5
+	and.l	#\4,\5
+	eor.l	\5,\1
+	lsl.l	#\3,\5
+	eor.l	\5,\2
+	endm
+
+MERGE16 macro ; MERGE a, b, 16, $0000ffff with word moves (spare: low word).
+	swap	\2
+	move.w	\1,\3
+	move.w	\2,\1
+	move.w	\3,\2
+	swap	\2
+	endm
+
+; C2P32: 32 chunky pixels in d0-d7 (four per long, the leftmost in the top
+; byte) -> planes 0-7 in d7, d5, d3, d1, d6, d4, d2, d0 (the c2p of
+; display.s). Uses a6.
+
+C2P32 macro
+	MERGE16	d0,d4,a6
+	MERGE16	d1,d5,a6
+	MERGE16	d2,d6,a6
+	MERGE16	d3,d7,a6
+
+	move.l	d7,a6
+	MERGE	d0,d4,2,$33333333,d7
+	MERGE	d1,d5,2,$33333333,d7
+	MERGE	d2,d6,2,$33333333,d7
+	move.l	a6,d7
+	move.l	d0,a6
+	MERGE	d3,d7,2,$33333333,d0
+	move.l	a6,d0
+
+	move.l	d7,a6
+	MERGE	d0,d2,8,$00ff00ff,d7
+	MERGE	d0,d2,1,$55555555,d7
+	MERGE	d1,d3,8,$00ff00ff,d7
+	MERGE	d1,d3,1,$55555555,d7
+	MERGE	d4,d6,8,$00ff00ff,d7
+	MERGE	d4,d6,1,$55555555,d7
+	move.l	a6,d7
+	move.l	d0,a6
+	MERGE	d5,d7,8,$00ff00ff,d0
+	MERGE	d5,d7,1,$55555555,d0
+	move.l	a6,d0
+
+	move.l	d7,a6
+	MERGE	d0,d1,4,$0f0f0f0f,d7
+	MERGE	d2,d3,4,$0f0f0f0f,d7
+	MERGE	d4,d5,4,$0f0f0f0f,d7
+	move.l	a6,d7
+	move.l	d0,a6
+	MERGE	d6,d7,4,$0f0f0f0f,d0
+	move.l	a6,d0
+	endm
+
+; Stores the planes of C2P32 to (\1)+ in plane order.
+
+STORE_PLANES macro
+	move.l	d7,(\1)+
+	move.l	d5,(\1)+
+	move.l	d3,(\1)+
+	move.l	d1,(\1)+
+	move.l	d6,(\1)+
+	move.l	d4,(\1)+
+	move.l	d2,(\1)+
+	move.l	d0,(\1)+
+	endm
+
+; Background group, one plane (\1): page 0 | (page 1 & ~mask) (page 0's
+; transparent pixels are 0 in every plane); a0 = page 0, a1 = page 1, d2 =
+; inverted mask, a3 = destination. Uses d0.
+
+MERGE_PLANE macro
+	move.l	(a1)+,d0
+	and.l	d2,d0
+	or.l	(a0)+,d0
+	move.l	d0,PLANAR_ROW_BYTES*\1(a3)
+	endm
+
+; Text group, one plane (\1): a5 = group (planes from 4), d0 = inverted
+; mask, a2 = destination. Uses d2.
+
+MASKED_PLANE macro
+	move.l	PLANAR_ROW_BYTES*\1(a2),d2
+	and.l	d0,d2
+	or.l	4+\1*4(a5),d2
+	move.l	d2,PLANAR_ROW_BYTES*\1(a2)
+	endm
+
+; Sprite row, one plane (\1): the plane word at (a4)+ shifted right by d5
+; from the long's top; d0 = mask (shifted, clipped; it also drops what the
+; swap brings into the low word), d1 = inverted mask, a2 = destination.
+; Uses d2-d3.
+
+SPRITE_PLANE macro
+	move	(a4)+,d2
+	swap	d2
+	lsr.l	d5,d2
+	and.l	d0,d2
+	move.l	PLANAR_ROW_BYTES*\1(a2),d3
+	and.l	d1,d3
+	or.l	d2,d3
+	move.l	d3,PLANAR_ROW_BYTES*\1(a2)
+	endm
+
+; Allocates the planar layers and sprite arena when the AGA screen can take
+; planar rendering (task context, after open_display). Without the memory
+; frames go through the chunky buffer. The compiled chunky sprites' arena is
+; given up for the planar one: the few chunky frames (see planar_frame_target)
+; draw their sprites with the generic routine.
+
+initialize_planar:
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+
+	jsr		planar_display_available
+	tst.l	d0
+	beq		.done
+
+	move.l	exec_base,a6
+
+	move.l	arena,d0
+	beq		.no_arena
+
+	clr.l	arena
+	move.l	d0,a1
+	move.l	arena_size,d0
+	jsr		_LVOFreeMem(a6)
+
+.no_arena:
+	move.l	#PLANAR_MEMORY_SIZE,d0
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,planar_memory
+	beq		.done
+
+	move.l	d0,planar_layer0
+	add.l	#PLANAR_LAYER_SIZE,d0
+	move.l	d0,planar_layer1
+	add.l	#PLANAR_LAYER_SIZE,d0
+	move.l	d0,planar_mask
+	add.l	#PLANAR_MASK_SIZE,d0
+	move.l	d0,planar_text_lines
+
+	move.l	#PLANAR_ARENA_SIZE,d0
+	move.l	d0,planar_arena_size
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,planar_arena
+	bne		.arena
+
+	move.l	#PLANAR_ARENA_MINIMUM,d0
+	move.l	d0,planar_arena_size
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+	move.l	d0,planar_arena
+	bne		.arena
+
+	move.l	planar_memory,a1
+	clr.l	planar_memory
+	move.l	#PLANAR_MEMORY_SIZE,d0
+	jsr		_LVOFreeMem(a6)
+
+	bra		.done
+
+.arena:
+	add.l	planar_arena_size,d0
+	move.l	d0,planar_arena_end
+	bsr		reset_planar_sprites
+
+	; Every text line is converted on the first planar frame.
+
+	lea		text_planar_stale,a0
+	move	#RENDER_HEIGHT/4-1,d0
+
+.stale:
+	move.l	#-1,(a0)+
+	dbf		d0,.stale
+
+	st		planar_enabled
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a1/a6
+
+	rts
+
+release_planar:
+	movem.l	d0-d1/a0-a1/a6,-(sp)
+
+	sf		planar_enabled
+	move.l	exec_base,a6
+
+	move.l	planar_arena,d0
+	beq		.no_arena
+
+	clr.l	planar_arena
+	move.l	d0,a1
+	move.l	planar_arena_size,d0
+	jsr		_LVOFreeMem(a6)
+
+.no_arena:
+	move.l	planar_memory,d0
+	beq		.done
+
+	clr.l	planar_memory
+	move.l	d0,a1
+	move.l	#PLANAR_MEMORY_SIZE,d0
+	jsr		_LVOFreeMem(a6)
+
+.done:
+	movem.l	(sp)+,d0-d1/a0-a1/a6
+
+	rts
+
+; Returns d0 = the picture's top left in plane 0 of the hidden screen buffer
+; if this frame is drawn planar, else 0.
+
+planar_frame_target:
+	moveq	#0,d0
+	tst.b	planar_enabled
+	beq		.done
+
+	tst.b	layers_ready
+	beq		.done
+
+	move	L_00E80000+CRTC_PAGE0_X,d1
+	or		L_00E80000+CRTC_PAGE1_X,d1
+	and		#511,d1
+	bne		.done ; Horizontal scroll: the chunky per-pixel path.
+
+	jsr		begin_planar_frame
+
+.done:
+	tst.l	d0
+
+	rts
+
+; build_layers: layer0 / layer1 into the planar layers, and page 0's mask.
+
+build_planar_layers:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	lea		layer0,a0 ; layer1 follows.
+	move.l	planar_layer0,a1 ; planar_layer1 follows.
+	lea		layer0+LAYER_WIDTH*LAYER_LINES*2,a2
+
+.convert:
+	movem.l	(a0)+,d0-d7
+
+	C2P32
+	STORE_PLANES a1
+
+	cmp.l	a2,a0
+	bne		.convert
+
+	; Page 0's mask: a pixel is opaque if its index is not 0, that is if any
+	; of its plane bits is set (graphics indices are their own slots).
+
+	move.l	planar_layer0,a0
+	move.l	planar_mask,a1
+	move	#LAYER_LINES*PLANAR_GROUPS-1,d1
+
+.mask:
+	move.l	(a0)+,d0
+	or.l	(a0)+,d0
+	or.l	(a0)+,d0
+	or.l	(a0)+,d0
+	or.l	(a0)+,d0
+	or.l	(a0)+,d0
+	or.l	(a0)+,d0
+	or.l	(a0)+,d0
+	move.l	d0,(a1)+
+
+	dbf		d1,.mask
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
+
+; Background: page 0 over page 1, each with its vertical scroll.
+
+planar_graphics:
+	move.l	planar_destination,a3
+	move.l	planar_layer0,a4
+	move.l	planar_layer1,a5
+	move.l	planar_mask,a6
+	moveq	#0,d7 ; Line.
+
+.line_loop:
+	moveq	#0,d1
+	move	L_00E80000+CRTC_PAGE0_Y,d1
+	add		d7,d1
+	and		#LAYER_LINES-1,d1
+	move.l	d1,d0
+	lsl.l	#8,d1 ; * PLANAR_LAYER_LINE
+	lea		(a4,d1.l),a0
+	lsl.l	#5,d0 ; * PLANAR_GROUPS * 4
+	lea		(a6,d0.l),a2
+
+	moveq	#0,d1
+	move	L_00E80000+CRTC_PAGE1_Y,d1
+	add		d7,d1
+	and		#LAYER_LINES-1,d1
+	lsl.l	#8,d1
+	lea		(a5,d1.l),a1
+
+	moveq	#PLANAR_GROUPS-1,d6
+
+.group_loop:
+	move.l	(a2)+,d2 ; Page 0's opaque pixels.
+	beq		.page1
+
+	moveq	#-1,d0
+	cmp.l	d0,d2
+	bne		.merge
+
+	move.l	(a0)+,(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES*2(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES*3(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES*4(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES*5(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES*6(a3)
+	move.l	(a0)+,PLANAR_ROW_BYTES*7(a3)
+	lea		8*4(a1),a1
+
+	bra		.next_group
+
+.page1:
+	move.l	(a1)+,(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES*2(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES*3(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES*4(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES*5(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES*6(a3)
+	move.l	(a1)+,PLANAR_ROW_BYTES*7(a3)
+	lea		8*4(a0),a0
+
+	bra		.next_group
+
+	; Page 1 where page 0 is transparent.
+
+.merge:
+	not.l	d2
+
+	MERGE_PLANE	0
+	MERGE_PLANE	1
+	MERGE_PLANE	2
+	MERGE_PLANE	3
+	MERGE_PLANE	4
+	MERGE_PLANE	5
+	MERGE_PLANE	6
+	MERGE_PLANE	7
+
+.next_group:
+	addq.l	#4,a3
+
+	dbf		d6,.group_loop
+
+	lea		PLANAR_LINE-PLANAR_GROUPS*4(a3),a3
+
+	addq	#1,d7
+	cmp		#RENDER_HEIGHT,d7
+	bne		.line_loop
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Text: converts the lines prepare_text has converted since the last planar
+; frame, then draws the lines with text.
+
+planar_text:
+	bsr		prepare_text
+
+	lea		text_planar_stale,a0
+	lea		text_line_used,a1
+	moveq	#0,d7 ; Line.
+
+.convert_loop:
+	tst.b	(a0,d7.w)
+	beq		.next_convert
+
+	sf		(a0,d7.w)
+	tst.b	(a1,d7.w)
+	beq		.next_convert ; No text: not drawn.
+
+	bsr		convert_planar_text_line
+
+.next_convert:
+	addq	#1,d7
+	cmp		#RENDER_HEIGHT,d7
+	bne		.convert_loop
+
+	move.l	planar_destination,a3
+	move.l	planar_text_lines,a4
+	moveq	#0,d7
+
+.line_loop:
+	tst.b	(a1,d7.w)
+	beq		.next_line
+
+	ifd __RENDER_PROFILE__
+	addq.l	#1,text_lines_drawn
+	endif
+
+	move.b	(a4),d6 ; Groups with text (bit 7 = group 0).
+	lea		4(a4),a5
+	move.l	a3,a2
+	moveq	#PLANAR_GROUPS-1,d5
+
+.group_loop:
+	add.b	d6,d6
+	bcc		.next_group
+
+	move.l	(a5),d0 ; Mask.
+	moveq	#-1,d1
+	cmp.l	d1,d0
+	bne		.masked
+
+	move.l	4(a5),(a2)
+	move.l	8(a5),PLANAR_ROW_BYTES(a2)
+	move.l	12(a5),PLANAR_ROW_BYTES*2(a2)
+	move.l	16(a5),PLANAR_ROW_BYTES*3(a2)
+	move.l	20(a5),PLANAR_ROW_BYTES*4(a2)
+	move.l	24(a5),PLANAR_ROW_BYTES*5(a2)
+	move.l	28(a5),PLANAR_ROW_BYTES*6(a2)
+	move.l	32(a5),PLANAR_ROW_BYTES*7(a2)
+
+	bra		.next_group
+
+.masked:
+	not.l	d0
+
+	MASKED_PLANE	0
+	MASKED_PLANE	1
+	MASKED_PLANE	2
+	MASKED_PLANE	3
+	MASKED_PLANE	4
+	MASKED_PLANE	5
+	MASKED_PLANE	6
+	MASKED_PLANE	7
+
+.next_group:
+	lea		PLANAR_TEXT_GROUP(a5),a5
+	addq.l	#4,a2
+
+	dbf		d5,.group_loop
+
+.next_line:
+	lea		PLANAR_TEXT_LINE(a4),a4
+	lea		PLANAR_LINE(a3),a3
+
+	addq	#1,d7
+	cmp		#RENDER_HEIGHT,d7
+	bne		.line_loop
+
+	rts
+
+; d7 = line: its text_draw groups (mask and colours per four pixels) into
+; planar groups. Preserves all registers.
+
+convert_planar_text_line:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	move	d7,d0
+	mulu	#TEXT_DRAW_LINE,d0
+	lea		text_draw,a3
+	add.l	d0,a3 ; Group bits.
+	lea		TEXT_GROUP_BITS(a3),a5 ; Masks and colours of the groups with text.
+
+	move	d7,d0
+	mulu	#PLANAR_TEXT_LINE,d0
+	move.l	planar_text_lines,a4
+	add.l	d0,a4
+	clr.b	(a4)
+
+	moveq	#0,d6 ; 32-pixel group.
+
+.group_loop:
+	move.b	(a3,d6.w),d3 ; Its eight four-pixel groups (bit 7 first).
+	beq		.next_group
+
+	moveq	#7,d0
+	sub		d6,d0
+	bset	d0,(a4)
+
+	move	d6,d0
+	mulu	#PLANAR_TEXT_GROUP,d0
+	lea		4(a4,d0.l),a2
+
+	lea		planar_text_pixels,a1
+	moveq	#0,d4 ; Mask.
+	moveq	#8-1,d5
+
+.four_loop:
+	lsl.l	#4,d4
+	add.b	d3,d3
+	bcc		.empty
+
+	move.l	(a5)+,d1 ; Mask bytes ($ff or 0).
+	move.l	(a5)+,(a1)+ ; Colours.
+	moveq	#4-1,d2
+
+.mask_bit:
+	rol.l	#8,d1
+	tst.b	d1
+	beq		.transparent
+
+	bset	d2,d4
+
+.transparent:
+	dbf		d2,.mask_bit
+
+	bra		.next_four
+
+.empty:
+	clr.l	(a1)+
+
+.next_four:
+	dbf		d5,.four_loop
+
+	move.l	d4,(a2)+
+	move	d6,planar_text_group
+
+	movem.l	planar_text_pixels,d0-d7
+	C2P32
+	STORE_PLANES a2
+
+	move	planar_text_group,d6
+
+.next_group:
+	addq	#1,d6
+	cmp		#PLANAR_GROUPS,d6
+	bne		.group_loop
+
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; Sprites, in the order of render_sprites.
+
+planar_sprites:
+	bsr		order_sprites
+	beq		.done
+
+	tst.b	sprite_cache_reset
+	beq		.cache_ok
+
+	bsr		reset_sprite_cache
+
+.cache_ok:
+	lea		sprite_order,a6
+	move	d7,d6
+	subq	#1,d6
+
+.sprite_loop:
+	move	(a6)+,d0
+	lea		sprite_list,a0
+	lea		(a0,d0.w*8),a0
+
+	moveq	#0,d0
+	move	4(a0),d0 ; Pattern.
+	cmp		#PCG_PATTERNS,d0
+	bcc		.next_sprite
+
+	moveq	#0,d2
+	move	(a0),d2 ; x
+	cmp		#RENDER_STRIDE-16,d2
+	bhi		.next_sprite
+
+	moveq	#0,d3
+	move	2(a0),d3 ; y
+	cmp		#RENDER_LINES-16,d3
+	bhi		.next_sprite
+
+	; Variant: pattern * 4 + flip (attributes bit 14 = horizontal, bit 15
+	; = vertical); palette: attributes bits 11-8.
+
+	move	6(a0),d5
+	lsl.l	#2,d0
+	move	d5,d1
+	rol		#2,d1
+	and		#3,d1
+	add		d1,d0
+	move	d5,d1
+	lsr		#8,d1
+	and		#$f,d1
+
+	bsr		planar_sprite
+	bsr		draw_planar_sprite
+
+.next_sprite:
+	dbf		d6,.sprite_loop
+
+.done:
+	rts
+
+; d0.l = variant, d1 = palette -> a4 = its planar sprite, made or brought up
+; to date. Preserves all other registers.
+
+planar_sprite:
+	movem.l	d0-d2/a0-a1,-(sp)
+
+	lea		planar_table,a0
+	move.l	(a0,d0.l*4),d2
+
+.find:
+	beq		.new
+
+	move.l	d2,a4
+	cmp		PE_PALETTE(a4),d1
+	beq		.found
+
+	move.l	PE_NEXT(a4),d2
+
+	bra		.find
+
+.found:
+	lea		sprite_remap,a1
+	move	d1,d2
+	lsl		#4,d2
+	add		d2,a1
+	move.l	(a1)+,d2
+	cmp.l	PE_REMAP(a4),d2
+	bne		.remade
+	move.l	(a1)+,d2
+	cmp.l	PE_REMAP+4(a4),d2
+	bne		.remade
+	move.l	(a1)+,d2
+	cmp.l	PE_REMAP+8(a4),d2
+	bne		.remade
+	move.l	(a1),d2
+	cmp.l	PE_REMAP+12(a4),d2
+	beq		.done
+
+	; The palette's slots changed: made again, with a new routine.
+
+.remade:
+	move.l	planar_arena_end,d2
+	sub.l	planar_arena_next,d2
+	cmp.l	#PLANAR_CODE_MAXIMUM,d2
+	bcc		.build
+
+	bsr		reset_planar_sprites ; Full: start again.
+
+.new:
+	move.l	planar_arena_end,d2
+	sub.l	planar_arena_next,d2
+	cmp.l	#PLANAR_ENTRY_SIZE+PLANAR_CODE_MAXIMUM,d2
+	bcc		.room
+
+	bsr		reset_planar_sprites ; Full: start again.
+
+.room:
+	move.l	planar_arena_next,a4
+	lea		PLANAR_ENTRY_SIZE(a4),a1
+	move.l	a1,planar_arena_next
+	move.l	(a0,d0.l*4),PE_NEXT(a4)
+	move.l	a4,(a0,d0.l*4)
+
+.build:
+	bsr		build_planar_sprite
+	bsr		compile_planar_sprite
+
+.done:
+	movem.l	(sp)+,d0-d2/a0-a1
+
+	rts
+
+; a4 = planar sprite, d0.l = variant, d1 = palette: takes the palette's slots
+; and converts the pattern. Preserves all registers.
+
+build_planar_sprite:
+	movem.l	d0-d7/a0-a3,-(sp)
+
+	move	d1,PE_PALETTE(a4)
+	lea		sprite_remap,a3
+	lsl		#4,d1
+	add		d1,a3 ; Slots of the palette's colours.
+	move.l	(a3),PE_REMAP(a4)
+	move.l	4(a3),PE_REMAP+4(a4)
+	move.l	8(a3),PE_REMAP+8(a4)
+	move.l	12(a3),PE_REMAP+12(a4)
+
+	move.l	d0,d7 ; Variant.
+	lsr.l	#2,d0
+	lsl.l	#7,d0
+	move.l	SPRITE_DATA_ADDRESS,a1
+	add.l	d0,a1 ; Pattern data.
+
+	lea		PE_ROWS(a4),a0
+	moveq	#0,d3 ; Row.
+
+.row_loop:
+	clr.l	(a0)
+	clr.l	4(a0)
+	clr.l	8(a0)
+	clr.l	12(a0)
+	clr		16(a0)
+
+	move	d3,d1
+	btst	#1,d7
+	beq		.row_ok
+
+	moveq	#15,d1
+	sub		d3,d1 ; Vertical flip.
+
+.row_ok:
+	lsl		#2,d1
+	move.l	(a1,d1.w),d4 ; Left 8 pixels.
+	move.l	64(a1,d1.w),d5 ; Right 8 pixels.
+	moveq	#0,d2 ; Pixel.
+
+.pixel_loop:
+	cmp		#8,d2
+	bne		.same_half
+
+	move.l	d5,d4
+
+.same_half:
+	rol.l	#4,d4
+	moveq	#$f,d0
+	and		d4,d0
+	beq		.next_pixel ; Transparent.
+
+	move	d2,d1
+	btst	#0,d7
+	beq		.column_ok
+
+	moveq	#15,d1
+	sub		d2,d1 ; Horizontal flip.
+
+.column_ok:
+	bfset	(a0){d1:1} ; Mask.
+
+	move.b	(a3,d0.w),d6 ; Slot.
+	lea		2(a0),a2
+	moveq	#8-1,d0
+
+.plane_loop:
+	lsr.b	#1,d6
+	bcc		.next_plane
+
+	bfset	(a2){d1:1}
+
+.next_plane:
+	addq.l	#2,a2
+
+	dbf		d0,.plane_loop
+
+.next_pixel:
+	addq	#1,d2
+	cmp		#16,d2
+	bne		.pixel_loop
+
+	lea		PE_ROW(a0),a0
+
+	addq	#1,d3
+	cmp		#16,d3
+	bne		.row_loop
+
+	movem.l	(sp)+,d0-d7/a0-a3
+
+	rts
+
+; a4 = planar sprite (rows made): generates its routine at the arena's
+; free space (the caller has checked the room). Preserves all registers.
+
+compile_planar_sprite:
+	movem.l	d0-d7/a0-a1/a6,-(sp)
+
+	move.l	planar_arena_next,a0
+	move.l	a0,PE_CODE(a4)
+	lea		PE_ROWS(a4),a1
+	moveq	#0,d7 ; Row offset.
+	moveq	#16-1,d6
+
+.row_loop:
+	move	(a1)+,d0 ; Mask.
+	beq		.empty_row
+
+	move	#OPCODE_MOVE_IMMEDIATE_D0,(a0)+
+	move	d0,(a0)+
+	clr		(a0)+
+	move.l	#OPCODE_LSR_D0_MOVE_D0_D1,(a0)+
+	move	#OPCODE_NOT_D1,(a0)+
+
+	move	d7,d4 ; Offset.
+	moveq	#8-1,d5
+
+.plane_loop:
+	move	(a1)+,d1
+	beq		.clear
+
+	cmp		d0,d1
+	beq		.set
+
+	move	#OPCODE_MOVE_IMMEDIATE_D2,(a0)+
+	move	d1,(a0)+
+	clr		(a0)+
+	move	#OPCODE_LSR_D2,(a0)+
+	move	#OPCODE_MOVE_A2_TO_D3,(a0)+
+	move	d4,(a0)+
+	move.l	#OPCODE_AND_D1_OR_D2,(a0)+
+	move	#OPCODE_MOVE_D3_TO_A2,(a0)+
+	move	d4,(a0)+
+
+	bra		.next_plane
+
+.clear:
+	move	#OPCODE_AND_D1_TO_A2,(a0)+
+	move	d4,(a0)+
+
+	bra		.next_plane
+
+.set:
+	move	#OPCODE_OR_D0_TO_A2,(a0)+
+	move	d4,(a0)+
+
+.next_plane:
+	add		#PLANAR_ROW_BYTES,d4
+
+	dbf		d5,.plane_loop
+
+	bra		.next_row
+
+.empty_row:
+	lea		8*2(a1),a1
+
+.next_row:
+	add		#PLANAR_LINE,d7
+
+	dbf		d6,.row_loop
+
+	move	#OPCODE_RTS,(a0)+
+	move.l	a0,planar_arena_next
+
+	ifd __RENDER_PROFILE__
+	addq.l	#1,planar_sprites_made
+	endif
+
+	; The new code must not meet stale instruction cache lines.
+
+	move.l	exec_base,a6
+	jsr		_LVOCacheClearU(a6)
+
+	movem.l	(sp)+,d0-d7/a0-a1/a6
+
+	rts
+
+; a4 = planar sprite, d2 = x, d3 = y (render buffer positions: the picture
+; starts at GUARD). Draws it clipped to the picture: through its routine
+; when it is whole inside. Preserves d6/a6.
+
+draw_planar_sprite:
+	movem.l	d0-d7/a0/a2/a4,-(sp)
+
+	; Screen x = x - GUARD + 32: the long at word w = x / 16 holds the
+	; sprite's 16 pixels from bit 31 - s, s = x & 15. The picture covers
+	; words 2-17 of the row: at word 1 only the long's low half is in it, at
+	; word 17 the high half.
+
+	move	d2,d0
+	add		#32-GUARD,d0
+	moveq	#15,d5
+	and		d0,d5 ; s
+	lsr		#4,d0 ; w
+	moveq	#-1,d6 ; Clip.
+	cmp		#1,d0
+	bne		.not_left
+
+	move.l	#$0000ffff,d6
+
+	bra		.clipped
+
+.not_left:
+	cmp		#17,d0
+	bcs		.clipped
+	bne		.done ; Right of the picture.
+
+	move.l	#$ffff0000,d6
+
+.clipped:
+	; Rows within the picture.
+
+	sub		#GUARD,d3 ; Picture line of row 0.
+	moveq	#0,d1 ; First row.
+	moveq	#16,d4 ; End row.
+	tst		d3
+	bpl		.top_ok
+
+	move	d3,d1
+	neg		d1
+
+.top_ok:
+	move	#RENDER_HEIGHT,d2
+	sub		d3,d2
+	cmp		d4,d2
+	bge		.bottom_ok
+
+	move	d2,d4
+
+.bottom_ok:
+	sub		d1,d4
+	ble		.done
+
+	move.l	planar_destination,a2
+	subq.l	#PLANAR_PICTURE_X,a2 ; Row start.
+	move	d3,d2
+	add		d1,d2
+	muls	#PLANAR_LINE,d2
+	add.l	d2,a2
+	add		d0,d0
+	add		d0,a2
+
+	cmp		#16,d4
+	bne		.clip
+
+	moveq	#-1,d2
+	cmp.l	d2,d6
+	bne		.clip
+
+	move.l	PE_CODE(a4),a0 ; Whole inside.
+	jsr		(a0)
+
+	bra		.done
+
+.clip:
+	subq	#1,d4
+	move	d4,d7 ; Rows - 1.
+
+	lea		PE_ROWS(a4),a4
+	mulu	#PE_ROW,d1
+	add.l	d1,a4
+
+.row_loop:
+	move	(a4)+,d0
+	swap	d0
+	clr		d0
+	lsr.l	d5,d0
+	and.l	d6,d0 ; Mask.
+	beq		.empty_row
+
+	move.l	d0,d1
+	not.l	d1
+
+	SPRITE_PLANE	0
+	SPRITE_PLANE	1
+	SPRITE_PLANE	2
+	SPRITE_PLANE	3
+	SPRITE_PLANE	4
+	SPRITE_PLANE	5
+	SPRITE_PLANE	6
+	SPRITE_PLANE	7
+
+	bra		.next_row
+
+.empty_row:
+	lea		8*2(a4),a4
+
+.next_row:
+	lea		PLANAR_LINE(a2),a2
+
+	dbf		d7,.row_loop
+
+.done:
+	movem.l	(sp)+,d0-d7/a0/a2/a4
+
+	rts
+
+; Empties the planar sprite arena (the patterns changed, or it is full).
+; Preserves all registers.
+
+reset_planar_sprites:
+	movem.l	d0/a0,-(sp)
+
+	ifd __RENDER_PROFILE__
+	addq.l	#1,planar_arena_resets
+	endif
+
+	move.l	planar_arena,planar_arena_next
+
+	lea		planar_table,a0
+	move	#PCG_PATTERNS*4-1,d0
+
+.clear:
+	clr.l	(a0)+
+	dbf		d0,.clear
+
+	movem.l	(sp)+,d0/a0
+
+	rts
+
 	xdef end_of_code
 
 end_of_code: ; graphics.s is linked last: end of the code hunk.
@@ -2144,6 +3319,10 @@ text_remaps:
 palette_entry_changes:
 	ds.w	512
 palette_rebuilds:
+	ds.l	1
+planar_sprites_made:
+	ds.l	1
+planar_arena_resets: ; Including the first.
 	ds.l	1
 profile_stage:
 	ds.l	1
@@ -2267,6 +3446,48 @@ text_bitmaps:
 
 text_matrix:
 	ds.b	32*32
+
+	cnop	0,4
+
+; Planar rendering (AGA).
+
+planar_destination: ; Picture's top left in plane 0 of the hidden buffer, or 0.
+	ds.l	1
+planar_memory: ; Layers, mask and text lines in one allocation.
+	ds.l	1
+planar_layer0:
+	ds.l	1
+planar_layer1:
+	ds.l	1
+planar_mask:
+	ds.l	1
+planar_text_lines:
+	ds.l	1
+planar_arena:
+	ds.l	1
+planar_arena_size:
+	ds.l	1
+planar_arena_next:
+	ds.l	1
+planar_arena_end:
+	ds.l	1
+
+planar_table: ; Per variant (pattern * 4 + flip): its first planar sprite.
+	ds.l	PCG_PATTERNS*4
+
+planar_text_pixels: ; One 32-pixel group of text colours.
+	ds.l	8
+
+text_planar_stale: ; Per line: converted into text_draw since its planar group.
+	ds.b	RENDER_HEIGHT
+
+planar_text_group:
+	ds.w	1
+
+planar_enabled:
+	ds.b	1
+
+	even
 
 ; ------------------------------------------------------------------------------
 	end
