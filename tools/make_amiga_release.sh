@@ -43,10 +43,18 @@ if [ "${NO_LHA:-0}" = 0 ]; then
 	mkdir "$work/empty" "$work/out" "$work/check"
 	rm -f binaries/amiga/ChoRenSha-amiga.lha
 
-	GAME_DATA_DIR="$work/empty" MUSIC=0 WORK_FILES="$drawer $release/ChoRenSha.info" \
-		COPY_BACK=ChoRenSha-amiga.lha RESULT_DIR="$work/out" \
-		tests/amiga/run_fsuae.sh rtg-040 "$system_dir/C/LhA" 3600 \
-		"-r a ChoRenSha-amiga.lha ChoRenSha ChoRenSha.info" > "$work/lha.log" 2>&1 || true
+	# FS-UAE's host-directory filesystem sometimes stops answering (the
+	# emulator hang in docs/AMIGA_PORT.md); packing takes about 6 minutes,
+	# so after 20 the attempt is given up and made once more.
+	for attempt in 1 2; do
+		GAME_DATA_DIR="$work/empty" MUSIC=0 WORK_FILES="$drawer $release/ChoRenSha.info" \
+			COPY_BACK=ChoRenSha-amiga.lha RESULT_DIR="$work/out" \
+			tests/amiga/run_fsuae.sh rtg-040 "$system_dir/C/LhA" 1200 \
+			"-r a ChoRenSha-amiga.lha ChoRenSha ChoRenSha.info" > "$work/lha.log" 2>&1 || true
+
+		[ -f "$work/out/ChoRenSha-amiga.lha" ] && break
+		echo "LhA attempt $attempt did not finish" >&2
+	done
 
 	if [ ! -f "$work/out/ChoRenSha-amiga.lha" ]; then
 		cat "$work/lha.log" >&2
