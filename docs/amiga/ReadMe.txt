@@ -61,6 +61,7 @@ Controls
     SHIFT or X             second button (either SHIFT)
     P or ESC               pause (press again to continue)
     M                      mouse control on / off
+    ` (left of 1)          frames-per-second counter on / off (top left)
 
   Mouse control (M): in a stage the ship follows the mouse's movement
   (move the mouse 3 cm left, the ship goes about as far left) and stops

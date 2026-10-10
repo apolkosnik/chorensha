@@ -38,7 +38,7 @@ BITS = {"up": 0, "down": 1, "left": 2, "right": 3, "a": 5, "b": 6}
 
 KEYS = {"1": 0x01, "z": 0x31, "x": 0x32, "space": 0x40, "tab": 0x42, "return": 0x44,
         "esc": 0x45, "up": 0x4c, "down": 0x4d, "right": 0x4e, "left": 0x4f,
-        "p": 0x19, "m": 0x37, "lshift": 0x60, "rshift": 0x61, "ctrl": 0x63}
+        "p": 0x19, "m": 0x37, "backtick": 0x00, "lshift": 0x60, "rshift": 0x61, "ctrl": 0x63}
 
 
 def main(source, destination):

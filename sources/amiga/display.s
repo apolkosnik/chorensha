@@ -20,6 +20,11 @@
 	xdef present_frame
 	xdef capture_screen
 	xdef display_active
+	xdef update_fps_display
+
+	xref fps_display
+	xref rendered_frames
+	xref total_vbl_count
 
 	xref exec_base
 	xref machine_display
@@ -110,12 +115,21 @@ wd_RPort=50
 _LVOLoadRGB32=-882
 _LVOWaitTOF=-270
 _LVOInitRastPort=-198
+_LVOText=-60
+_LVOMove=-240
+_LVORectFill=-306
+_LVOSetAPen=-342
+_LVOSetBPen=-348
+_LVOSetDrMd=-354
+_LVORawDoFmt=-522
+JAM2=1
 _LVOReadPixelArray8=-780
 _LVOAllocBitMap=-918
 _LVOFreeBitMap=-924
 
 RASTPORT_SIZE=100
 rp_BitMap=4
+rp_TxBaseline=62
 
 ; Picasso96API.library
 
@@ -169,6 +183,25 @@ SCREEN_WIDTH=320
 POINTER_SIZE=16
 AGA_DEPTH=8
 AGA_X_BYTES=(SCREEN_WIDTH-PICTURE_WIDTH)/2/8 ; Picture start in a plane row.
+
+; Screenshots: from the picture's left edge; -D__CAPTURE_BORDER__ (test
+; builds) from the screen's, to show the FPS counter in the left border.
+
+	ifd __CAPTURE_BORDER__
+CAPTURE_X=0
+	else
+CAPTURE_X=(SCREEN_WIDTH-PICTURE_WIDTH)/2
+	endif
+
+; FPS counter (` key): pictures shown per second, in the left border (the
+; picture is centred on the screen), with the system font.
+
+FPS_X=4
+FPS_Y=1 ; Top of the text.
+FPS_WIDTH=3*8 ; "nn" in the font's 8-pixel cells, and a space.
+FPS_HEIGHT=8
+FPS_TICKS=55 ; Recomputed about once a second.
+FPS_TICK_HZ100=5546 ; The frame timer: 55.46 Hz.
 
 ; ------------------------------------------------------------------------------
 	text
@@ -892,9 +925,9 @@ capture_screen:
 	move.l	graphics_base,a6
 	move.l	window,a0
 	move.l	wd_RPort(a0),a0
-	moveq	#(SCREEN_WIDTH-PICTURE_WIDTH)/2,d0
+	moveq	#CAPTURE_X,d0
 	moveq	#0,d1
-	move.l	#(SCREEN_WIDTH-PICTURE_WIDTH)/2+PICTURE_WIDTH-1,d2
+	move.l	#CAPTURE_X+PICTURE_WIDTH-1,d2
 	move.l	screen_height,d3
 	subq.l	#1,d3
 	lea		temporary_rastport,a1
@@ -916,7 +949,7 @@ capture_screen:
 	moveq	#0,d1
 	move.l	window,a1
 	move.l	wd_RPort(a1),a1
-	moveq	#(SCREEN_WIDTH-PICTURE_WIDTH)/2,d2
+	moveq	#CAPTURE_X,d2
 	moveq	#0,d3
 	move.l	#PICTURE_WIDTH,d4
 	move.l	screen_height,d5
@@ -934,7 +967,7 @@ capture_screen:
 	move.l	(a1,d0.l*4),a1
 	move.l	sb_BitMap(a1),a1
 	move.l	bm_Planes(a1),a3
-	add.w	#AGA_X_BYTES,a3 ; Plane 0, first row.
+	add.w	#CAPTURE_X/8,a3 ; Plane 0, first row.
 	move.l	plane_spacing,a4
 	move.l	screen_height,d7
 	subq	#1,d7
@@ -1172,6 +1205,194 @@ c2p_c2plib:
 	endif
 
 ; ------------------------------------------------------------------------------
+;
+; FPS counter: at each frame end (task context, OS stack). While it is on
+; (fps_display, the ` key), the pictures shown per second are recomputed
+; about once a second and drawn at the top of the left border; when it is
+; turned off, the area is cleared. Only the picture is ever drawn over, so
+; the text stays (on AGA it is drawn into both screen buffers). Preserves
+; all registers.
+
+update_fps_display:
+	movem.l	d0-d7/a0-a6,-(sp)
+
+	tst.b	display_active
+	beq		.done
+
+	move.b	fps_display,d0
+	cmp.b	fps_shown,d0
+	beq		.same_state
+
+	move.b	d0,fps_shown
+	tst.b	d0
+	beq		.clear
+
+	; Turned on: start counting, show "--" until the first second.
+
+	move.l	total_vbl_count,fps_tick
+	move.l	rendered_frames,fps_frames
+	lea		fps_wait_text,a0
+	bsr		draw_fps_text
+
+	bra		.done
+
+.clear:
+	lea		fps_clear_text,a0
+	bsr		draw_fps_text
+
+	bra		.done
+
+.same_state:
+	tst.b	d0
+	beq		.done
+
+	move.l	total_vbl_count,d1
+	sub.l	fps_tick,d1 ; Ticks.
+	cmp.l	#FPS_TICKS,d1
+	bcs		.done
+
+	; Pictures * timer rate / ticks, rounded.
+
+	move.l	rendered_frames,d0
+	sub.l	fps_frames,d0
+	mulu.l	#FPS_TICK_HZ100,d0
+	move.l	d1,d2
+	mulu.l	#100,d2
+	move.l	d2,d3
+	lsr.l	#1,d3
+	add.l	d3,d0
+	divu.l	d2,d0
+	cmp.l	#99,d0
+	bls		.value_set
+
+	moveq	#99,d0
+
+.value_set:
+	move.l	d0,fps_arguments
+	add.l	d1,fps_tick
+	move.l	rendered_frames,fps_frames
+
+	lea		fps_format,a0
+	lea		fps_arguments,a1
+	lea		.put_char(pc),a2
+	lea		fps_text,a3
+	move.l	exec_base,a6
+	jsr		_LVORawDoFmt(a6)
+
+	lea		fps_text,a0
+	bsr		draw_fps_text
+
+.done:
+	movem.l	(sp)+,d0-d7/a0-a6
+
+	rts
+
+.put_char:
+	move.b	d0,(a3)+
+
+	rts
+
+; a0 = text (3 characters): drawn at the counter's place, in the brightest
+; palette colour on colour 0 (the border's), into the shown screen (RTG:
+; through the window) or both screen buffers (AGA).
+
+draw_fps_text:
+	movem.l	d2-d4/a2-a3/a6,-(sp)
+
+	move.l	a0,a3
+
+	; The brightest colour: the largest R + G + B (LoadRGB32 table).
+
+	lea		hardware_palette+4,a0
+	moveq	#0,d2 ; Best sum.
+	moveq	#1,d3 ; Its pen.
+	moveq	#0,d4 ; Pen.
+
+.palette_loop:
+	moveq	#0,d0
+	moveq	#0,d1
+	move.b	(a0),d1
+	add.l	d1,d0
+	move.b	4(a0),d1
+	add.l	d1,d0
+	move.b	8(a0),d1
+	add.l	d1,d0
+	lea		12(a0),a0
+	cmp.l	d2,d0
+	bls		.not_brighter
+
+	move.l	d0,d2
+	move.l	d4,d3
+
+.not_brighter:
+	addq	#1,d4
+	cmp		#256,d4
+	bne		.palette_loop
+
+	move.l	d3,fps_pen
+
+	cmp.l	#BACKEND_AGA,backend
+	beq		.aga
+
+	move.l	window,a0
+	move.l	wd_RPort(a0),a2
+	bsr		.draw
+
+	bra		.done
+
+.aga:
+	; Into both buffers' bitmaps, through a RastPort of its own.
+
+	moveq	#0,d4
+
+.buffer_loop:
+	move.l	graphics_base,a6
+	lea		fps_rastport,a1
+	jsr		_LVOInitRastPort(a6)
+	lea		screen_buffers,a0
+	move.l	(a0,d4.l*4),d0
+	beq		.next_buffer
+
+	move.l	d0,a0
+	lea		fps_rastport,a2
+	move.l	sb_BitMap(a0),rp_BitMap(a2)
+	bsr		.draw
+
+.next_buffer:
+	addq.l	#1,d4
+	cmp.l	#2,d4
+	bne		.buffer_loop
+
+.done:
+	movem.l	(sp)+,d2-d4/a2-a3/a6
+
+	rts
+
+; a2 = RastPort, a3 = text.
+
+.draw:
+	move.l	graphics_base,a6
+	move.l	a2,a1
+	moveq	#JAM2,d0
+	jsr		_LVOSetDrMd(a6)
+	move.l	a2,a1
+	move.l	fps_pen,d0
+	jsr		_LVOSetAPen(a6)
+	move.l	a2,a1
+	moveq	#0,d0
+	jsr		_LVOSetBPen(a6)
+	move.l	a2,a1
+	moveq	#FPS_X,d0
+	moveq	#0,d1
+	move	rp_TxBaseline(a2),d1
+	add		#FPS_Y,d1
+	jsr		_LVOMove(a6)
+	move.l	a2,a1
+	move.l	a3,a0
+	moveq	#3,d0
+	jmp		_LVOText(a6)
+
+; ------------------------------------------------------------------------------
 	data
 ; ------------------------------------------------------------------------------
 
@@ -1234,6 +1455,15 @@ aga_screen_tags_mode:
 	dc.l	SA_Exclusive,-1
 	dc.l	TAG_DONE
 
+fps_format:
+	dc.b	'%2ld ',0
+fps_wait_text:
+	dc.b	'-- ',0
+fps_clear_text:
+	dc.b	'   ',0
+
+	even
+
 window_tags:
 	dc.l	WA_CustomScreen
 window_tags_screen:
@@ -1269,6 +1499,24 @@ temporary_bitmap:
 	ds.l	1
 temporary_rastport:
 	ds.b	RASTPORT_SIZE
+
+fps_rastport:
+	ds.b	RASTPORT_SIZE
+
+fps_tick:
+	ds.l	1 ; Frame timer tick at the last count.
+fps_frames:
+	ds.l	1 ; Pictures shown then.
+fps_pen:
+	ds.l	1
+fps_arguments:
+	ds.l	1
+fps_text:
+	ds.b	8
+fps_shown:
+	ds.b	1
+
+	even
 
 screen:
 	ds.l	1

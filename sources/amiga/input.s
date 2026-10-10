@@ -18,6 +18,7 @@
 ;   ESC, 1, TAB, SHIFT, CTRL, RETURN, SPACE, cursor keys   X68000 key matrix
 ;   P                    X68000 ESC (the game's pause, as ESC)
 ;   M                    mouse control on / off
+;   ` (left of 1)        FPS counter on / off (display.s)
 ;
 ; Auto fire: the game fires a volley when trigger A goes down (from one
 ; frame to the next), so holding it fires once. In a stage, a held trigger
@@ -42,6 +43,7 @@
 	xdef update_input
 	xdef mouse_frame_hook
 	xdef mouse_mode
+	xdef fps_display
 	xdef amiga_stage_frame
 	xdef amiga_ship_control
 	xdef input_tick
@@ -167,6 +169,7 @@ IECLASS_RAWMOUSE=2
 IECODE_LBUTTON=$68
 IECODE_RBUTTON=$69
 RAW_KEY_M=$37
+RAW_KEY_BACKTICK=$00 ; The key left of 1.
 MOUSE_DEAD_ZONE=2 ; Pixels.
 MOUSE_MAX_STEP=8 ; Pixels a frame (about 440 per second).
 RESPAWN_MOVING=$80 ; WORD_000A8EFC above this: the game flies the ship in.
@@ -1108,6 +1111,17 @@ process_key:
 	bra		.done
 
 .not_m:
+	cmp.b	#RAW_KEY_BACKTICK,d1
+	bne		.not_backtick
+
+	tst.l	d4
+	bmi		.done ; Released.
+
+	not.b	fps_display
+
+	bra		.done
+
+.not_backtick:
 	lea		key_map,a1
 	add		d1,d1
 	add		d1,a1
@@ -1476,6 +1490,8 @@ mouse_target_y:
 	ds.w	1
 mouse_mode:
 	ds.b	1 ; Mouse control on (M).
+fps_display:
+	ds.b	1 ; FPS counter on (`).
 mouse_mode_changed:
 	ds.b	1
 mouse_message_shown:
