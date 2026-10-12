@@ -9,6 +9,13 @@ card (RTG) or on the AGA chipset.
 The whole game plays, with its sound effects and its music (on Paula, or
 through AHI or an MHI MP3 decoder).
 
+| | | |
+| --- | --- | --- |
+| ![Title screen](docs/screenshots/title.png) | ![Stage 1: the butterfly fighters](docs/screenshots/butterflies.png) | ![A mid-boss](docs/screenshots/mid-boss.png) |
+| ![A big explosion](docs/screenshots/explosion.png) | ![Bullets](docs/screenshots/bullets.png) | ![A gunship](docs/screenshots/gunship.png) |
+
+The screenshots are the Amiga port's own pictures (from its attract demo).
+
 
 ## Download
 
