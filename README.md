@@ -153,6 +153,7 @@ hex; write them as `0x...` (in a Shell, `$` starts a variable).
 | `MHI`, `MHI=<driver>` | Music from the MP3 files on an MHI decoder: `LIBS:MHI/mhiz3660.library`, or the driver given (e.g. `MHI=mhizz9000.library`). Effects stay on Paula (or AHI). |
 | `MUSICVOL=<0-64>` | The music's volume (default 64, full). |
 | `SFXVOL=<0-64>` | The effects' volume (default 64, full). |
+| `PARALLAX50` | Smoother background scrolling on a 50 Hz display: each picture draws the two background layers where they are at the moment the picture is shown, instead of at the game's 55 Hz frame, so the floor no longer jumps 8 lines about five times a second. The game, its speed and the sprites are unchanged. |
 
 The start-up text shows the screen mode and the sound output in use. If
 an option cannot be used (no AGA, no graphics card, an unsuitable mode, no

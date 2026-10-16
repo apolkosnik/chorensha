@@ -1,0 +1,6 @@
+# "mouse on" over the attract demo's high score table: M at frame 380 shows
+# the message on text row 11 (the NO.02 line) for 2 s. Run with "600
+# input.bin": screen_00500 must equal the run without input (the cells under
+# the message drawn again, no hole in the table).
+380 key m press
+384 key m release

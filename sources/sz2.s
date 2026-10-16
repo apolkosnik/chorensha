@@ -4524,6 +4524,7 @@ DRAW_CHARACTER:
 
 	move	8+2(sp),d0 ; Text row (0-127): the renderer reconverts it.
 	jsr		amiga_text_row_written
+	jsr		amiga_text_character ; Under the "mouse on" message?
 
 	endif
 
@@ -4747,6 +4748,7 @@ CLEAR_TEXT_PLANE:
 	; simultaneous access mode (R21 = $1F0), which the shadow memory does
 	; not emulate.
 
+	jsr		amiga_text_cleared ; Under the "mouse on" message too.
 	jmp		amiga_clear_text_planes
 
 	endif

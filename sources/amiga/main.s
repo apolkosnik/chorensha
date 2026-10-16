@@ -23,6 +23,8 @@
 	xdef machine_rtg
 
 	xref print_music_summary
+	xref print_parallax_summary
+	xref parallax_requested
 	xref audio_ahi_requested
 	xref audio_ahi_mode
 	xref audio_music_volume
@@ -661,7 +663,8 @@ print_info_text:
 ; "MHI" plays the music on an MHI decoder (LIBS:MHI/mhiz3660.library),
 ; "MHI=<driver>" with that driver (e.g. MHI=mhizz9000.library). Display:
 ; "AGA" or "RTG" chooses the display (default: a graphics card if there is
-; one, else AGA), "MODE=<id>" (hex) the RTG screen mode.
+; one, else AGA), "MODE=<id>" (hex) the RTG screen mode, "PARALLAX50" draws
+; the background where it is when each picture is shown (parallax.s).
 ; The arguments are copied without them for parse_frame_limit.
 
 parse_audio_options:
@@ -737,6 +740,19 @@ parse_audio_options:
 	bra		.token
 
 .not_volume:
+	; PARALLAX50 (whole word).
+
+	lea		parallax_keyword,a3
+	bsr		match_word
+	beq		.not_parallax
+
+	st		parallax_requested
+	add.l	d0,a0
+	sub.l	d0,d1
+
+	bra		.token
+
+.not_parallax:
 	; AGA, RTG (whole words).
 
 	lea		aga_keyword,a3
@@ -1224,6 +1240,7 @@ print_run_summary:
 	jsr		_LVOVPrintf(a6)
 
 	jsr		print_music_summary
+	jsr		print_parallax_summary
 	move.l	dos_base,a6
 
 	ifd __RENDER_PROFILE__
@@ -1579,6 +1596,8 @@ aga_refused_text:
 	dc.b	'AGA was asked for, but this machine has no AGA chipset or less than 8 MB of fast RAM.',10,0
 rtg_refused_text:
 	dc.b	'RTG was asked for, but there is no graphics card (Picasso96 or CyberGraphX).',10,0
+parallax_keyword:
+	dc.b	'PARALLAX50',0
 aga_keyword:
 	dc.b	'AGA',0
 rtg_keyword:

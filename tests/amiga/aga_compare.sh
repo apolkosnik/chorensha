@@ -34,13 +34,14 @@ objects() { # objects <directory> <display flags> [graphics flags]
 	$vasm sources/amiga/emulator.s -quiet -Fhunk -m68030 -D__LOCKSTEP__ -o "$out/emulator.o"
 	$vasm sources/amiga/input.s -quiet -Fhunk -m68030 -o "$out/input.o"
 	$vasm sources/amiga/audio.s -quiet -Fhunk -m68030 -o "$out/audio.o"
+	$vasm sources/amiga/parallax.s -quiet -Fhunk -m68030 -D__LOCKSTEP__ -o "$out/parallax.o"
 	$vasm sources/amiga/graphics.s -quiet -Fhunk -m68030 ${3:-} -o "$out/graphics.o"
 	$vasm sources/amiga/display.s -quiet -Fhunk -m68030 $2 -o "$out/display.o"
 	$vasm sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o "$out/sz2.o"
 }
 
 objects "$work/rtg" ""
-$vlink "$work"/rtg/{main,sz2,mem_map,emulator,input,display,audio,graphics}.o -bamigahunk -s -o "$work/rtg/sz2"
+$vlink "$work"/rtg/{main,sz2,mem_map,emulator,input,display,audio,graphics,parallax}.o -bamigahunk -s -o "$work/rtg/sz2"
 
 aga_flags="-D__FORCE_AGA__"
 extra=()
@@ -55,7 +56,7 @@ if [ -n "${C2PLIB:-}" ]; then
 fi
 
 objects "$work/aga" "$aga_flags" "${AGA_GRAPHICS_FLAGS:-}"
-$vlink "$work"/aga/{main,sz2,mem_map,emulator,input,display,audio,graphics}.o "${extra[@]}" -bamigahunk -s -o "$work/aga/sz2"
+$vlink "$work"/aga/{main,sz2,mem_map,emulator,input,display,audio,graphics,parallax}.o "${extra[@]}" -bamigahunk -s -o "$work/aga/sz2"
 
 for build in rtg aga; do
 	RESULT_DIR="$work/$build/results" tests/amiga/run_fsuae.sh "$config" "$work/$build/sz2" 2400 "$frames" \

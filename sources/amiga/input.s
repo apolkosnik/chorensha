@@ -39,13 +39,17 @@
 ; direction, held for MOUSE_MENU_PRESS frame timer ticks and then released
 ; for MOUSE_MENU_GAP (mouse_menu_tick; on the timer, as the game also polls
 ; in loops that complete no frame). "mouse on" /
-; "mouse off" is shown for MOUSE_MESSAGE_TICKS where the game shows "pause"
-; (DRAW_TEXT, from the frame end: mouse_frame_hook).
+; "mouse off" is shown for MOUSE_MESSAGE_TICKS on a text row the game never
+; writes, above "pause" (DRAW_TEXT, from the frame end: mouse_frame_hook);
+; the characters under it (a high score table) are drawn again when it goes,
+; and when the game draws into it the message goes at the next frame end.
 
 	xdef initialize_input
 	xdef release_input
 	xdef update_input
 	xdef mouse_frame_hook
+	xdef amiga_text_character
+	xdef amiga_text_cleared
 	xdef mouse_mode
 	xdef fps_display
 	xdef amiga_stage_frame
@@ -62,6 +66,8 @@
 	xref total_vbl_count
 	xref WORD_00098864
 	xref DRAW_TEXT
+	xref text_matrix
+	xref text_bitmaps
 	xref WORD_000A8EFC
 	xref WORD_0008D8FA
 	xref WORD_000A8EFE
@@ -187,8 +193,11 @@ SHIP_BOTTOM=$3F00
 AUTOFIRE_SHIFT=1
 AUTOFIRE_FRAMES=1<<AUTOFIRE_SHIFT ; Pressed for 2 frames, released for 2.
 MOUSE_MESSAGE_TICKS=110 ; 2 s.
-MOUSE_MESSAGE_X=11 ; Text cells: "mouse off" centred where "pause" is.
-MOUSE_MESSAGE_Y=16
+MOUSE_MESSAGE_X=11 ; Text cells: "mouse off" centred above "pause" (13, 16).
+	ifnd MOUSE_MESSAGE_Y
+MOUSE_MESSAGE_Y=11 ; Between "rank" (10) and "mission complete" (12).
+	endif
+MOUSE_MESSAGE_LENGTH=9
 
 IND_WRITEEVENT=11
 io_Length=36
@@ -915,6 +924,13 @@ mouse_frame_hook:
 	beq		.no_change
 
 	sf		mouse_mode_changed
+
+	tst.b	mouse_message_shown
+	bne		.under_saved ; Shown already: what is under it is kept.
+
+	bsr		save_mouse_message_cells
+
+.under_saved:
 	lea		mouse_on_text,a0
 	tst.b	mouse_mode
 	bne		.text_set
@@ -926,6 +942,7 @@ mouse_frame_hook:
 	move.l	total_vbl_count,d0
 	add.l	#MOUSE_MESSAGE_TICKS,d0
 	move.l	d0,mouse_message_end
+	sf		mouse_message_overdrawn
 	st		mouse_message_shown
 
 	bra		.done
@@ -934,12 +951,16 @@ mouse_frame_hook:
 	tst.b	mouse_message_shown
 	beq		.done
 
+	tst.b	mouse_message_overdrawn
+	bne		.erase ; The game drew there ("pause"): its text wins.
+
 	move.l	total_vbl_count,d0
 	cmp.l	mouse_message_end,d0
 	bcs		.done
 
+.erase:
 	sf		mouse_message_shown
-	lea		mouse_erase_text,a0
+	lea		mouse_message_under,a0 ; The cells as the game left them.
 	bsr		draw_mouse_message
 
 .done:
@@ -978,14 +999,110 @@ mouse_frame_hook:
 draw_mouse_message:
 	movem.l	d2-d7/a2-a6,-(sp)
 
+	st		mouse_message_drawing
 	move.l	a0,-(sp)
 	pea		MOUSE_MESSAGE_Y.w
 	pea		MOUSE_MESSAGE_X.w
 	jsr		DRAW_TEXT
 	lea		12(sp),sp
+	sf		mouse_message_drawing
 
 	movem.l	(sp)+,d2-d7/a2-a6
 
+	rts
+
+; Keeps the characters of the cells the message covers (pause text, high
+; scores) in mouse_message_under, to draw them again when it goes: a cell's
+; character (text_matrix) if its row's draw bitmap has it, else a space.
+
+save_mouse_message_cells:
+	movem.l	d0-d2/a0-a2,-(sp)
+
+	move.l	text_bitmaps+32*4+MOUSE_MESSAGE_Y*4,d2 ; Bit 31 - x: drawn.
+	lea		text_matrix+MOUSE_MESSAGE_Y*32+MOUSE_MESSAGE_X,a0
+	lea		mouse_message_under,a1
+	moveq	#31-MOUSE_MESSAGE_X,d1
+	moveq	#MOUSE_MESSAGE_LENGTH-1,d0
+
+.cell:
+	move.b	(a0)+,(a1)
+	btst	d1,d2
+	beq		.space
+
+	cmp.b	#' ',(a1)
+	bcc		.next ; (Control characters: a space.)
+
+.space:
+	move.b	#' ',(a1)
+
+.next:
+	addq.l	#1,a1
+	subq	#1,d1
+	dbf		d0,.cell
+
+	clr.b	(a1)
+
+	movem.l	(sp)+,d0-d2/a0-a2
+
+	rts
+
+; From DRAW_CHARACTER(x, y, character) (the game's arguments on the stack
+; above its return address), for every character the game draws: one that
+; falls on the shown message replaces the saved cell, and the message is
+; taken away at the next frame end. Preserves all registers.
+
+amiga_text_character:
+	tst.b	mouse_message_shown
+	beq		.done
+
+	tst.b	mouse_message_drawing
+	bne		.done
+
+	cmp		#MOUSE_MESSAGE_Y,12+2(sp)
+	bne		.done
+
+	move.l	d0,-(sp)
+
+	move	4+8+2(sp),d0
+	sub		#MOUSE_MESSAGE_X,d0
+	cmp		#MOUSE_MESSAGE_LENGTH,d0
+	bcc		.outside
+
+	move.l	a0,-(sp)
+	lea		mouse_message_under,a0
+	move.b	8+16+3(sp),(a0,d0.w)
+	cmp.b	#' ',(a0,d0.w)
+	bcc		.saved
+
+	move.b	#' ',(a0,d0.w)
+
+.saved:
+	move.l	(sp)+,a0
+	st		mouse_message_overdrawn
+
+.outside:
+	move.l	(sp)+,d0
+
+.done:
+	rts
+
+; From CLEAR_TEXT_PLANE: nothing is under the message any more. Preserves
+; all registers.
+
+amiga_text_cleared:
+	tst.b	mouse_message_shown
+	beq		.done
+
+	move.l	a0,-(sp)
+	lea		mouse_message_under,a0
+	rept	MOUSE_MESSAGE_LENGTH
+	move.b	#' ',(a0)+
+	endr
+	move.l	(sp)+,a0
+
+	st		mouse_message_overdrawn ; Gone from the screen already.
+
+.done:
 	rts
 
 ; ------------------------------------------------------------------------------
@@ -1426,8 +1543,6 @@ mouse_on_text:
 	dc.b	'mouse on ',0
 mouse_off_text:
 	dc.b	'mouse off',0
-mouse_erase_text:
-	dc.b	'         ',0
 
 	even
 
@@ -1641,6 +1756,12 @@ mouse_mode_changed:
 	ds.b	1
 mouse_message_shown:
 	ds.b	1
+mouse_message_drawing:
+	ds.b	1 ; draw_mouse_message is drawing (amiga_text_character).
+mouse_message_overdrawn:
+	ds.b	1 ; The game drew into the message, or cleared the text.
+mouse_message_under:
+	ds.b	MOUSE_MESSAGE_LENGTH+1 ; The cells under the message.
 mouse_button_state:
 	ds.b	1 ; Triggers from the mouse buttons (active low).
 amiga_stage_frame:

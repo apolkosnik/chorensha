@@ -37,6 +37,9 @@
 	xdef compile_sprite
 	xdef compile_characters
 	xdef render_frame
+	xref picture_scroll
+	xref picture_page0_y
+	xref picture_page1_y
 	xdef amiga_clear_text_planes
 	xdef amiga_graphics_changed
 	xdef amiga_text_row_written
@@ -403,6 +406,7 @@ render_frame:
 
 .layers_ok:
 	bsr		update_palette
+	jsr		picture_scroll ; PARALLAX50: the background's position.
 	PROFILE	0
 
 	bsr		planar_frame_target
@@ -1227,7 +1231,7 @@ render_graphics:
 	; Page 1 line (index 0 shows the backdrop in slot 0).
 
 	moveq	#0,d1
-	move	L_00E80000+CRTC_PAGE1_Y,d1
+	move	picture_page1_y,d1
 	add		d7,d1
 	and		#LAYER_LINES-1,d1
 	lsl.l	#8,d1 ; * LAYER_WIDTH
@@ -1237,7 +1241,7 @@ render_graphics:
 	; Page 0 line and its runs.
 
 	moveq	#0,d1
-	move	L_00E80000+CRTC_PAGE0_Y,d1
+	move	picture_page0_y,d1
 	add		d7,d1
 	and		#LAYER_LINES-1,d1
 	move.l	(a3,d1.l*4),d0 ; Runs of this line.
@@ -2826,7 +2830,7 @@ prepare_pipelined_frame:
 	move.l	d0,blit_destination
 
 	moveq	#0,d1
-	move	L_00E80000+CRTC_PAGE0_Y,d1
+	move	picture_page0_y,d1
 	and		#LAYER_LINES-1,d1
 	move.l	d1,d2
 	lsl.l	#8,d1 ; * PLANAR_LAYER_LINE
@@ -2837,7 +2841,7 @@ prepare_pipelined_frame:
 	move.l	d2,blit_page0_mask
 
 	moveq	#0,d1
-	move	L_00E80000+CRTC_PAGE1_Y,d1
+	move	picture_page1_y,d1
 	and		#LAYER_LINES-1,d1
 	lsl.l	#8,d1
 	add.l	blit_layer1,d1
@@ -3024,7 +3028,7 @@ planar_graphics:
 
 .line_loop:
 	moveq	#0,d1
-	move	L_00E80000+CRTC_PAGE0_Y,d1
+	move	picture_page0_y,d1
 	add		d7,d1
 	and		#LAYER_LINES-1,d1
 	move.l	d1,d0
@@ -3034,7 +3038,7 @@ planar_graphics:
 	lea		(a6,d0.l),a2
 
 	moveq	#0,d1
-	move	L_00E80000+CRTC_PAGE1_Y,d1
+	move	picture_page1_y,d1
 	add		d7,d1
 	and		#LAYER_LINES-1,d1
 	lsl.l	#8,d1

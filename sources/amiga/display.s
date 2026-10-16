@@ -29,6 +29,11 @@
 	xdef update_fps_display
 	xdef display_mode_request
 	xdef graphics_base
+	xdef backend
+	xref stop_parallax
+	xref parallax_flipped
+	xref parallax_before_flip
+	xref parallax_uploaded
 	xdef planar_display_available
 	xdef begin_planar_frame
 	xdef pipelined_frame_target
@@ -584,6 +589,8 @@ open_screen_buffers:
 close_display:
 	movem.l	d2-d7/a2-a6,-(sp)
 
+	jsr		stop_parallax
+
 	clr.b	display_active
 
 	move.l	intuition_base,a6
@@ -906,6 +913,8 @@ present_frame:
 	jsr		_LVOWritePixelArray(a6)
 
 .uploaded:
+	jsr		parallax_uploaded ; RTG: shown now.
+
 	movem.l	(sp)+,d2-d7/a2-a6
 
 .done:
@@ -1016,6 +1025,7 @@ next_screen_buffer:
 
 flip_screen_buffer:
 	bsr		wait_until_safe
+	jsr		parallax_before_flip
 
 	move.l	intuition_base,a6
 	move.l	screen,a0
@@ -1026,6 +1036,7 @@ flip_screen_buffer:
 
 	move.l	hidden_buffer_number,shown_buffer
 	st		safe_pending
+	jsr		parallax_flipped
 
 .not_shown:
 	bra		load_palette
