@@ -131,7 +131,9 @@ Mouse (after M):
 
 **Mouse control:** in a stage the ship follows the mouse's movement (move
 the mouse 3 cm left, the ship goes about as far left) and stops when the
-mouse stops. The game shows "mouse on" or "mouse off" for two seconds.
+mouse stops. In the menus, moving the mouse up, down, left or right steps
+through the options (one step per short movement) and the left button
+selects. The game shows "mouse on" or "mouse off" for two seconds.
 
 **Auto fire:** holding the shot button keeps shooting (the original game
 shot once per press).

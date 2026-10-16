@@ -34,7 +34,11 @@
 ; game moves or holds the ship itself (respawn, held still, slowed), the
 ; joystick directions point to the target instead (dead zone of
 ; MOUSE_DEAD_ZONE pixels), at the game's speed. The left mouse button is trigger A, the right one trigger
-; B. Outside a stage (menus) only the buttons count. "mouse on" /
+; B. Outside a stage (menus, the name entry) the movement steps through the
+; options: every MOUSE_MENU_STEP pixels (vertical first) is one press of a
+; direction, held for MOUSE_MENU_PRESS frame timer ticks and then released
+; for MOUSE_MENU_GAP (mouse_menu_tick; on the timer, as the game also polls
+; in loops that complete no frame). "mouse on" /
 ; "mouse off" is shown for MOUSE_MESSAGE_TICKS where the game shows "pause"
 ; (DRAW_TEXT, from the frame end: mouse_frame_hook).
 
@@ -171,6 +175,9 @@ IECODE_RBUTTON=$69
 RAW_KEY_M=$37
 RAW_KEY_BACKTICK=$00 ; The key left of 1.
 MOUSE_DEAD_ZONE=2 ; Pixels.
+MOUSE_MENU_STEP=24 ; Pixels of mouse movement per menu step.
+MOUSE_MENU_PRESS=4 ; Frame timer ticks a menu step's direction is held,
+MOUSE_MENU_GAP=4 ; then released (up to about 7 steps a second).
 MOUSE_MAX_STEP=8 ; Pixels a frame (about 440 per second).
 RESPAWN_MOVING=$80 ; WORD_000A8EFC above this: the game flies the ship in.
 SHIP_LEFT=$400 ; The ship's area (the game's limits, 1/64 pixel).
@@ -206,6 +213,7 @@ initialize_input:
 	move.l	#-1,iocs_joystick_data
 
 	move.b	#-1,mouse_button_state
+	move.b	#-1,mouse_menu_state
 	move.b	#X68_LEFT,latest_horizontal
 	move.b	#X68_UP,latest_vertical
 
@@ -442,6 +450,8 @@ read_joystick:
 ; records. Preserves all registers.
 
 input_tick:
+	bsr		mouse_menu_tick
+
 	tst.b	joystick_ready
 	beq		.script ; Still read by update_input until ReadJoyPort works.
 
@@ -497,6 +507,123 @@ input_tick:
 
 	rts
 
+; Mouse control outside a stage: the mouse's movement into presses of a
+; direction (mouse_menu_state, active low) for menus. Preserves all
+; registers.
+
+mouse_menu_tick:
+	movem.l	d0-d1,-(sp)
+
+	tst.b	mouse_mode
+	beq		.off
+
+	tst.b	mouse_in_stage
+	bne		.off ; The ship takes the movement (also while paused).
+
+	; Take the movement (single instructions: the input handler adds to
+	; it), at most two steps ahead.
+
+	move.l	mouse_dx,d0
+	sub.l	d0,mouse_dx
+	add.l	mouse_menu_x,d0
+	bsr		.clamp
+	move.l	d0,mouse_menu_x
+
+	move.l	mouse_dy,d0
+	sub.l	d0,mouse_dy
+	add.l	mouse_menu_y,d0
+	bsr		.clamp
+	move.l	d0,mouse_menu_y
+
+	tst		mouse_menu_ticks
+	beq		.idle
+
+	subq	#1,mouse_menu_ticks
+	cmp		#MOUSE_MENU_GAP,mouse_menu_ticks
+	bhi		.done ; Still held.
+
+	move.b	#-1,mouse_menu_state
+
+	bra		.done
+
+.idle:
+	moveq	#X68_DOWN,d1
+	move.l	mouse_menu_y,d0
+	cmp.l	#MOUSE_MENU_STEP,d0
+	bge		.vertical
+
+	moveq	#X68_UP,d1
+	cmp.l	#-MOUSE_MENU_STEP,d0
+	bgt		.horizontal
+
+.vertical:
+	tst.l	d0
+	bmi		.up
+
+	sub.l	#MOUSE_MENU_STEP,mouse_menu_y
+
+	bra		.press
+
+.up:
+	add.l	#MOUSE_MENU_STEP,mouse_menu_y
+
+	bra		.press
+
+.horizontal:
+	moveq	#X68_RIGHT,d1
+	move.l	mouse_menu_x,d0
+	cmp.l	#MOUSE_MENU_STEP,d0
+	bge		.horizontal_step
+
+	moveq	#X68_LEFT,d1
+	cmp.l	#-MOUSE_MENU_STEP,d0
+	bgt		.done
+
+.horizontal_step:
+	tst.l	d0
+	bmi		.left
+
+	sub.l	#MOUSE_MENU_STEP,mouse_menu_x
+
+	bra		.press
+
+.left:
+	add.l	#MOUSE_MENU_STEP,mouse_menu_x
+
+.press:
+	moveq	#-1,d0
+	bclr	d1,d0
+	move.b	d0,mouse_menu_state
+	move	#MOUSE_MENU_PRESS+MOUSE_MENU_GAP,mouse_menu_ticks
+
+	bra		.done
+
+.off:
+	clr.l	mouse_menu_x
+	clr.l	mouse_menu_y
+	clr		mouse_menu_ticks
+	move.b	#-1,mouse_menu_state
+
+.done:
+	movem.l	(sp)+,d0-d1
+
+	rts
+
+.clamp:
+	cmp.l	#MOUSE_MENU_STEP*2,d0
+	ble		.not_above
+
+	move.l	#MOUSE_MENU_STEP*2,d0
+
+.not_above:
+	cmp.l	#-MOUSE_MENU_STEP*2,d0
+	bge		.not_below
+
+	move.l	#-MOUSE_MENU_STEP*2,d0
+
+.not_below:
+	rts
+
 ; ------------------------------------------------------------------------------
 ;
 ; _JOYGET (trap handler): d0.l = the current joystick bits (X68000, active
@@ -535,12 +662,17 @@ joystick_now:
 	beq		.combine
 
 	; Mouse control: the buttons; in a stage, the directions toward the
-	; pointer.
+	; target; elsewhere the menu steps.
 
 	and.b	mouse_button_state,d1
 	tst.b	amiga_stage_frame
-	beq		.combine
+	bne		.stage
 
+	and.b	mouse_menu_state,d1
+
+	bra		.combine
+
+.stage:
 	bsr		mouse_directions
 	and.b	d0,d1
 
@@ -620,6 +752,7 @@ mouse_directions:
 
 amiga_ship_control:
 	st		amiga_stage_frame
+	st		mouse_in_stage
 	sf		mouse_moved_ship
 
 	tst.b	mouse_mode
@@ -756,6 +889,10 @@ reset_mouse_target:
 	tst.b	amiga_stage_frame
 	bne		.done
 
+	sf		mouse_target_set ; (Menus: mouse_menu_tick takes the movement.)
+
+	bra		.done
+
 .reset:
 	sf		mouse_target_set
 	clr.l	mouse_dx
@@ -827,6 +964,8 @@ mouse_frame_hook:
 	sf		autofire_released
 
 .autofire_done:
+	tst.b	amiga_stage_frame
+	sne		mouse_in_stage ; A frame without the ship control: menus.
 	bsr		reset_mouse_target
 	sf		amiga_stage_frame ; Set again by the next stage frame.
 
@@ -1484,6 +1623,12 @@ mouse_dx:
 	ds.l	1 ; Mouse movement since the last frame end (counts).
 mouse_dy:
 	ds.l	1
+mouse_menu_x:
+	ds.l	1 ; Movement not yet turned into menu steps (counts).
+mouse_menu_y:
+	ds.l	1
+mouse_menu_ticks:
+	ds.w	1 ; Ticks left of the current menu step (pressed, then released).
 mouse_target_x:
 	ds.w	1 ; Mouse control's target (the ship's units).
 mouse_target_y:
@@ -1500,6 +1645,10 @@ mouse_button_state:
 	ds.b	1 ; Triggers from the mouse buttons (active low).
 amiga_stage_frame:
 	ds.b	1 ; The game has run its ship control this frame.
+mouse_in_stage:
+	ds.b	1 ; The last frame was a stage frame (mouse_menu_tick off).
+mouse_menu_state:
+	ds.b	1 ; Menu step directions from the mouse (active low).
 mouse_target_set:
 	ds.b	1
 mouse_moved_ship:

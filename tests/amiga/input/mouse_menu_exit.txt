@@ -1,0 +1,11 @@
+# Main menu with mouse control: M, then the mouse moved down three steps
+# (START, CONTINUE, CONFIG, EXIT; 30 pixels each, a step is 24) and the left
+# button (trigger A) chooses EXIT: the game returns to the shell. Without
+# the menu steps the click would choose START.
+300 key m press
+304 key m release
+320 mouse 0 30
+340 mouse 0 30
+360 mouse 0 30
+400 mouse left press
+406 mouse left release
