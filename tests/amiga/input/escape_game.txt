@@ -1,0 +1,25 @@
+# ESC in a stage: back to the title, then ESC on the title: the program
+# ends. Main menu: START (trigger A); ESC at frame 900 (in stage 1) leaves
+# the game as START + SELECT does, straight to the title menu. ESC presses
+# from frame 1500 on, every 250 frames: the first one ends the program
+# (frame 1500: the title's high score table, which also chooses EXIT). Run
+# with "4000 input.bin": "Exit: game" at frame 1500; screen_01000 shows the
+# title menu.
+300 a
+310 -
+900 key esc press
+904 key esc release
+1500 key esc press
+1504 key esc release
+1750 key esc press
+1754 key esc release
+2000 key esc press
+2004 key esc release
+2250 key esc press
+2254 key esc release
+2500 key esc press
+2504 key esc release
+2750 key esc press
+2754 key esc release
+3000 key esc press
+3004 key esc release

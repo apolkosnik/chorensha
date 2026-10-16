@@ -480,7 +480,16 @@ print_sound_outputs:
 	jsr		_LVOPutStr(a6)
 
 .done:
-	rts
+	; The volumes (MUSICVOL, SFXVOL).
+
+	moveq	#0,d0
+	move.b	audio_music_volume,d0
+	move.l	d0,volume_arguments
+	move.b	audio_effect_volume,d0
+	move.l	d0,volume_arguments+4
+	move.l	#volume_format,d1
+	move.l	#volume_arguments,d2
+	jmp		_LVOVPrintf(a6)
 
 ; ------------------------------------------------------------------------------
 
@@ -2999,7 +3008,7 @@ write_samples_dump:
 audio_music_volume:
 	dc.b	MAXIMUM_VOLUME ; MUSICVOL (main.s).
 audio_effect_volume:
-	dc.b	MAXIMUM_VOLUME ; SFXVOL.
+	dc.b	MAXIMUM_VOLUME/2 ; SFXVOL (half: the effects were louder than the music).
 
 	even
 
@@ -3031,6 +3040,11 @@ ahi_device_name:
 
 no_sound_text:
 	dc.b	'Sound: none (the audio channels are in use): the game runs silent.',10,0
+volume_format:
+	dc.b	'Volume: music %ld, effects %ld (of 64).',10,0
+	even
+volume_arguments:
+	dc.l	0,0
 paula_effects_text:
 	dc.b	'Sound: Paula, effects on channels 0 and 1.',10,0
 paula_music_text:

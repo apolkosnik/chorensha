@@ -1,0 +1,30 @@
+# ESC at game over ends its countdown. As game_over_fire_held.txt (lives
+# lost with trigger B held from frame 600; "game over" from about frame
+# 2110; without ESC its 448-frame countdown ends at frame 2558, where the
+# name entry waits for the buttons' release: screenshot screen_902558), with
+# ESC at frame 2350: the name entry is reached at frame 2350 (its stall
+# screenshot is screen_9023NN). Run with "3000 input.bin".
+300 a
+310 -
+600 b
+700 b+left
+800 b+right
+900 b+left
+1000 b+right
+1100 b+left
+1200 b+right
+1300 b+left
+1400 b+right
+1500 b+left
+1600 b+right
+1700 b+up
+1800 b+down
+1900 b+left
+2000 b+right
+2100 b+left
+2200 b+right
+2300 b+left
+2350 key esc press
+2354 key esc release
+2400 b
+tick 4000 -

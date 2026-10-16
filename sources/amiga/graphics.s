@@ -161,6 +161,8 @@ _LVOAllocSignal=-330
 _LVOFreeSignal=-336
 
 MEMF_ANY=0
+MEMF_LARGEST=1<<17
+_LVOAvailMem=-216
 
 ; CRTC scroll registers (shadow): text X/Y, GR0 X/Y (page 0), GR2 X/Y (page 1).
 
@@ -328,32 +330,75 @@ amiga_graphics_changed:
 
 ; ------------------------------------------------------------------------------
 ;
-; Allocates the compiled sprite arena (1 MB, else 256 KB, else none: sprites
+; Allocates the compiled sprite arena (see allocate_arena; none: sprites
 ; are then drawn by the generic routine). Task context.
 
 initialize_renderer:
 	movem.l	d0-d1/a0-a1/a6,-(sp)
 
-	move.l	exec_base,a6
-	move.l	#COMPILED_ARENA_SIZE,d0
-	move.l	d0,arena_size
-	moveq	#MEMF_ANY,d1
-	jsr		_LVOAllocMem(a6)
+	bsr		allocate_arena
 	move.l	d0,arena
-	bne		.allocated
+	move.l	d1,arena_size
 
-	move.l	#COMPILED_ARENA_MINIMUM,d0
-	move.l	d0,arena_size
-	moveq	#MEMF_ANY,d1
-	jsr		_LVOAllocMem(a6)
-	move.l	d0,arena
-
-.allocated:
 	st		sprite_cache_reset
 
 	bsr		initialize_planar
 
 	movem.l	(sp)+,d0-d1/a0-a1/a6
+
+	rts
+
+; Returns d0 = a sprite arena, d1 = its size: the largest of 16, 8, 4 and
+; 2 MB that leaves ARENA_RESERVE in one block (for the sound, allocated
+; later, and the system), else 1 MB, else 256 KB, else d0 = 0. With more
+; room the arena is emptied less often (each time, every sprite is made
+; again as it appears). Uses a0-a1/a6.
+
+ARENA_RESERVE=$400000
+
+allocate_arena:
+	movem.l	d2/a2,-(sp)
+
+	move.l	exec_base,a6
+	lea		arena_sizes,a2
+
+.size:
+	move.l	(a2)+,d2
+	beq		.small
+
+	move.l	#MEMF_ANY|MEMF_LARGEST,d1
+	jsr		_LVOAvailMem(a6)
+	sub.l	#ARENA_RESERVE,d0
+	bcs		.size
+
+	cmp.l	d2,d0
+	bcs		.size
+
+	move.l	d2,d0
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+	tst.l	d0
+	bne		.allocated
+
+	bra		.size
+
+.small:
+	move.l	#COMPILED_ARENA_SIZE,d2
+	move.l	d2,d0
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+	tst.l	d0
+	bne		.allocated
+
+	move.l	#COMPILED_ARENA_MINIMUM,d2
+	move.l	d2,d0
+	moveq	#MEMF_ANY,d1
+	jsr		_LVOAllocMem(a6)
+
+.allocated:
+	move.l	d2,d1
+
+	movem.l	(sp)+,d2/a2
 
 	rts
 
@@ -2302,9 +2347,6 @@ BLTBMOD=$062
 BLTAMOD=$064
 BLTDMOD=$066
 
-PLANAR_ARENA_SIZE=$100000
-PLANAR_ARENA_MINIMUM=$40000
-
 ; Planar sprite: next (same pattern and flip), palette, its routine, the
 ; palette's slots it was made with, then 16 rows of a mask word and eight
 ; plane words. The routine follows it in the arena (or comes later, when it
@@ -2492,18 +2534,10 @@ initialize_planar:
 	add.l	#PLANAR_TEXT_SIZE,d0
 	move.l	d0,planar_frame
 
-	move.l	#PLANAR_ARENA_SIZE,d0
-	move.l	d0,planar_arena_size
-	moveq	#MEMF_ANY,d1
-	jsr		_LVOAllocMem(a6)
+	bsr		allocate_arena
 	move.l	d0,planar_arena
-	bne		.arena
-
-	move.l	#PLANAR_ARENA_MINIMUM,d0
-	move.l	d0,planar_arena_size
-	moveq	#MEMF_ANY,d1
-	jsr		_LVOAllocMem(a6)
-	move.l	d0,planar_arena
+	move.l	d1,planar_arena_size
+	tst.l	d0
 	bne		.arena
 
 	move.l	planar_memory,a1
@@ -3813,6 +3847,9 @@ layers_dirty: ; Build the layers on the first frame (GVRAM is empty until the
 	dc.b	-1 ; game builds it, then amiga_graphics_changed marks it).
 
 	even
+
+arena_sizes: ; allocate_arena: tried while ARENA_RESERVE stays free.
+	dc.l	$1000000,$800000,$400000,$200000,0
 
 text_dirty_rows: ; Bit per text character row (128); all dirty at start.
 	dcb.b	16,$ff

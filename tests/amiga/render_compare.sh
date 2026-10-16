@@ -39,7 +39,7 @@ build() { # build <directory> <graphics.s> <display.s>
 	$vasm "$2" -quiet -Fhunk -m68030 -o "$out/graphics.o"
 	$vasm sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o "$out/sz2.o"
 	$vlink "$out/main.o" "$out/sz2.o" "$out/mem_map.o" "$out/emulator.o" "$out/input.o" \
-		"$out/display.o" "$out/audio.o" "$out/graphics.o" "$out/parallax.o" -bamigahunk -s -o "$out/sz2"
+		"$out/display.o" "$out/audio.o" "$out/parallax.o" "$out/graphics.o" -bamigahunk -s -o "$out/sz2"
 }
 
 mkdir -p "$work/reference_sources"

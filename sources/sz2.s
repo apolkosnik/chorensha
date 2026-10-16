@@ -9938,6 +9938,10 @@ L_00024DAA:
 	ble.s   L_00024D9E                              ; 00024DD8 6FC4
 
 L_00024DDA:
+	ifd __AMIGA__
+	jsr		amiga_escape_clear ; ESC before the title is not EXIT.
+	endif
+
 	clr.w   D5                                      ; 00024DDA 4245                     ; J($00025080) J($00025088) 
 
 L_00024DDC:
@@ -10112,6 +10116,17 @@ L_00024F1A:
 	lea     12(A7),A7                               ; 00024F34 4FEF 000C
 
 L_00024F38:
+	ifd __AMIGA__
+	jsr		amiga_escape_pressed ; ESC on the title: EXIT.
+	beq.s	.no_escape
+
+	moveq	#3,D4 ; EXIT.
+
+	bra.s	L_00024F46
+
+.no_escape:
+	endif
+
 	cmpa.w  #$0,A3                                  ; 00024F38 B6FC 0000
 	bne.s   L_00024F56                              ; 00024F3C 6618
 
@@ -10119,6 +10134,7 @@ L_00024F38:
 	btst    #$0,D1                                  ; 00024F40 0801 0000
 	beq.s   L_00024F56                              ; 00024F44 6710
 
+L_00024F46:
 	pea     $40.w                                   ; 00024F46 4878 0040
 	jsr     PLAY_PCM_SAMPLE                              ; 00024F4A 4EB9 0002 64F4
 
@@ -10198,6 +10214,17 @@ L_00024FC0:
 	bra.s   L_00024FEA                              ; 00024FE0 6008
 
 L_00024FE2:
+	ifd __AMIGA__
+	jsr		amiga_escape_pressed ; ESC on the title's high scores: EXIT.
+	beq.s	.no_escape
+
+	moveq	#3,D4
+
+	bra		L_00024F46
+
+.no_escape:
+	endif
+
 	addq.w  #$1,D3                                  ; 00024FE2 5243
 	cmp.w   #$FF,D3                                 ; 00024FE4 B67C 00FF
 	ble.s   L_00024F88                              ; 00024FE8 6F9E
@@ -13516,11 +13543,19 @@ L_00026DD4:
 L_00026E1A:
 	jsr     READ_JOYSTICK_FOR_MENU                              ; 00026E1A 4EB9 0002 778A
 
+	ifd __AMIGA__
+	jsr		amiga_escape_menu ; ESC: START + SELECT, out of the game.
+	endif
+
 	move.w  D0,D5                                   ; 00026E20 3A00
 	beq.w   L_00026EB4                              ; 00026E22 6700 0090
 
 	cmp.w   #$1,D5                                  ; 00026E26 BA7C 0001
+	ifd __AMIGA__
+	bne.w   L_00026EA8 ; (Out of reach with the ESC checks below.)
+	else
 	bne.s   L_00026EA8                              ; 00026E2A 667C
+	endif
 
 	pea     $1.w                                    ; 00026E2C 4878 0001
 	jsr     WAIT_VBL                              ; 00026E30 4EB9 0002 2C92
@@ -13535,6 +13570,11 @@ L_00026E1A:
 L_00026E4C:
 	jsr     READ_JOYSTICK_FOR_MENU                              ; 00026E4C 4EB9 0002 778A
 
+	ifd __AMIGA__
+	jsr		amiga_escape_pressed ; ESC while paused: out of the game.
+	bne		amiga_pause_escape
+	endif
+
 	btst    #$0,D0                                  ; 00026E52 0800 0000
 	bne.s   L_00026E4C                              ; 00026E56 66F4
 
@@ -13546,6 +13586,11 @@ L_00026E4C:
 L_00026E64:
 	jsr     READ_JOYSTICK_FOR_MENU                              ; 00026E64 4EB9 0002 778A
 
+	ifd __AMIGA__
+	jsr		amiga_escape_pressed ; ESC while paused: out of the game.
+	bne		amiga_pause_escape
+	endif
+
 	btst    #$0,D0                                  ; 00026E6A 0800 0000
 	beq.s   L_00026E64                              ; 00026E6E 67F4
 
@@ -13556,6 +13601,11 @@ L_00026E64:
 
 L_00026E7C:
 	jsr     READ_JOYSTICK_FOR_MENU                              ; 00026E7C 4EB9 0002 778A
+
+	ifd __AMIGA__
+	jsr		amiga_escape_pressed ; ESC while paused: out of the game.
+	bne		amiga_pause_escape
+	endif
 
 	btst    #$0,D0                                  ; 00026E82 0800 0000
 	bne.s   L_00026E7C                              ; 00026E86 66F4
@@ -13569,6 +13619,24 @@ L_00026E7C:
 	jsr     DRAW_TEXT                              ; 00026E9E 4EB9 0002 5D1A
 
 	lea     16(A7),A7                               ; 00026EA4 4FEF 0010
+
+	ifd __AMIGA__
+
+	bra.s	L_00026EA8
+
+	; ESC while paused: "pause" erased, then as START + SELECT.
+
+amiga_pause_escape:
+	pea     PAUSE_ERASE_TEXT(pc)
+	pea     $10.w
+	pea     $D.w
+	jsr     DRAW_TEXT
+
+	lea     12(A7),A7
+
+	moveq	#3,D5
+
+	endif
 
 L_00026EA8:
 	cmp.w   #$3,D5                                  ; 00026EA8 BA7C 0003
@@ -13825,6 +13893,11 @@ L_000270EE:
 	lea     12(A7),A7                               ; 0002710C 4FEF 000C
 
 L_00027110:
+	ifd __AMIGA__
+	jsr		amiga_escape_pressed ; ESC: no more waiting.
+	bne		L_0002713E
+	endif
+
 	move.w  D6,D4                                   ; 00027110 3806
 	pea     $1.w                                    ; 00027112 4878 0001
 	jsr     READ_JOYSTICK_BUTTONS                              ; 00027116 4EB9 0005 A5D4

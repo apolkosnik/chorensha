@@ -41,7 +41,7 @@ objects() { # objects <directory> <display flags> [graphics flags]
 }
 
 objects "$work/rtg" ""
-$vlink "$work"/rtg/{main,sz2,mem_map,emulator,input,display,audio,graphics,parallax}.o -bamigahunk -s -o "$work/rtg/sz2"
+$vlink "$work"/rtg/{main,sz2,mem_map,emulator,input,display,audio,parallax,graphics}.o -bamigahunk -s -o "$work/rtg/sz2"
 
 aga_flags="-D__FORCE_AGA__"
 extra=()
@@ -56,7 +56,7 @@ if [ -n "${C2PLIB:-}" ]; then
 fi
 
 objects "$work/aga" "$aga_flags" "${AGA_GRAPHICS_FLAGS:-}"
-$vlink "$work"/aga/{main,sz2,mem_map,emulator,input,display,audio,graphics,parallax}.o "${extra[@]}" -bamigahunk -s -o "$work/aga/sz2"
+$vlink "$work"/aga/{main,sz2,mem_map,emulator,input,display,audio,parallax,graphics}.o "${extra[@]}" -bamigahunk -s -o "$work/aga/sz2"
 
 for build in rtg aga; do
 	RESULT_DIR="$work/$build/results" tests/amiga/run_fsuae.sh "$config" "$work/$build/sz2" 2400 "$frames" \

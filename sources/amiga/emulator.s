@@ -24,6 +24,7 @@
 	xdef free_frame_records
 
 	xref keyboard_matrix
+	xref amiga_bitsns_group0
 	xref initialize_input
 	xref release_input
 	xref update_input
@@ -2458,7 +2459,17 @@ iocs_call:
 	lea		keyboard_matrix,a0
 	moveq	#$f,d0
 	and		d1,d0
+	bne		.bitsns_group
+
+	move.b	(a0),d0
+	jsr		amiga_bitsns_group0 ; CD32 PLAY: START.
+
+	bra		.bitsns_read
+
+.bitsns_group:
 	move.b	(a0,d0.w),d0
+
+.bitsns_read:
 	and.l	#$ff,d0
 
 	move.l	(sp)+,a0

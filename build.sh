@@ -49,8 +49,8 @@ diff binaries/sz2.dif binaries/x68000/sz2.dif
 ./tools/vasmm68k_mot sources/amiga/parallax.s -quiet -Fhunk -m68030 -o binaries/amiga_parallax.o
 ./tools/vasmm68k_mot sources/sz2.s -quiet -no-opt -Fhunk -m68030 -D__AMIGA__ -o binaries/sz2_amiga.o
 
-./tools/vlink binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_graphics.o binaries/amiga_parallax.o -bamigahunk -o binaries/amiga/sz2_dbg
-./tools/vlink binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_graphics.o binaries/amiga_parallax.o -bamigahunk -s -o binaries/amiga/sz2
+./tools/vlink binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_parallax.o binaries/amiga_graphics.o -bamigahunk -o binaries/amiga/sz2_dbg
+./tools/vlink binaries/amiga_main.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator.o binaries/amiga_input.o binaries/amiga_display.o binaries/amiga_audio.o binaries/amiga_parallax.o binaries/amiga_graphics.o -bamigahunk -s -o binaries/amiga/sz2
 
 # Hardware test kit (tests/amiga/hardware): the game with render profiling
 # (writes profile.bin) and the screen memory benchmark.
@@ -59,6 +59,6 @@ diff binaries/sz2.dif binaries/x68000/sz2.dif
 ./tools/vasmm68k_mot sources/amiga/emulator.s -quiet -Fhunk -m68030 -D__RENDER_PROFILE__ -o binaries/amiga_emulator_profile.o
 ./tools/vasmm68k_mot sources/amiga/graphics.s -quiet -Fhunk -m68030 -D__RENDER_PROFILE__ -o binaries/amiga_graphics_profile.o
 ./tools/vasmm68k_mot sources/amiga/display.s -quiet -Fhunk -m68030 -D__RENDER_PROFILE__ -o binaries/amiga_display_profile.o
-./tools/vlink binaries/amiga_main_profile.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator_profile.o binaries/amiga_input.o binaries/amiga_display_profile.o binaries/amiga_audio.o binaries/amiga_graphics_profile.o binaries/amiga_parallax.o -bamigahunk -s -o binaries/amiga/sz2_profile
+./tools/vlink binaries/amiga_main_profile.o binaries/sz2_amiga.o binaries/amiga_mem_map.o binaries/amiga_emulator_profile.o binaries/amiga_input.o binaries/amiga_display_profile.o binaries/amiga_audio.o binaries/amiga_parallax.o binaries/amiga_graphics_profile.o -bamigahunk -s -o binaries/amiga/sz2_profile
 ./tools/vasmm68k_mot tests/amiga/hardware/vram_bench.s -quiet -Fhunk -m68020 -o binaries/amiga_vram_bench.o
 ./tools/vlink binaries/amiga_vram_bench.o -bamigahunk -s -o binaries/amiga/vram_bench

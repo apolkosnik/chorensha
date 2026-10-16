@@ -1,0 +1,4 @@
+# ESC on the title: the program ends (EXIT). Run with "1000 input.bin":
+# "Exit: game" at about frame 200.
+200 key esc press
+204 key esc release

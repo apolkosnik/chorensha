@@ -15,8 +15,11 @@
 ;   cursor keys          joystick directions
 ;   CTRL, Z              trigger A          (fire 1 / red button)
 ;   SHIFT (either), X    trigger B          (fire 2 / blue button)
-;   ESC, 1, TAB, SHIFT, CTRL, RETURN, SPACE, cursor keys   X68000 key matrix
-;   P                    X68000 ESC (the game's pause, as ESC)
+;   1, TAB, SHIFT, CTRL, RETURN, SPACE, cursor keys   X68000 key matrix
+;   ESC                  back to the title (a game, also paused or at game
+;                        over), EXIT on the title (amiga_escape_pressed, from
+;                        sz2.s); in other menus also the X68000's ESC
+;   P, CD32 PLAY         X68000 ESC (the game's START: pause)
 ;   M                    mouse control on / off
 ;   ` (left of 1)        FPS counter on / off (display.s)
 ;
@@ -49,6 +52,10 @@
 	xdef update_input
 	xdef mouse_frame_hook
 	xdef amiga_text_character
+	xdef amiga_escape_pressed
+	xdef amiga_escape_menu
+	xdef amiga_escape_clear
+	xdef amiga_bitsns_group0
 	xdef amiga_text_cleared
 	xdef mouse_mode
 	xdef fps_display
@@ -124,6 +131,7 @@ JP_TYPE_NOTAVAIL=$00000000
 JP_TYPE_GAMECTLR=$10000000
 JP_TYPE_JOYSTK=$30000000
 JPB_BUTTON_BLUE=23
+JPB_BUTTON_PLAY=17
 JPB_BUTTON_RED=22
 JPB_JOY_UP=3
 JPB_JOY_DOWN=2
@@ -180,6 +188,7 @@ IECODE_LBUTTON=$68
 IECODE_RBUTTON=$69
 RAW_KEY_M=$37
 RAW_KEY_BACKTICK=$00 ; The key left of 1.
+RAW_KEY_ESC=$45
 MOUSE_DEAD_ZONE=2 ; Pixels.
 MOUSE_MENU_STEP=24 ; Pixels of mouse movement per menu step.
 MOUSE_MENU_PRESS=4 ; Frame timer ticks a menu step's direction is held,
@@ -447,6 +456,11 @@ read_joystick:
 	bclr	#X68_TRIGGER_B,d2
 .not_blue:
 	move.b	d2,joystick_state
+
+	; CD32 PLAY: START (pause), as the X68000's ESC key (amiga_bitsns).
+
+	btst	#JPB_BUTTON_PLAY,d0
+	sne		pad_start
 
 .done:
 	movem.l	(sp)+,d0-d2/a0-a1/a6
@@ -906,6 +920,58 @@ reset_mouse_target:
 	sf		mouse_target_set
 	clr.l	mouse_dx
 	clr.l	mouse_dy
+
+.done:
+	rts
+
+; ------------------------------------------------------------------------------
+;
+; ESC, "back to the title", for the game's loops (sz2.s, __AMIGA__): returns
+; the Z flag clear once for each ESC press since the last call (several at
+; once count as one). Preserves all registers.
+
+amiga_escape_pressed:
+	move.l	d0,-(sp)
+
+	move.l	escape_presses,d0
+	cmp.l	escape_taken,d0
+	beq		.done
+
+	move.l	d0,escape_taken
+	moveq	#1,d0 ; Z clear.
+
+.done:
+	movem.l	(sp)+,d0 ; (Keeps the flags.)
+
+	rts
+
+; The game loop's READ_JOYSTICK_FOR_MENU result in d0: START + SELECT (3,
+; the game's own way out of a game) after an ESC press.
+
+amiga_escape_menu:
+	bsr		amiga_escape_pressed
+	beq		.done
+
+	moveq	#3,d0
+
+.done:
+	rts
+
+; The title menu appears: ESC presses before it are not "exit".
+
+amiga_escape_clear:
+	move.l	escape_presses,escape_taken
+
+	rts
+
+; _BITSNS group 0 (emulator.s): d0.b = the key matrix byte; returns it with
+; bit 1 (the X68000's ESC, the game's START) set while CD32 PLAY is held.
+
+amiga_bitsns_group0:
+	tst.b	pad_start
+	beq		.done
+
+	bset	#1,d0
 
 .done:
 	rts
@@ -1378,6 +1444,30 @@ process_key:
 	bra		.done
 
 .not_backtick:
+	; ESC: back to the title (counted for amiga_escape_pressed); in menus
+	; also the X68000's ESC (START: back out of the configuration).
+
+	cmp.b	#RAW_KEY_ESC,d1
+	bne		.not_escape
+
+	tst.l	d4
+	bmi		.escape_up
+
+	addq.l	#1,escape_presses
+	tst.b	mouse_in_stage
+	bne		.done ; In a stage ESC does not pause (P does).
+
+	st		escape_in_matrix
+
+	bra		.not_escape
+
+.escape_up:
+	tst.b	escape_in_matrix
+	beq		.done
+
+	sf		escape_in_matrix
+
+.not_escape:
 	lea		key_map,a1
 	add		d1,d1
 	add		d1,a1
@@ -1726,6 +1816,10 @@ keyboard_joystick_state:
 	ds.b	1
 script_joystick_state:
 	ds.b	1
+escape_presses:
+	ds.l	1 ; ESC presses (input handler).
+escape_taken:
+	ds.l	1 ; The last one seen by amiga_escape_pressed.
 mouse_message_end:
 	ds.l	1 ; Frame timer tick to erase the message at.
 autofire_frames:
@@ -1756,6 +1850,10 @@ mouse_mode_changed:
 	ds.b	1
 mouse_message_shown:
 	ds.b	1
+escape_in_matrix:
+	ds.b	1 ; ESC was pressed in a menu: in the key matrix until released.
+pad_start:
+	ds.b	1 ; CD32 PLAY held.
 mouse_message_drawing:
 	ds.b	1 ; draw_mouse_message is drawing (amiga_text_character).
 mouse_message_overdrawn:

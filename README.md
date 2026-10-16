@@ -96,7 +96,7 @@ rename it, e.g. to run from a small disk), the game runs without music.
 Started from Workbench, its messages appear in a small window, which stays
 open after the game has ended until you close it.
 
-To quit, choose EXIT in the game's menu.
+To quit, choose EXIT in the game's menu, or press ESC on the title screen.
 
 
 ## Controls
@@ -108,6 +108,7 @@ Joystick in port 2 or a CD32 pad:
 | directions | move |
 | fire (red) button | shot |
 | second (blue) button | second button |
+| PLAY (CD32 pad) | pause |
 
 Keyboard:
 
@@ -116,7 +117,8 @@ Keyboard:
 | cursor keys | move |
 | CTRL or Z | shot |
 | SHIFT or X | second button (either SHIFT) |
-| P or ESC | pause (press again to continue) |
+| P | pause (press again to continue) |
+| ESC | back to the title (from a game, also paused or at game over); on the title: quit |
 | M | mouse control on / off |
 | `` ` `` (left of 1) | frames-per-second counter on / off (top left) |
 | 1, TAB, RETURN, SPACE | as the same keys on the X68000 |
@@ -152,7 +154,7 @@ hex; write them as `0x...` (in a Shell, `$` starts a variable).
 | `AHI`, `AHI=0x<id>` | Effects and music through AHI (sound cards), in the mode chosen for the music unit in the AHI preferences, or in the mode given. |
 | `MHI`, `MHI=<driver>` | Music from the MP3 files on an MHI decoder: `LIBS:MHI/mhiz3660.library`, or the driver given (e.g. `MHI=mhizz9000.library`). Effects stay on Paula (or AHI). |
 | `MUSICVOL=<0-64>` | The music's volume (default 64, full). |
-| `SFXVOL=<0-64>` | The effects' volume (default 64, full). |
+| `SFXVOL=<0-64>` | The effects' volume (default 32, half: at full volume they drown the music). |
 | `PARALLAX50` | Smoother background scrolling on a 50 Hz display: each picture draws the two background layers where they are at the moment the picture is shown, instead of at the game's 55 Hz frame, so the floor no longer jumps 8 lines about five times a second. The game, its speed and the sprites are unchanged. |
 
 The start-up text shows the screen mode and the sound output in use. If
