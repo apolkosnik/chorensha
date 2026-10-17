@@ -186,5 +186,6 @@ drawer.
 - Atari Falcon port and the disassembly this port builds on: Sascha
   Springer.
 - Amiga port: Adam Polkosnik.
+- Amiga colour icons: Hexaae.
 - Music recorded with MCDRV 0.69 by CUL (free software), played by the
   Musashi 68000 emulator and rendered with ymfm's YM2151 (Aaron Giles).
